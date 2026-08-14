@@ -58,7 +58,6 @@ export const zh = {
   'branch.loading': '读取分支…',
   'branch.error': '读取分支失败',
   'branch.none': '非 Git 仓库',
-  'branch.openGraph': '查看图谱',
 
   'panel.tab.files': '文件',
   'panel.tab.preview': '预览',
@@ -152,7 +151,6 @@ export const en: Record<keyof typeof zh, string> = {
   'branch.loading': 'Reading branches…',
   'branch.error': 'Could not read branches',
   'branch.none': 'Not a git repository',
-  'branch.openGraph': 'Open graph',
 
   'panel.tab.files': 'Files',
   'panel.tab.preview': 'Preview',

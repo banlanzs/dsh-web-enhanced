@@ -1,18 +1,33 @@
+/* Branch strip: a dock row in the composer stack, above the input card.
+
+   Alignment rides the conversation column's shared geometry rather than
+   hand-picked padding. `.composerStack` carries no side padding of its own —
+   the input card pads itself with `--dsh-composer-side-clearance` — so a dock
+   row has to subtract that clearance itself and cap at the card width, which
+   is what the shipped dock cards (todo / goal / queue) do. Without this the
+   strip stretched the full column and sat left of the input card. */
+
 .strip {
+  box-sizing: border-box;
+  flex: none;
+  margin: 0 auto;
+  width: calc(100% - var(--dsh-composer-side-clearance) * 2);
+  max-width: var(--dsh-composer-card-max-width);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 12px;
+  padding: 2px 8px;
   font-size: 11px;
-  opacity: 0.9;
+  color: var(--dsw-alias-label-secondary, inherit);
 }
 
 .label {
+  flex: none;
   opacity: 0.7;
 }
 
 .select {
-  border: 1px solid rgb(128 128 128 / 32%);
+  border: 1px solid var(--dsw-alias-border-l1, rgb(128 128 128 / 32%));
   border-radius: 4px;
   background: transparent;
   color: inherit;
@@ -21,23 +36,9 @@
   padding: 1px 5px;
 }
 
-.graph {
-  border: none;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font-size: 11px;
-  opacity: 0.75;
-  padding: 0;
-}
-
-.graph:hover {
-  opacity: 1;
-}
-
 .message {
-  color: #d9534f;
   overflow: hidden;
+  color: #d9534f;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

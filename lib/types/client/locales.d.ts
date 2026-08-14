@@ -55,7 +55,6 @@ export declare const zh: {
     readonly 'branch.loading': "读取分支…";
     readonly 'branch.error': "读取分支失败";
     readonly 'branch.none': "非 Git 仓库";
-    readonly 'branch.openGraph': "查看图谱";
     readonly 'panel.tab.files': "文件";
     readonly 'panel.tab.preview': "预览";
     readonly 'panel.tab.scm': "变更";

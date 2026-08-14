@@ -22,9 +22,9 @@ type Branches =
   | { readonly phase: 'ready'; readonly items: readonly GitBranchView[] }
   | { readonly phase: 'error' }
 
-/** The branch strip: current branch, switcher, and the graph entry. */
+/** The branch strip: current branch and the switcher. */
 export function BranchStrip({
-  useSessions, useWorkspaces, remote, openOverlay, t,
+  useSessions, useWorkspaces, remote, t,
 }: BranchStripProps) {
   const sessions = useSessions(state => state)
   const workspaces = useWorkspaces(state => state)
@@ -96,14 +96,8 @@ export function BranchStrip({
           <option key={branch.name} value={branch.name}>{branch.name}</option>
         ))}
       </select>
-      <button
-        type="button"
-        className={css.graph}
-        data-testid="branch-open-graph"
-        onClick={() => { openOverlay('graph') }}
-      >
-        {t('branch.openGraph')}
-      </button>
+      {/* No graph entry here: the sidebar already owns that action, and a
+          second entry above the composer duplicated it. */}
       {message !== null && <span className={css.message} data-testid="branch-message">{message}</span>}
     </div>
   )

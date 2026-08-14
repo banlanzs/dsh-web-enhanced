@@ -8,5 +8,5 @@
 import type { WebEnhancedProps } from '../contract.ts';
 /** Full composed props of the branch strip. */
 export type BranchStripProps = WebEnhancedProps<'conversation.input.dock'>;
-/** The branch strip: current branch, switcher, and the graph entry. */
-export declare function BranchStrip({ useSessions, useWorkspaces, remote, openOverlay, t, }: BranchStripProps): import("react").JSX.Element | null;
+/** The branch strip: current branch and the switcher. */
+export declare function BranchStrip({ useSessions, useWorkspaces, remote, t, }: BranchStripProps): import("react").JSX.Element | null;
