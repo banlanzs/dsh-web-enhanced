@@ -1,4 +1,5 @@
 node_modules/
 *.tsbuildinfo
 lib/*.map
+*.tgz
 FEATURE-REQUEST.md

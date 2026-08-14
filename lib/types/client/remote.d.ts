@@ -18,12 +18,18 @@
  * @module dsh-web-enhanced/src/client/remote
  */
 import type { TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol';
-import type { WebEnhancedRemote } from './contract.ts';
+import type { RawWebEnhancedNamespace } from './facade.ts';
 /** The contribution mounted by the client half. */
 export declare const webEnhancedRemote: TypertRemoteContribution;
 declare module '@deepseek-ai/dsh-typert-protocol' {
     interface TypertRemoteNamespaceMap {
-        /** Web-enhanced host capabilities (hand-declared strict contribution). */
-        webEnhanced: WebEnhancedRemote;
+        /**
+         * Web-enhanced host capabilities (hand-declared strict contribution).
+         *
+         * Typed with the RAW method shapes: a mounted namespace method resolves to
+         * the `RemoteResult` envelope, not to the host payload. `createRemoteFacade`
+         * opens it for components.
+         */
+        webEnhanced: RawWebEnhancedNamespace;
     }
 }

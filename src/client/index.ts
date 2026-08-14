@@ -30,7 +30,9 @@ import { webEnhancedRemote } from './remote.ts'
 import { en, zh } from './locales.ts'
 // The LocaleNamespaceMap merge for 'webEnhanced' rides this import.
 import type {} from './locale-keys.ts'
-import type { WebEnhancedInject, WebEnhancedRemote } from './contract.ts'
+import type { WebEnhancedInject } from './contract.ts'
+import { createRemoteFacade } from './facade.ts'
+import type { RawWebEnhancedNamespace } from './facade.ts'
 import { createOverlay, createPanel, createPreview } from './stores.ts'
 import { BoardSidebarEntry, GraphSidebarEntry } from './board/SidebarEntry.tsx'
 import { BoardOverlay } from './board/BoardOverlay.tsx'
@@ -74,11 +76,14 @@ export function apply(ctx: ClientContext): void {
       (disposeMount) => {
         disposers.push(disposeMount)
         // Uninjected read of the namespace service mounted on the gateway fiber.
-        const remote = ctx.get('remote.webEnhanced' as never, false) as unknown as WebEnhancedRemote | undefined
-        if (remote === undefined) {
+        const mounted = ctx.get('remote.webEnhanced' as never, false) as unknown as RawWebEnhancedNamespace | undefined
+        if (mounted === undefined) {
           console.error('[web-enhanced] remote.webEnhanced unavailable after $mount')
           return
         }
+        // Mounted methods resolve to the RemoteResult envelope, not to the
+        // host payload; the facade opens it so components see one union.
+        const remote = createRemoteFacade(mounted)
 
         const face = (): WebEnhancedInject => ({
           remote,
