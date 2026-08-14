@@ -1,0 +1,50 @@
+/* Workspace view: one entry in the conversation view ring. The ring gives it
+   the full column at full height, so this owns layout only inside that box. */
+
+.view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.tabs {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgb(128 128 128 / 24%));
+}
+
+.tab {
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 10px;
+  opacity: 0.7;
+}
+
+.tab:hover {
+  opacity: 1;
+}
+
+.tab[data-active] {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(128 128 160 / 22%));
+  opacity: 1;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.empty {
+  margin: 24px auto;
+  font-size: 12px;
+  opacity: 0.7;
+  text-align: center;
+}

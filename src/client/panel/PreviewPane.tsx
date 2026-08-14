@@ -20,7 +20,7 @@ import type { MdSpan } from './markdown.ts'
 import css from './PreviewPane.module.css'
 
 /** Props of the preview pane. */
-export type PreviewPaneProps = WebEnhancedProps<'shell.overlay'> & { readonly workspaceId: string }
+export type PreviewPaneProps = WebEnhancedProps<'conversation.view'> & { readonly workspaceId: string }
 
 /** Mode buttons in display order. */
 const MODES: ReadonlyArray<{ mode: PreviewMode; key: 'preview.mode.source' | 'preview.mode.split' | 'preview.mode.view' }> = [

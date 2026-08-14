@@ -119,59 +119,35 @@ export function createOverlay(): { cell: Cell<OverlayState>; actions: OverlayAct
   }
 }
 
-// ── right panel ────────────────────────────────────────────────────────────
+// ── workspace view ─────────────────────────────────────────────────────────
 
-/** Default rendered width of the right panel, in CSS pixels. */
-export const PANEL_DEFAULT_WIDTH = 380
+/** localStorage key of the persisted view state. */
+const PANEL_PERSIST_KEY = 'dsh.webEnhanced.panel.v2'
 
-/** Narrowest the drag handle may make the panel. */
-export const PANEL_MIN_WIDTH = 260
-
-/** Widest the drag handle may make the panel. */
-export const PANEL_MAX_WIDTH = 900
-
-/** localStorage key of the persisted panel geometry. */
-const PANEL_PERSIST_KEY = 'dsh.webEnhanced.panel.v1'
-
-/** Per-workspace panel geometry and browsing state. */
+/**
+ * Browsing state of the workspace view.
+ *
+ * The view is a tab in the conversation's view ring, so it owns no geometry —
+ * width, collapse, and docking belong to the frame. What persists is where the
+ * user was: the active tab and which directories they had open, the latter per
+ * workspace since paths are only meaningful inside one project root.
+ */
 export interface PanelState {
-  /** Active tab; shared across workspaces (a view preference, not geometry). */
+  /** Active tab; shared across workspaces (a view preference, not per-project). */
   readonly tab: PanelTab
-  /** Collapsed flag per workspace id. */
-  readonly collapsed: Readonly<Record<string, boolean>>
-  /** Rendered width per workspace id, in CSS pixels. */
-  readonly width: Readonly<Record<string, number>>
   /** Expanded directory paths per workspace id. */
   readonly expanded: Readonly<Record<string, readonly string[]>>
   /** Live file-name filter of the tree (transient, never persisted). */
   readonly query: string
 }
 
-/** Panel actions handed to components through their inject face. */
+/** View actions handed to components through their inject face. */
 export interface PanelActions {
   /**
    * Select the active tab.
    * @param tab - files, preview, or scm.
    */
   readonly selectTab: (tab: PanelTab) => void
-  /**
-   * Collapse or expand the panel for one workspace.
-   * @param workspaceId - the owning workspace.
-   * @param collapsed - target state.
-   */
-  readonly setCollapsed: (workspaceId: string, collapsed: boolean) => void
-  /**
-   * Set the panel width for one workspace; the value is clamped to the
-   * supported range so a stale persisted number cannot render it unusable.
-   * @param workspaceId - the owning workspace.
-   * @param width - requested width in CSS pixels.
-   */
-  readonly setWidth: (workspaceId: string, width: number) => void
-  /**
-   * Restore the default width for one workspace (the handle's double-click).
-   * @param workspaceId - the owning workspace.
-   */
-  readonly resetWidth: (workspaceId: string) => void
   /**
    * Toggle one directory's expansion in the tree.
    * @param workspaceId - the owning workspace.
@@ -185,30 +161,12 @@ export interface PanelActions {
   readonly setQuery: (query: string) => void
 }
 
-/** Clamp a requested width into the supported range. */
-export function clampPanelWidth(width: number): number {
-  if (!Number.isFinite(width)) return PANEL_DEFAULT_WIDTH
-  return Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, Math.round(width)))
-}
-
-/** Restore persisted panel geometry, dropping anything that is not the stored shape. */
+/** Restore persisted view state, dropping anything that is not the stored shape. */
 function revivePanel(raw: unknown): PanelState | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined
   const record = raw as Record<string, unknown>
   const tab = record['tab']
-  const collapsed: Record<string, boolean> = {}
-  const width: Record<string, number> = {}
   const expanded: Record<string, readonly string[]> = {}
-  if (typeof record['collapsed'] === 'object' && record['collapsed'] !== null) {
-    for (const [key, value] of Object.entries(record['collapsed'])) {
-      if (typeof value === 'boolean') collapsed[key] = value
-    }
-  }
-  if (typeof record['width'] === 'object' && record['width'] !== null) {
-    for (const [key, value] of Object.entries(record['width'])) {
-      if (typeof value === 'number') width[key] = clampPanelWidth(value)
-    }
-  }
   if (typeof record['expanded'] === 'object' && record['expanded'] !== null) {
     for (const [key, value] of Object.entries(record['expanded'])) {
       if (Array.isArray(value)) expanded[key] = value.filter(item => typeof item === 'string')
@@ -216,40 +174,22 @@ function revivePanel(raw: unknown): PanelState | undefined {
   }
   return {
     tab: tab === 'files' || tab === 'preview' || tab === 'scm' ? tab : 'files',
-    collapsed,
-    width,
     expanded,
-    // The filter is a live gesture, not geometry: a reload starts unfiltered.
+    // The filter is a live gesture, not a place: a reload starts unfiltered.
     query: '',
   }
 }
 
-/** Create the panel cell and its bound actions. */
+/** Create the view cell and its bound actions. */
 export function createPanel(): { cell: Cell<PanelState>; actions: PanelActions } {
   const cell = createCell<PanelState>(
-    { tab: 'files', collapsed: {}, width: {}, expanded: {}, query: '' },
+    { tab: 'files', expanded: {}, query: '' },
     { key: PANEL_PERSIST_KEY, revive: revivePanel },
   )
   return {
     cell,
     actions: {
       selectTab: (tab) => { cell.update(current => current.tab === tab ? current : { ...current, tab }) },
-      setCollapsed: (workspaceId, collapsed) => {
-        cell.update(current => current.collapsed[workspaceId] === collapsed
-          ? current
-          : { ...current, collapsed: { ...current.collapsed, [workspaceId]: collapsed } })
-      },
-      setWidth: (workspaceId, width) => {
-        const clamped = clampPanelWidth(width)
-        cell.update(current => current.width[workspaceId] === clamped
-          ? current
-          : { ...current, width: { ...current.width, [workspaceId]: clamped } })
-      },
-      resetWidth: (workspaceId) => {
-        cell.update(current => current.width[workspaceId] === PANEL_DEFAULT_WIDTH
-          ? current
-          : { ...current, width: { ...current.width, [workspaceId]: PANEL_DEFAULT_WIDTH } })
-      },
       toggleExpanded: (workspaceId, path) => {
         cell.update((current) => {
           const open = current.expanded[workspaceId] ?? []
@@ -260,28 +200,6 @@ export function createPanel(): { cell: Cell<PanelState>; actions: PanelActions }
       setQuery: (query) => { cell.update(current => current.query === query ? current : { ...current, query }) },
     },
   }
-}
-
-/**
- * Resolve the rendered width of one workspace's panel.
- * @param state - panel state.
- * @param workspaceId - the owning workspace, or undefined before one resolves.
- * @returns the persisted width, or the default.
- */
-export function panelWidthOf(state: PanelState, workspaceId: string | undefined): number {
-  if (workspaceId === undefined) return PANEL_DEFAULT_WIDTH
-  return state.width[workspaceId] ?? PANEL_DEFAULT_WIDTH
-}
-
-/**
- * Whether one workspace's panel is collapsed.
- * @param state - panel state.
- * @param workspaceId - the owning workspace, or undefined before one resolves.
- * @returns the persisted flag; panels start expanded.
- */
-export function panelCollapsedOf(state: PanelState, workspaceId: string | undefined): boolean {
-  if (workspaceId === undefined) return false
-  return state.collapsed[workspaceId] ?? false
 }
 
 // ── preview tabs ───────────────────────────────────────────────────────────

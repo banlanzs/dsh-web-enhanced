@@ -55,12 +55,10 @@ export declare const zh: {
     readonly 'branch.loading': "读取分支…";
     readonly 'branch.error': "读取分支失败";
     readonly 'branch.none': "非 Git 仓库";
+    readonly 'view.workspace': "工作区";
     readonly 'panel.tab.files': "文件";
     readonly 'panel.tab.preview': "预览";
     readonly 'panel.tab.scm': "变更";
-    readonly 'panel.collapse': "折叠面板";
-    readonly 'panel.expand': "展开面板";
-    readonly 'panel.resize': "拖动调整宽度，双击复位";
     readonly 'panel.noWorkspace': "当前会话未绑定项目";
     readonly 'files.search': "按文件名搜索";
     readonly 'files.empty': "目录为空";

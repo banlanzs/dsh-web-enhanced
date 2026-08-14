@@ -68,50 +68,29 @@ export declare function createOverlay(): {
     cell: Cell<OverlayState>;
     actions: OverlayActions;
 };
-/** Default rendered width of the right panel, in CSS pixels. */
-export declare const PANEL_DEFAULT_WIDTH = 380;
-/** Narrowest the drag handle may make the panel. */
-export declare const PANEL_MIN_WIDTH = 260;
-/** Widest the drag handle may make the panel. */
-export declare const PANEL_MAX_WIDTH = 900;
-/** Per-workspace panel geometry and browsing state. */
+/**
+ * Browsing state of the workspace view.
+ *
+ * The view is a tab in the conversation's view ring, so it owns no geometry —
+ * width, collapse, and docking belong to the frame. What persists is where the
+ * user was: the active tab and which directories they had open, the latter per
+ * workspace since paths are only meaningful inside one project root.
+ */
 export interface PanelState {
-    /** Active tab; shared across workspaces (a view preference, not geometry). */
+    /** Active tab; shared across workspaces (a view preference, not per-project). */
     readonly tab: PanelTab;
-    /** Collapsed flag per workspace id. */
-    readonly collapsed: Readonly<Record<string, boolean>>;
-    /** Rendered width per workspace id, in CSS pixels. */
-    readonly width: Readonly<Record<string, number>>;
     /** Expanded directory paths per workspace id. */
     readonly expanded: Readonly<Record<string, readonly string[]>>;
     /** Live file-name filter of the tree (transient, never persisted). */
     readonly query: string;
 }
-/** Panel actions handed to components through their inject face. */
+/** View actions handed to components through their inject face. */
 export interface PanelActions {
     /**
      * Select the active tab.
      * @param tab - files, preview, or scm.
      */
     readonly selectTab: (tab: PanelTab) => void;
-    /**
-     * Collapse or expand the panel for one workspace.
-     * @param workspaceId - the owning workspace.
-     * @param collapsed - target state.
-     */
-    readonly setCollapsed: (workspaceId: string, collapsed: boolean) => void;
-    /**
-     * Set the panel width for one workspace; the value is clamped to the
-     * supported range so a stale persisted number cannot render it unusable.
-     * @param workspaceId - the owning workspace.
-     * @param width - requested width in CSS pixels.
-     */
-    readonly setWidth: (workspaceId: string, width: number) => void;
-    /**
-     * Restore the default width for one workspace (the handle's double-click).
-     * @param workspaceId - the owning workspace.
-     */
-    readonly resetWidth: (workspaceId: string) => void;
     /**
      * Toggle one directory's expansion in the tree.
      * @param workspaceId - the owning workspace.
@@ -124,27 +103,11 @@ export interface PanelActions {
      */
     readonly setQuery: (query: string) => void;
 }
-/** Clamp a requested width into the supported range. */
-export declare function clampPanelWidth(width: number): number;
-/** Create the panel cell and its bound actions. */
+/** Create the view cell and its bound actions. */
 export declare function createPanel(): {
     cell: Cell<PanelState>;
     actions: PanelActions;
 };
-/**
- * Resolve the rendered width of one workspace's panel.
- * @param state - panel state.
- * @param workspaceId - the owning workspace, or undefined before one resolves.
- * @returns the persisted width, or the default.
- */
-export declare function panelWidthOf(state: PanelState, workspaceId: string | undefined): number;
-/**
- * Whether one workspace's panel is collapsed.
- * @param state - panel state.
- * @param workspaceId - the owning workspace, or undefined before one resolves.
- * @returns the persisted flag; panels start expanded.
- */
-export declare function panelCollapsedOf(state: PanelState, workspaceId: string | undefined): boolean;
 /** Open preview tabs and the active selection. */
 export interface PreviewState {
     readonly tabs: readonly PreviewTab[];

@@ -16,7 +16,7 @@ import { loadPreviewTab } from '../preview.ts'
 import css from './FileTree.module.css'
 
 /** Props of the file tree: the panel's composed props plus the resolved workspace. */
-export type FileTreeProps = WebEnhancedProps<'shell.overlay'> & { readonly workspaceId: string }
+export type FileTreeProps = WebEnhancedProps<'conversation.view'> & { readonly workspaceId: string }
 
 /** Debounce of the search query, in milliseconds. */
 const SEARCH_DEBOUNCE_MS = 200

@@ -6,7 +6,7 @@
  */
 import type { WebEnhancedProps } from '../contract.ts';
 /** Props of the SCM pane. */
-export type ScmPaneProps = WebEnhancedProps<'shell.overlay'> & {
+export type ScmPaneProps = WebEnhancedProps<'conversation.view'> & {
     readonly workspaceId: string;
 };
 /** The SCM pane. */

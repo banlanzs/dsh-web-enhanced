@@ -13,7 +13,7 @@ import { errorMessageOf } from '../result.ts'
 import css from './ScmPane.module.css'
 
 /** Props of the SCM pane. */
-export type ScmPaneProps = WebEnhancedProps<'shell.overlay'> & { readonly workspaceId: string }
+export type ScmPaneProps = WebEnhancedProps<'conversation.view'> & { readonly workspaceId: string }
 
 /** Load state of the status list. */
 type Status =

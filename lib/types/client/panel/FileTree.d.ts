@@ -10,7 +10,7 @@
  */
 import type { WebEnhancedProps } from '../contract.ts';
 /** Props of the file tree: the panel's composed props plus the resolved workspace. */
-export type FileTreeProps = WebEnhancedProps<'shell.overlay'> & {
+export type FileTreeProps = WebEnhancedProps<'conversation.view'> & {
     readonly workspaceId: string;
 };
 /** The file tree. */

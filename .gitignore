@@ -3,3 +3,4 @@ node_modules/
 lib/*.map
 *.tgz
 FEATURE-REQUEST.md
+TODO.md

@@ -18,7 +18,7 @@ Developed and built independently of the deepseek-harness repo — the plugin on
 |---|---|
 | **Task board** | Sidebar entry opens a board with five columns (Planned / To do / Running / Done / Failed). 「Run」opens a real DSH agent session that executes the task prompt; the status and result write back automatically when it finishes. 「View session」jumps to the execution session. **Each card has an inline edit form** (title / prompt / cron / column — done or failed tasks reopen via planned/todo). Supports 5-field cron scheduling (e.g. `0 23 * * *`): runs automatically at the due time, catches up after a host restart, and recovers interrupted runs. |
 | **Git graph** | Sidebar entry opens a graph overlay; branch lanes + commit history rendered as SVG (first-parent continuous lanes + horizontal merge links). A branch strip above the composer switches branches, shows recent commits, and opens the graph. |
-| **Right panel** | When a project session is open, a floating panel (Preview / Files / Changes) appears on the right of the chat area. The file tree expands, searches by name, and opens files in preview; preview supports markdown / HTML (sandboxed iframe) / code / **diff** (line-highlighted unified diff) / CSV / images / PDF / text / **Office docx & xlsx** (host-side structural conversion) with source / **split** (editor + preview side by side with a draggable divider) / view modes and save. The Changes tab is backed by real `git status` with stage / unstage / discard and per-file diffs. Panel width is draggable, double-click resets it, and collapsed state + width persist per workspace (localStorage). |
+| **Workspace view** | A **Workspace** tab in the conversation's view ring, beside Chat and Trajectory, with three panes (Files / Preview / Changes). The file tree expands, searches by name, and opens files in preview; preview supports markdown / HTML (sandboxed iframe) / code / **diff** (line-highlighted unified diff) / CSV / images / PDF / text / **Office docx & xlsx** (host-side structural conversion) with source / **split** (editor + preview side by side) / view modes and save. The Changes pane is backed by real `git status` with stage / unstage / discard and per-file diffs. The active pane and the open directories persist per workspace. |
 | **Balance line** | Shows the DeepSeek API balance (`GET /user/balance`) below the composer, with a refresh button and a muted error state. |
 
 ## Screenshots
@@ -111,11 +111,12 @@ Plugin-row `config` fields (all have defaults):
 
 - **Zero harness changes**: the client UI only registers into existing slots.
   - `sidebar.footer.action` — the task-board and git-graph **entry buttons**.
-  - `shell.overlay` — the board, the graph, and the right dock **themselves**. This is the frame-wide floating layer: above every column, outside their scroll containers, additive (a list slot), and click-through until an entry opts into pointer events.
-  - `conversation.input.dock` — the branch strip (above the composer).
+  - `shell.overlay` — the board and the graph **themselves**. This is the frame-wide floating layer: above every column, outside their scroll containers, additive (a list slot), and click-through until an entry opts into pointer events.
+  - `conversation.view` — the Workspace tab, one entry in the view ring beside Chat and Trajectory. The ring renders one view at a time at full column width, so this surface owns no geometry: no docking, no drag-to-resize, no collapse. Those belong to the frame.
+  - `conversation.input.dock` — the branch strip (above the composer), aligned to the input card through the column's shared width variables.
   - `conversation.composer.dock` — the balance line (below the composer).
 
-  The right dock deliberately does **not** take the layout's `details` slot: that is a `single` slot already occupied by ui-conversation's `DetailsPanel`, so registering there would replace the tool-details column and remove the `conversation.details.tool` seat it declares. Living on `shell.overlay` is also what lets the dock own its own geometry — `ctx.layout` exposes open/close for the details column but no width API, and the dock's width must be draggable and remembered per project.
+  Nothing registers into the layout's `details` slot: that is a `single` slot already occupied by ui-conversation's `DetailsPanel`, so registering there would replace the tool-details column and remove the `conversation.details.tool` seat it declares.
 - **One request object per remote method**: the Typert gateway maps `descriptor.parameters` positionally onto the host method (`Reflect.apply`) and both halves reject a mismatched argument count, so a descriptor's parameter list *is* the host signature. Every method here declares exactly one `request` parameter; `tests/contribution.spec.ts` guards it.
 - **Hand-written remote contribution**: host methods use the `@Remote` decorator (Typert SRC mode; the host gateway auto-discovers the `ctx.webEnhanced` service); the client mounts a hand-declared src-json contribution in `apply` — no typert generation pipeline.
 - **Cross-scope shared state**: the overlays are `root`-scoped and the branch strip and balance line are `session`-scoped, so a single slot-store handle cannot serve both ("one handle, one scope"). Shared state lives in `apply` as plain observables and reaches components through each registration's inject `hooks` compartment.
@@ -150,7 +151,7 @@ Prereqs: `dsh`/`pnpm` on PATH, and the main repo's web build output (playwright 
 
 ## Known limitations
 
-- The right panel is a floating layer, not the product details column: it does not participate in the layout's collapse/yield chain, minimum width 300px.
+- The workspace surface is a view tab, not a side-by-side column: it replaces the transcript while active rather than sitting next to it, and it owns no width or collapse of its own.
 - Office preview is structural: docx headings/paragraphs/lists/tables and the first xlsx worksheet are rendered; inline styles (bold, colors), images, and multi-sheet workbooks are not. Legacy `.doc`/`.xls` binaries are not previewable.
 - Scheduled tasks are best-effort: 30s tick granularity; windows missed while the host is down are caught up once at startup, no backlog is kept.
 - The balance key shares its source with the model provider (env var); when unconfigured it shows an error state rather than failing.

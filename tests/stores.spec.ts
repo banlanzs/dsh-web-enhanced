@@ -10,8 +10,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  PANEL_DEFAULT_WIDTH, PANEL_MAX_WIDTH, PANEL_MIN_WIDTH, activeTabOf, clampPanelWidth, createCell,
-  createOverlay, createPanel, createPreview, panelCollapsedOf, panelWidthOf,
+  activeTabOf, createCell, createOverlay, createPanel, createPreview,
 } from '../src/client/stores.ts'
 import type { PreviewTab } from '../src/client/contract.ts'
 
@@ -82,68 +81,46 @@ describe('overlay', () => {
   })
 })
 
-describe('panel geometry', () => {
-  it('clamps a requested width into the supported range', () => {
-    expect(clampPanelWidth(10)).toBe(PANEL_MIN_WIDTH)
-    expect(clampPanelWidth(99999)).toBe(PANEL_MAX_WIDTH)
-    expect(clampPanelWidth(Number.NaN)).toBe(PANEL_DEFAULT_WIDTH)
-    expect(clampPanelWidth(400.4)).toBe(400)
-  })
-
-  it('keeps width and collapse per workspace', () => {
+describe('workspace view state', () => {
+  it('keeps the active tab across workspaces', () => {
+    // The tab is a view preference, not a per-project fact.
     const { cell, actions } = createPanel()
-    actions.setWidth('w1', 500)
-    actions.setCollapsed('w2', true)
-    const state = cell.getSnapshot()
-    expect(panelWidthOf(state, 'w1')).toBe(500)
-    expect(panelWidthOf(state, 'w2')).toBe(PANEL_DEFAULT_WIDTH)
-    expect(panelCollapsedOf(state, 'w2')).toBe(true)
-    expect(panelCollapsedOf(state, 'w1')).toBe(false)
-    expect(panelWidthOf(state, undefined)).toBe(PANEL_DEFAULT_WIDTH)
-  })
-
-  it('restores the default width on reset', () => {
-    const { cell, actions } = createPanel()
-    actions.setWidth('w1', 700)
-    actions.resetWidth('w1')
-    expect(panelWidthOf(cell.getSnapshot(), 'w1')).toBe(PANEL_DEFAULT_WIDTH)
+    expect(cell.getSnapshot().tab).toBe('files')
+    actions.selectTab('scm')
+    expect(cell.getSnapshot().tab).toBe('scm')
   })
 
   it('toggles directory expansion per workspace', () => {
     const { cell, actions } = createPanel()
     actions.toggleExpanded('w1', 'src')
+    actions.toggleExpanded('w2', 'docs')
     expect(cell.getSnapshot().expanded['w1']).toEqual(['src'])
+    expect(cell.getSnapshot().expanded['w2']).toEqual(['docs'])
     actions.toggleExpanded('w1', 'src')
     expect(cell.getSnapshot().expanded['w1']).toEqual([])
   })
 
-  it('persists geometry across instances but starts the filter empty', () => {
+  it('persists the tab and open directories but starts the filter empty', () => {
     const first = createPanel()
-    first.actions.setWidth('w1', 512)
-    first.actions.setCollapsed('w1', true)
-    first.actions.toggleExpanded('w1', 'src')
     first.actions.selectTab('scm')
+    first.actions.toggleExpanded('w1', 'src')
     first.actions.setQuery('needle')
 
     const restored = createPanel().cell.getSnapshot()
-    expect(restored.width['w1']).toBe(512)
-    expect(restored.collapsed['w1']).toBe(true)
-    expect(restored.expanded['w1']).toEqual(['src'])
     expect(restored.tab).toBe('scm')
-    // The filter is a live gesture, not geometry.
+    expect(restored.expanded['w1']).toEqual(['src'])
+    // The filter is a live gesture, not a place.
     expect(restored.query).toBe('')
   })
 
   it('drops persisted values that are not the stored shape', () => {
-    localStorage.setItem('dsh.webEnhanced.panel.v1', JSON.stringify({
-      tab: 'nope', collapsed: { w1: 'yes' }, width: { w1: 'wide', w2: 99999 }, expanded: { w1: [1, 'src'] },
+    localStorage.setItem('dsh.webEnhanced.panel.v2', JSON.stringify({
+      tab: 'nope', expanded: { w1: [1, 'src'], w2: 'not-an-array' },
     }))
     const state = createPanel().cell.getSnapshot()
     expect(state.tab).toBe('files')
-    expect(state.collapsed).toEqual({})
-    // A stale out-of-range number is clamped rather than discarded.
-    expect(state.width).toEqual({ w2: PANEL_MAX_WIDTH })
     expect(state.expanded['w1']).toEqual(['src'])
+    expect(state.expanded['w2']).toBeUndefined()
   })
 })
 

@@ -25,3 +25,14 @@ export interface WorkspaceSlice {
  * @returns the owning workspace, or undefined.
  */
 export declare function workspaceOfSession(sessions: SessionSlice, workspaces: WorkspaceSlice): WorkspaceView | undefined;
+/**
+ * The workspace accounting for one exact session.
+ *
+ * Session-scoped surfaces use this rather than {@link workspaceOfSession}:
+ * the framework hands them the session they render for, which stays correct
+ * even when it is not the currently selected one.
+ * @param sessionId - the session to account for.
+ * @param workspaces - workspace list slice.
+ * @returns the owning workspace, or undefined for an ungrouped session.
+ */
+export declare function workspaceOfSessionId(sessionId: string, workspaces: WorkspaceSlice): WorkspaceView | undefined;

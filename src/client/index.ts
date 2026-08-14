@@ -38,7 +38,7 @@ import { BoardSidebarEntry, GraphSidebarEntry } from './board/SidebarEntry.tsx'
 import { BoardOverlay } from './board/BoardOverlay.tsx'
 import { BranchStrip } from './git/BranchStrip.tsx'
 import { GraphOverlay } from './git/GraphOverlay.tsx'
-import { RightPanel } from './panel/RightPanel.tsx'
+import { WorkspaceView } from './panel/WorkspaceView.tsx'
 import { BalanceLine } from './balance/BalanceLine.tsx'
 
 /** Locale namespace owned by this plugin. */
@@ -134,13 +134,16 @@ export function apply(ctx: ClientContext): void {
             locale: NS,
             inject: face,
           }, GraphOverlay)),
-          ctx.slots.inject('shell.overlay', () => ctx.slots.register({
-            name: 'shell.overlay',
-            id: 'web-enhanced-panel',
+          ctx.slots.inject('conversation.view', () => ctx.slots.register({
+            name: 'conversation.view',
+            id: 'web-enhanced-workspace',
             order: 30,
             locale: NS,
+            // Thunked so the tab label follows a locale switch without
+            // re-registering the view.
+            label: () => ctx.locale.bind(NS)('view.workspace'),
             inject: face,
-          }, RightPanel)),
+          }, WorkspaceView)),
           ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
             name: 'conversation.input.dock',
             id: 'web-enhanced-branch',

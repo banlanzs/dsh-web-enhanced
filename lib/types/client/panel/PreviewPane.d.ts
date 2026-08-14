@@ -10,7 +10,7 @@
  */
 import type { WebEnhancedProps } from '../contract.ts';
 /** Props of the preview pane. */
-export type PreviewPaneProps = WebEnhancedProps<'shell.overlay'> & {
+export type PreviewPaneProps = WebEnhancedProps<'conversation.view'> & {
     readonly workspaceId: string;
 };
 /** The preview pane. */
