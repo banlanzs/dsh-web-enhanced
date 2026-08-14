@@ -101,11 +101,23 @@ export class WebEnhancedGateway extends TypertRemoteService {
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'webEnhanced')
     this.resolved = resolveConfig(config)
-    this.balance = new BalanceClient({
-      apiKeyEnv: this.resolved.balanceApiKeyEnv,
-      cacheTtlMs: this.resolved.balanceCacheTtlMs,
-      baseUrl: this.resolved.balanceBaseUrl,
-    })
+    this.balance = new BalanceClient(
+      {
+        apiKeyEnv: this.resolved.balanceApiKeyEnv,
+        cacheTtlMs: this.resolved.balanceCacheTtlMs,
+        baseUrl: this.resolved.balanceBaseUrl,
+      },
+      // Resolved per query, never captured: the seam's own contract is that a
+      // rotated credential reaches the next operation without a restart. Read
+      // uninjected so a deployment without the seam still mounts the gateway.
+      async (ref) => {
+        const credentials = ctx.get('credentials')
+        if (credentials === undefined) return undefined
+        // The seam brands its references; this one comes from validated config.
+        const hit = await credentials.resolve(ref as never)
+        return hit?.value
+      },
+    )
     this.board = new TaskBoard(ctx, this.boardDeps(ctx), {
       cronIntervalMs: this.resolved.cronIntervalMs,
     })

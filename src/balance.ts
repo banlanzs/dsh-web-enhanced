@@ -1,7 +1,12 @@
 /**
- * DeepSeek balance query: resolves the API key the same way the model
- * provider does (an environment variable, by default `DEEPSEEK_API_KEY`),
- * calls `/user/balance`, and caches the view. Failures are result fields.
+ * DeepSeek balance query.
+ *
+ * The API key is resolved exactly the way the model adapter resolves it: the
+ * credential seam first, the ambient environment only as the fallback for a
+ * deployment without that seam. Reading `process.env` alone would miss a key
+ * configured through settings or a `.env` layer — which is the normal case, and
+ * would report "not set" for an account whose model requests are working.
+ * Failures are result fields.
  * @module dsh-web-enhanced/src/balance
  */
 
@@ -14,14 +19,27 @@ export interface BalanceConfig {
   readonly baseUrl: string
 }
 
+/**
+ * Resolve one credential reference to its value.
+ *
+ * Mirrors `ctx.credentials.resolve` narrowed to what this client needs; the
+ * gateway supplies it, and a deployment without the credential seam supplies
+ * nothing so the ambient environment decides.
+ */
+export type ResolveCredential = (ref: string) => Promise<string | undefined>
+
 /** Balance query client with a short-lived view cache. */
 export class BalanceClient {
   private cache: { readonly at: number; readonly value: BalanceView } | null = null
 
   /**
-   * @param config - key source, cache TTL, and endpoint base.
+   * @param config - key reference, cache TTL, and endpoint base.
+   * @param resolveCredential - credential-seam lookup; omitted falls back to the environment.
    */
-  constructor(private readonly config: BalanceConfig) {}
+  constructor(
+    private readonly config: BalanceConfig,
+    private readonly resolveCredential?: ResolveCredential,
+  ) {}
 
   /** Cached or freshly fetched balance view. */
   async get(): Promise<BalanceView> {
@@ -37,12 +55,28 @@ export class BalanceClient {
     this.cache = null
   }
 
+  /**
+   * The API key, resolved per query so a rotated credential reaches the very
+   * next refresh — the same per-operation contract the adapters follow.
+   */
+  private async apiKey(): Promise<string | undefined> {
+    if (this.resolveCredential !== undefined) {
+      const resolved = await this.resolveCredential(this.config.apiKeyEnv)
+      if (resolved !== undefined && resolved.trim() !== '') return resolved
+    }
+    const ambient = process.env[this.config.apiKeyEnv]
+    return ambient === undefined || ambient.trim() === '' ? undefined : ambient
+  }
+
   private async fetchBalance(now: number): Promise<BalanceView> {
-    const key = process.env[this.config.apiKeyEnv]
-    if (key === undefined || key.trim() === '') {
+    const key = await this.apiKey()
+    if (key === undefined) {
       return {
         isAvailable: false, infos: [], cachedAt: now,
-        error: { code: 'no-api-key', message: `environment variable ${this.config.apiKeyEnv} is not set` },
+        error: {
+          code: 'no-api-key',
+          message: `credential ${this.config.apiKeyEnv} is not configured (checked the credential store and the environment)`,
+        },
       }
     }
     let response: Response

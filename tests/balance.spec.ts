@@ -1,24 +1,77 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BalanceClient } from '../src/balance.ts'
-import type { BalanceConfig } from '../src/balance.ts'
+import type { BalanceConfig, ResolveCredential } from '../src/balance.ts'
 
 const config: BalanceConfig = { apiKeyEnv: 'WEB_ENHANCED_TEST_KEY', cacheTtlMs: 60_000, baseUrl: 'https://example.test' }
 
 let fetchMock: ReturnType<typeof vi.fn>
 
-function mount(body: unknown, ok = true): BalanceClient {
+function mount(body: unknown, ok = true, resolveCredential?: ResolveCredential): BalanceClient {
   fetchMock = vi.fn(async () => ({
     ok,
     status: ok ? 200 : 403,
     json: async () => body,
   }))
   vi.stubGlobal('fetch', fetchMock)
-  return new BalanceClient(config)
+  return new BalanceClient(config, resolveCredential)
+}
+
+/** The bearer token of the single fetch the client made. */
+function sentBearer(): unknown {
+  return (fetchMock.mock.calls[0]?.[1] as { headers: Record<string, string> }).headers.Authorization
 }
 
 afterEach(() => {
   vi.unstubAllGlobals()
   delete process.env.WEB_ENHANCED_TEST_KEY
+})
+
+describe('BalanceClient credential resolution', () => {
+  it('prefers the credential seam over the ambient environment', async () => {
+    // The seam is where a key configured through settings or a .env layer
+    // lives; reading the environment alone reports "not configured" for an
+    // account whose model requests are working.
+    process.env.WEB_ENHANCED_TEST_KEY = 'sk-ambient'
+    const resolve = vi.fn(async () => 'sk-managed')
+    const client = mount({ is_available: true, balance_infos: [] }, true, resolve)
+    await client.get()
+    expect(resolve).toHaveBeenCalledWith('WEB_ENHANCED_TEST_KEY')
+    expect(sentBearer()).toBe('Bearer sk-managed')
+  })
+
+  it('falls back to the environment when the seam has no value', async () => {
+    process.env.WEB_ENHANCED_TEST_KEY = 'sk-ambient'
+    const client = mount({ is_available: true, balance_infos: [] }, true, async () => undefined)
+    await client.get()
+    expect(sentBearer()).toBe('Bearer sk-ambient')
+  })
+
+  it('treats a blank seam value as absent', async () => {
+    process.env.WEB_ENHANCED_TEST_KEY = 'sk-ambient'
+    const client = mount({ is_available: true, balance_infos: [] }, true, async () => '   ')
+    await client.get()
+    expect(sentBearer()).toBe('Bearer sk-ambient')
+  })
+
+  it('reports both sources in the unconfigured message', async () => {
+    const client = mount({}, true, async () => undefined)
+    const view = await client.get()
+    expect(view.error?.code).toBe('no-api-key')
+    expect(view.error?.message).toContain('credential store')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('re-resolves per query so a rotated credential lands on the next refresh', async () => {
+    const resolve = vi.fn()
+      .mockResolvedValueOnce('sk-old')
+      .mockResolvedValueOnce('sk-new')
+    const client = mount({ is_available: true, balance_infos: [] }, true, resolve as ResolveCredential)
+    await client.get()
+    client.clear()
+    await client.get()
+    expect(resolve).toHaveBeenCalledTimes(2)
+    expect((fetchMock.mock.calls[1]?.[1] as { headers: Record<string, string> }).headers.Authorization).toBe('Bearer sk-new')
+  })
 })
 
 describe('BalanceClient', () => {
