@@ -1,20 +1,10 @@
 /**
- * The web-enhanced Typert contribution, hand-declared for the client
- * assembly: the host gateway discovers the same methods through the SRC
- * fallback (the `@Remote` decorators on `WebEnhancedGateway`), so this plugin
- * ships no generated typert artifacts.
+ * The client half's Typert contribution: the shared descriptors mounted as
+ * this page's Remote namespace, plus the namespace typing.
  *
- * Parameter arity is the contract that matters here. The Gateway invokes a
- * host method as `Reflect.apply(method, receiver, args)` with `args` built by
- * mapping `descriptor.parameters` in order, and the client half refuses a call
- * whose argument count differs from `descriptor.parameters.length`. So a
- * descriptor's parameter list IS the host method's positional signature:
- * every method here declares exactly ONE `request` parameter and every gateway
- * method takes exactly one request object. Splitting a request object into
- * per-field parameters would compile fine and fail at runtime on both sides.
- *
- * Parameter codecs stay permissive (the host validates its own request types);
- * result codecs are strict and mirror `../types.ts`.
+ * The descriptors themselves live in `../descriptors.ts` because the host half
+ * registers the same list — see that module for why registering explicitly is
+ * required rather than relying on the `@Remote` markers.
  * @module dsh-web-enhanced/src/client/remote
  */
 import type { TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol';
@@ -24,7 +14,7 @@ export declare const webEnhancedRemote: TypertRemoteContribution;
 declare module '@deepseek-ai/dsh-typert-protocol' {
     interface TypertRemoteNamespaceMap {
         /**
-         * Web-enhanced host capabilities (hand-declared strict contribution).
+         * Web-enhanced host capabilities.
          *
          * Typed with the RAW method shapes: a mounted namespace method resolves to
          * the `RemoteResult` envelope, not to the host payload. `createRemoteFacade`
