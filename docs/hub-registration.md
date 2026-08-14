@@ -12,10 +12,10 @@
 ## README.md（插件表格，按名字排序插入）
 
 ```
-| [dsh-web-enhanced](https://github.com/omdsh-dev/dsh-web-enhanced) | bundle · cordis | 任务看板（cron 定时 + 真实会话执行）、Git 图谱、文件/预览/变更浮动面板、余额显示 — DSH Web 增强插件：四块 UI 全部经既有槽位注册，独立仓库开发构建 | TS | 2026-08-16 |
+| [dsh-web-enhanced](https://github.com/banlanzs/dsh-web-enhanced) | bundle · cordis | 任务看板（cron 定时 + 真实会话执行）、Git 图谱、文件/预览/变更浮动面板、余额显示 — DSH Web 增强插件：四块 UI 全部经既有槽位注册，独立仓库开发构建 | TS | 2026-08-16 |
 ```
 
 管理器标注：package.json 声明 `dsh.bundle.patch`（`cordis.patch.yml`）→ 自动推导 `bundle · cordis`，无需人工覆盖。
 已打 topics：`dsh`、`dsh-plugin`、`web`、`task-board`、`cron`、`git`。
 
-> 仓库位于 `omdsh-dev` 组织（公开），hub 同步循环可直接读取组织仓库。
+> 仓库位于 `banlanzs` 账户（公开），hub 同步循环可直接读取组织仓库。

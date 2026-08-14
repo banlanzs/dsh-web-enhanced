@@ -48,7 +48,7 @@ const SMOKE = process.argv.includes('--smoke')
 const INSTALL = arg('--install') ?? 'link'
 const TARBALL = arg('--tarball')
 const TARBALL_SHA = arg('--tarball-sha256')
-const GIT_URL = 'git+https://github.com/omdsh-dev/dsh-web-enhanced.git'
+const GIT_URL = 'git+https://github.com/banlanzs/dsh-web-enhanced.git'
 
 // ── 文案（产品语言 zh，en 镜像；断言同时接受两者）─────────────────────────
 const UI = {

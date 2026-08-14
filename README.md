@@ -38,14 +38,22 @@ Captured from the real UI by `scripts/e2e.mjs --capture` (no model key needed):
 The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile:
 
 ```sh
-dsh plugin --profile web add ./dsh-web-enhanced        # local directory
-# or from git / npm / tarball:
-# dsh plugin --profile web add github:you/dsh-web-enhanced#<sha>
+dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # recommended
+# or:
+# dsh plugin --profile web add ./dsh-web-enhanced-0.4.0.tgz
 # dsh plugin --profile web add dsh-web-enhanced
-# dsh plugin --profile web add ./dsh-web-enhanced-0.2.0.tgz
 ```
 
-When installing from git, pnpm runs the package's `prepare` script (self-contained build) — on first install you will be prompted to enable `allowBuilds` for this package.
+`lib/` is committed, so there is no `prepare` step and installing from git needs no toolchain and no `allowBuilds` prompt.
+
+> **Install it, do not `link:` it.** Every `@deepseek-ai/*` package is a **peer** dependency and must resolve to the single copy the profile provides. Node resolves a symlinked package from its REAL path, so a `link:`-installed plugin resolves those specifiers inside its own `node_modules` instead — a second `@deepseek-ai/dsh-typert-protocol` instance. The `@Remote` decorator records its markers in that module's private state, so the host gateway (holding the other instance) then sees no descriptors at all and every `/api/webEnhanced/*` answers **404** while the client half still loads and renders. Verify a suspicious install with:
+>
+> ```sh
+> node -e "console.log(require.resolve('@deepseek-ai/dsh-typert-protocol',{paths:['<profile>']}))"
+> node -e "console.log(require.resolve('@deepseek-ai/dsh-typert-protocol',{paths:['<plugin>/lib']}))"
+> ```
+>
+> The two paths must be identical.
 
 Then start:
 
@@ -58,18 +66,27 @@ dsh --profile web
 After cloning, just run it — it checks the prerequisites (dsh / pnpm / repo reachability), installs via the public git URL, and prompts you to restart:
 
 ```sh
-git clone https://github.com/omdsh-dev/dsh-web-enhanced.git
+git clone https://github.com/banlanzs/dsh-web-enhanced.git
 cd dsh-web-enhanced
 ./scripts/install.sh
 ```
 
-### Developer iteration (link mode)
+### Developer iteration
+
+`link:` is NOT usable for this plugin (see the note above — it duplicates the
+harness packages and silently disables every host capability). Iterate by
+reinstalling from a packed tarball instead:
 
 ```sh
 cd dsh-web-enhanced
-pnpm install
-dsh plugin --profile web add link:$PWD
+pnpm install && pnpm run check && npm pack
+dsh plugin --profile web remove dsh-web-enhanced
+dsh plugin --profile web add ./dsh-web-enhanced-0.4.0.tgz
 ```
+
+On Windows, tarball installs need real symlink permission (pnpm's
+`importPackage` step). If it fails with `EPERM ... symlink`, either enable
+Developer Mode or install from the git URL, which does not take that path.
 
 ## Configuration
 
@@ -111,7 +128,7 @@ Plugin-row `config` fields (all have defaults):
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + full tests + build (87 tests)
+pnpm run check   # typecheck + full tests + build (148 tests)
 ```
 
 Build outputs:

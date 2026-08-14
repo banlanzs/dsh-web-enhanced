@@ -38,14 +38,22 @@
 插件是一个 bundle 组合包（`dsh.bundle`），安装进 Web profile：
 
 ```sh
-dsh plugin --profile web add ./dsh-web-enhanced        # 本地目录
-# 或从 git / npm / tarball：
-# dsh plugin --profile web add github:you/dsh-web-enhanced#<sha>
+dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # 推荐
+# 或：
+# dsh plugin --profile web add ./dsh-web-enhanced-0.4.0.tgz
 # dsh plugin --profile web add dsh-web-enhanced
-# dsh plugin --profile web add ./dsh-web-enhanced-0.2.0.tgz
 ```
 
-从 git 安装时 pnpm 会运行包的 `prepare` 脚本（自包含构建），首次需要按提示为该包开启 `allowBuilds`。
+`lib/` 随仓提交，因此没有 `prepare` 步骤——从 git 安装无需工具链，也不会提示 `allowBuilds`。
+
+> **要安装，不要 `link:`。** 所有 `@deepseek-ai/*` 都是 **peer** 依赖，必须解析到 profile 提供的那一份。Node 解析符号链接包时以其**真实路径**为起点，所以 `link:` 安装的插件会在自己的 `node_modules` 里解析这些包——于是有了第二份 `@deepseek-ai/dsh-typert-protocol`。`@Remote` 装饰器把标记记录在该模块的私有状态里，持有另一份实例的 host 网关因此看不到任何 descriptor，`/api/webEnhanced/*` 全部返回 **404**，而客户端半仍能正常加载渲染（故障表现具有迷惑性）。怀疑安装有问题时这样验证：
+>
+> ```sh
+> node -e "console.log(require.resolve('@deepseek-ai/dsh-typert-protocol',{paths:['<profile>']}))"
+> node -e "console.log(require.resolve('@deepseek-ai/dsh-typert-protocol',{paths:['<plugin>/lib']}))"
+> ```
+>
+> 两条路径必须完全一致。
 
 然后启动：
 
@@ -58,18 +66,25 @@ dsh --profile web
 clone 后直接运行——脚本会检查前置（dsh / pnpm / 仓库可达），用公开 git URL 安装并提示重启：
 
 ```sh
-git clone https://github.com/omdsh-dev/dsh-web-enhanced.git
+git clone https://github.com/banlanzs/dsh-web-enhanced.git
 cd dsh-web-enhanced
 ./scripts/install.sh
 ```
 
-### 开发迭代（link 模式）
+### 开发迭代
+
+本插件**不能**用 `link:`（见上文提示——它会复制一份宿主包，从而静默地让所有
+host 能力失效）。改用打包重装来迭代：
 
 ```sh
 cd dsh-web-enhanced
-pnpm install
-dsh plugin --profile web add link:$PWD
+pnpm install && pnpm run check && npm pack
+dsh plugin --profile web remove dsh-web-enhanced
+dsh plugin --profile web add ./dsh-web-enhanced-0.4.0.tgz
 ```
+
+Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPackage` 步骤）。
+若报 `EPERM ... symlink`，可开启开发者模式，或改用 git URL 安装（不走该路径）。
 
 ## 配置
 
@@ -102,7 +117,7 @@ dsh plugin --profile web add link:$PWD
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + 全部测试 + 构建（87 个测试）
+pnpm run check   # typecheck + 全部测试 + 构建（148 个测试）
 ```
 
 构建产物：

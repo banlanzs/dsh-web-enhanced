@@ -1,5 +1,5 @@
 #!/bin/sh
-# dsh-web-enhanced 一键安装脚本（公开仓库：omdsh-dev/dsh-web-enhanced，git URL 安装无需登录）
+# dsh-web-enhanced 一键安装脚本（公开仓库：banlanzs/dsh-web-enhanced，git URL 安装无需登录）
 #
 # 用法:
 #   ./scripts/install.sh            # 装进默认 web profile
@@ -22,8 +22,8 @@ if [ "$fail_early" = 1 ]; then
   exit 1
 fi
 
-REPO_URL="git+https://github.com/omdsh-dev/dsh-web-enhanced.git"
-GIT_URL="https://github.com/omdsh-dev/dsh-web-enhanced.git"
+REPO_URL="git+https://github.com/banlanzs/dsh-web-enhanced.git"
+GIT_URL="https://github.com/banlanzs/dsh-web-enhanced.git"
 DSH_HOME="${DSH_HOME:-$HOME/.dsh}"
 RED='\033[31m'; GREEN='\033[32m'; YELLOW='\033[33m'; BOLD='\033[1m'; NC='\033[0m'
 
