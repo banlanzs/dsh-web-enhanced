@@ -1,0 +1,43 @@
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.label {
+  opacity: 0.7;
+}
+
+.select {
+  border: 1px solid rgb(128 128 128 / 32%);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  max-width: 220px;
+  padding: 1px 5px;
+}
+
+.graph {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  opacity: 0.75;
+  padding: 0;
+}
+
+.graph:hover {
+  opacity: 1;
+}
+
+.message {
+  color: #d9534f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

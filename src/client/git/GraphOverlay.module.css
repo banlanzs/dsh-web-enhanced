@@ -1,0 +1,99 @@
+.action {
+  border: 1px solid rgb(128 128 128 / 30%);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Height must match ROW_HEIGHT in GraphOverlay.tsx: the SVG rails are drawn
+   against it, so a mismatch breaks the vertical continuity between rows. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  font-size: 12px;
+}
+
+.row:hover {
+  background: rgb(128 128 160 / 12%);
+}
+
+.rail {
+  flex: none;
+}
+
+.edge {
+  stroke-width: 1.6;
+  fill: none;
+}
+
+.dot {
+  stroke: var(--dsh-surface, Canvas);
+  stroke-width: 1.5;
+}
+
+.edge[data-lane='0'] { stroke: #6a8fd8; }
+.edge[data-lane='1'] { stroke: #4caf72; }
+.edge[data-lane='2'] { stroke: #d9a441; }
+.edge[data-lane='3'] { stroke: #b978d1; }
+.edge[data-lane='4'] { stroke: #48b3c2; }
+.edge[data-lane='5'] { stroke: #d9534f; }
+
+.dot[data-lane='0'] { fill: #6a8fd8; }
+.dot[data-lane='1'] { fill: #4caf72; }
+.dot[data-lane='2'] { fill: #d9a441; }
+.dot[data-lane='3'] { fill: #b978d1; }
+.dot[data-lane='4'] { fill: #48b3c2; }
+.dot[data-lane='5'] { fill: #d9534f; }
+
+.hash {
+  flex: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref {
+  flex: none;
+  border-radius: 8px;
+  background: rgb(106 143 216 / 25%);
+  font-size: 10px;
+  padding: 1px 7px;
+}
+
+.author,
+.date {
+  flex: none;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.empty,
+.error {
+  margin: 12px 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.error {
+  color: #d9534f;
+  opacity: 1;
+}

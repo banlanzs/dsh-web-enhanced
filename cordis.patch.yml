@@ -1,0 +1,6 @@
+# dsh-web-enhanced bundle patch: one Loader row that mounts the plugin's
+# node half (the webEnhanced gateway service) and, through the package's
+# dsh.client manifest, the browser half in the Web profile.
+- insert:
+    - id: web-enhanced
+      name: dsh-web-enhanced

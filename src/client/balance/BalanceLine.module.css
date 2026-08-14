@@ -1,0 +1,39 @@
+.line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 12px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.label {
+  opacity: 0.7;
+}
+
+.value {
+  font-variant-numeric: tabular-nums;
+}
+
+.error {
+  color: #d9534f;
+}
+
+.refresh {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  opacity: 0.8;
+  padding: 0;
+}
+
+.refresh:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.refresh:hover:not(:disabled) {
+  opacity: 1;
+}

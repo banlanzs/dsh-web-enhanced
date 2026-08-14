@@ -1,0 +1,124 @@
+.action,
+.primary {
+  border: 1px solid rgb(128 128 128 / 30%);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
+.primary {
+  border-color: rgb(106 143 216 / 65%);
+  background: rgb(106 143 216 / 22%);
+}
+
+.primary:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.error {
+  margin: 0 0 10px;
+  border-radius: 5px;
+  background: rgb(217 83 79 / 16%);
+  color: #d9534f;
+  font-size: 12px;
+  padding: 6px 9px;
+}
+
+.form {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  border: 1px solid rgb(128 128 128 / 26%);
+  border-radius: 7px;
+  padding: 10px 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  opacity: 0.72;
+}
+
+.input,
+.textarea {
+  border: 1px solid rgb(128 128 128 / 32%);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 4px 7px;
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.hint {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.formActions {
+  display: flex;
+  gap: 6px;
+}
+
+/* Five columns that scroll horizontally rather than squeezing cards. */
+.columns {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(230px, 1fr);
+  gap: 10px;
+  overflow-x: auto;
+  align-items: start;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.columnTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.78;
+  text-transform: uppercase;
+}
+
+.count {
+  border-radius: 8px;
+  background: rgb(128 128 160 / 24%);
+  font-size: 10px;
+  padding: 0 6px;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.empty {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.55;
+}

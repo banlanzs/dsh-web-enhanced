@@ -1,0 +1,125 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid rgb(128 128 128 / 26%);
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: rgb(128 128 160 / 8%);
+}
+
+.card[data-status='running'] {
+  border-color: rgb(106 143 216 / 60%);
+}
+
+.card[data-status='failed'] {
+  border-color: rgb(217 83 79 / 55%);
+}
+
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.prompt {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.8;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: 10px;
+  opacity: 0.65;
+}
+
+.metaRow {
+  font-variant-numeric: tabular-nums;
+}
+
+.result,
+.resultError {
+  margin: 0;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 4px 6px;
+  background: rgb(128 128 160 / 16%);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.resultError {
+  background: rgb(217 83 79 / 18%);
+  color: #d9534f;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.primary,
+.action,
+.danger {
+  border: 1px solid rgb(128 128 128 / 30%);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.primary {
+  border-color: rgb(106 143 216 / 65%);
+  background: rgb(106 143 216 / 22%);
+}
+
+.danger {
+  color: #d9534f;
+  border-color: rgb(217 83 79 / 45%);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fieldLabel {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.input,
+.textarea {
+  border: 1px solid rgb(128 128 128 / 32%);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.hint {
+  font-size: 10px;
+  opacity: 0.6;
+}

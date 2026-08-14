@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        # 默认两矩阵（发布负责人可按支持面增删）：
+        #  - Node 22：最低支持宿主。
+        #  - Node 24：前向集成。
+        # host-ref 是 smoke e2e 的宿主基线：web-enhanced 客户端消费 rc.6
+        # 发布包，e2e 的宿主必须提供与 rc.6 客户端槽位契约一致的 web 客户端。
+        # master 可能已前移，稳定时把两行都固定到开发基线 SHA
+        # （本地 deepseek-harness checkout 当前为 47f943859bef60e4160492346772ded9b24f765a）。
+        include:
+          - node: 22
+            host-ref: "master"
+          - node: 24
+            host-ref: "master"
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      # 宿主 checkout 统一落在 $GITHUB_WORKSPACE/../../.dsh/source/current
+      # （= $GITHUB_WORKSPACE 的规范化父级 .dsh）——smoke e2e 从这里取宿主
+      # 二进制与 playwright chromium。
+      - name: Clone dsh main repo at DSH_ROOT
+        run: |
+          DSH_ROOT="$GITHUB_WORKSPACE/../../.dsh/source/current"
+          mkdir -p "$(dirname "$DSH_ROOT")"
+          git clone --depth 1 "https://github.com/deepseek-ai/deepseek-harness.git" "$DSH_ROOT"
+          git -C "$DSH_ROOT" checkout "${{ matrix.host-ref }}"
+          echo "HOST_SHA=$(git -C "$DSH_ROOT" rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Install + build host
+        working-directory: ${{ github.workspace }}/../../.dsh/source/current
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Install plugin dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check (typecheck + full tests + build)
+        run: pnpm run check
+
+      - name: Pack verification gate
+        run: node scripts/verify-pack.mjs
+
+      # 提交进仓的 lib/ 必须与 src 一致：漂移 = 上次源码改动从未构建发布。
+      - name: Verify lib matches src
+        run: |
+          git diff --exit-code -- lib/ || {
+            echo "::error::lib/ 与 src/ 不一致：请运行 pnpm run build 并提交 lib/ 产物"
+            exit 1
+          }
+
+      # no-key smoke：隔离 DSH_HOME + 精确宿主二进制 + 固定端口，绝不触碰
+      # 任何活跃实例；宿主二进制必须位于本次 checkout 内。
+      - name: Smoke e2e (no model key)
+        run: |
+          node scripts/e2e.mjs --smoke --install link --port 3190
+        env:
+          DSH_ROOT: ${{ github.workspace }}/../../.dsh/source/current
+          DSH_BIN: ${{ github.workspace }}/../../.dsh/source/current/apps/cli/lib/bin.js
+
+      - name: Archive e2e artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: |
+            e2e-*.png
+            dsh-web.log
+          if-no-files-found: ignore

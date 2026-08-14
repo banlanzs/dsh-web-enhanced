@@ -1,0 +1,35 @@
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 8px;
+  text-align: start;
+}
+
+.entry:hover {
+  background: rgb(128 128 160 / 18%);
+}
+
+.entry[data-active] {
+  background: rgb(128 128 160 / 26%);
+}
+
+.glyph {
+  flex: none;
+  width: 14px;
+  opacity: 0.8;
+  text-align: center;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

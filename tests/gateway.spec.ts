@@ -1,0 +1,517 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { zipSync } from 'fflate'
+import { Context } from '@deepseek-ai/cordis'
+import Storage from '@deepseek-ai/dsh-storage'
+import { defineDomain, DomainFacility, domainTable } from '@deepseek-ai/dsh-storage-domain'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
+import { MemoryMediaPool, MemoryStorageBackend } from './helpers/memory-backend.ts'
+import { taskRecordSchema } from '../src/schemas.ts'
+import type { TaskId, TaskRecord } from '../src/types.ts'
+import { WebEnhancedGateway } from '../src/index.ts'
+import { FakeSubprocess } from './helpers/fake-subprocess.ts'
+
+const DOMAIN_SPEC = defineDomain({
+  name: 'web_enhanced',
+  version: 1,
+  tables: { tasks: domainTable<TaskId, TaskRecord>(taskRecordSchema as never) },
+})
+
+const contexts: Context[] = []
+const roots: string[] = []
+
+async function tempRoot(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), 'web-enhanced-gw-'))
+  roots.push(root)
+  return root
+}
+
+afterEach(async () => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+  delete process.env.WEB_ENHANCED_TEST_KEY
+  await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
+  await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
+})
+
+/** Fake agent whose run settles with the given outcome events. */
+function fakeAgent(events: SessionEvent[], id = 's-run'): unknown {
+  return {
+    whenIdle: vi.fn(async () => {}),
+    followup: vi.fn(),
+    session: { seq: 10, events, id },
+  }
+}
+
+function completedEvents(): SessionEvent[] {
+  return [
+    { seq: 10, time: 10, type: 'turn/start', data: { turn: 1 } },
+    { seq: 11, time: 11, type: 'assistant/message', data: { message: { content: [{ type: 'text', text: 'all done' }] } } },
+    { seq: 12, time: 12, type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } },
+  ] as unknown as SessionEvent[]
+}
+
+interface HarnessOptions {
+  pool?: MemoryMediaPool
+  createAgent?: () => unknown
+  flush?: () => Promise<unknown>
+  workspaces?: Array<{ id: string; path: string }>
+}
+
+async function harness(options: HarnessOptions = {}): Promise<{
+  ctx: Context
+  gateway: WebEnhancedGateway
+  pool: MemoryMediaPool
+  subprocess: FakeSubprocess
+  create: ReturnType<typeof vi.fn>
+  setCreate: (fn: (options: unknown) => Promise<unknown>) => void
+}> {
+  const pool = options.pool ?? new MemoryMediaPool()
+  const ctx = new Context()
+  contexts.push(ctx)
+  await ctx.plugin(Storage)
+  ctx.storage.backend.register('memory', new MemoryStorageBackend(pool))
+  const facility = new DomainFacility(ctx, { backend: 'memory', routes: {} })
+  ctx.storage.mount('domain', facility)
+  ctx.provide('storageDomain', facility)
+  const workspaces = options.workspaces ?? []
+  ctx.provide('workspaceRegistry', { list: () => workspaces } as never)
+  // Constructing the Service subclass registers it as ctx.subprocess.
+  const subprocess = new FakeSubprocess(ctx)
+  const createRef: { current: (options: unknown) => Promise<unknown> } = {
+    current: async () => ({
+      agent: (options.createAgent ?? (() => fakeAgent(completedEvents())))() as never,
+      dispose: async () => {},
+    }),
+  }
+  const create = vi.fn((agentOptions: unknown) => createRef.current(agentOptions))
+  ctx.provide('agents', { create } as never)
+  ctx.provide('sessions', { flush: vi.fn(async () => options.flush === undefined ? true : options.flush()) } as never)
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-chat' }) } as never)
+  await ctx.plugin(WebEnhancedGateway, { balanceApiKeyEnv: 'WEB_ENHANCED_TEST_KEY' })
+  const gateway = ctx.get('webEnhanced') as WebEnhancedGateway
+  return {
+    ctx, gateway, pool, subprocess, create,
+    setCreate: (fn) => { createRef.current = fn },
+  }
+}
+
+/** Poll with real timers until the assertion passes (awaited; async asserts poll). */
+async function settleUntil(assert: () => void | Promise<void>, timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    try {
+      await assert()
+      return
+    } catch {
+      // keep polling
+    }
+    if (Date.now() > deadline) throw new Error('settleUntil timed out')
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
+}
+
+/** Seed one record into the medium before the gateway mounts (restart simulation). */
+async function seedRecord(pool: MemoryMediaPool, record: TaskRecord): Promise<void> {
+  const ctx = new Context()
+  await ctx.plugin(Storage)
+  ctx.storage.backend.register('memory', new MemoryStorageBackend(pool))
+  const facility = new DomainFacility(ctx, { backend: 'memory', routes: {} })
+  ctx.storage.mount('domain', facility)
+  ctx.provide('storageDomain', facility)
+  const domain = await facility.open(DOMAIN_SPEC)
+  await domain.table('tasks').put(record.id, record)
+  await domain.close()
+  await ctx.fiber.dispose()
+}
+
+const taskBase = (id: string, overrides: Partial<TaskRecord> = {}): TaskRecord => ({
+  id: id as TaskId,
+  title: 'task',
+  prompt: 'prompt',
+  status: 'planned',
+  cron: null,
+  nextRunAt: null,
+  workspaceId: null,
+  sessionId: null,
+  result: null,
+  createdAt: 1,
+  updatedAt: 1,
+  lastRunAt: null,
+  ...overrides,
+})
+
+/** Minimal docx document.xml exercising headings, paragraphs, lists, tables. */
+function docxXml(): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Title</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Hello world</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>Item</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr><w:tc><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr><w:tc><w:p><w:r><w:t>1</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>2</w:t></w:r></w:p></w:tc></w:tr>
+    </w:tbl>
+  </w:body>
+</w:document>`
+}
+
+/** Minimal xlsx: one sheet referencing shared strings and inline numbers. */
+function xlsxXml(): { workbook: string; rels: string; strings: string; sheet: string } {
+  return {
+    workbook: '<?xml version="1.0"?><workbook xmlns="x" xmlns:r="r"><sheets><sheet name="S1" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    rels: '<?xml version="1.0"?><Relationships xmlns="x"><Relationship Id="rId1" Type="t" Target="worksheets/sheet1.xml"/></Relationships>',
+    strings: '<?xml version="1.0"?><sst><si><t>Alpha</t></si><si><t>Beta</t></si></sst>',
+    sheet: '<?xml version="1.0"?><worksheet xmlns="x"><sheetData>' +
+      '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1"><v>42</v></c></row>' +
+      '<row r="2"><c r="A2" t="s"><v>1</v></c><c r="B2"><v>7</v></c></row>' +
+      '</sheetData></worksheet>',
+  }
+}
+
+const encode = (text: string): Uint8Array => new TextEncoder().encode(text)
+
+/** Pack a docx zip with the minimal document part. */
+function docxBytes(xml: string): Buffer {
+  return Buffer.from(zipSync({ 'word/document.xml': encode(xml) }))
+}
+
+/** Pack an xlsx zip with workbook, rels, shared strings, and one sheet. */
+function xlsxBytes(parts: ReturnType<typeof xlsxXml>): Buffer {
+  return Buffer.from(zipSync({
+    'xl/workbook.xml': encode(parts.workbook),
+    'xl/_rels/workbook.xml.rels': encode(parts.rels),
+    'xl/sharedStrings.xml': encode(parts.strings),
+    'xl/worksheets/sheet1.xml': encode(parts.sheet),
+  }))
+}
+
+describe('WebEnhancedGateway', () => {
+  it('publishes every remote under the webEnhanced namespace', async () => {
+    const { gateway } = await harness()
+    expect(gateway.typertRemote).toMatchObject({ serviceKey: 'webEnhanced', namespace: 'webEnhanced' })
+    expect(remoteMethods(gateway).map(entry => entry.method)).toEqual([
+      'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet',
+      'gitBranches', 'gitLog', 'gitCheckout', 'gitStatus', 'gitDiff',
+      'gitStage', 'gitUnstage', 'gitDiscard',
+      'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview',
+    ])
+  })
+
+  describe('tasks', () => {
+    it('creates, lists, updates, and removes tasks', async () => {
+      const { gateway } = await harness()
+      const created = await gateway.taskCreate({ title: ' 升级 DSH ', prompt: ' run pnpm run build ', cron: '0 23 * * *' })
+      if ('error' in created) throw new Error(created.error.message)
+      expect(created.task.title).toBe('升级 DSH')
+      expect(created.task.cron).toBe('0 23 * * *')
+      expect(created.task.nextRunAt).not.toBeNull()
+      expect((await gateway.taskList()).tasks).toHaveLength(1)
+      const updated = await gateway.taskUpdate({ id: created.task.id, status: 'todo', title: 'renamed' })
+      if ('error' in updated) throw new Error(updated.error.message)
+      expect(updated.task).toMatchObject({ status: 'todo', title: 'renamed' })
+      const removed = await gateway.taskRemove({ id: created.task.id })
+      if ('error' in removed) throw new Error(removed.error.message)
+      expect(removed.removed).toBe(true)
+      expect((await gateway.taskRemove({ id: created.task.id })).removed).toBe(false)
+    })
+
+    it('rejects empty titles, prompts, unreachable crons, and unknown workspaces', async () => {
+      const { gateway } = await harness()
+      expect((await gateway.taskCreate({ title: ' ', prompt: 'x' })).error?.code).toBe('invalid-title')
+      expect((await gateway.taskCreate({ title: 'x', prompt: ' ' })).error?.code).toBe('invalid-prompt')
+      expect((await gateway.taskCreate({ title: 'x', prompt: 'y', cron: '0 0 30 2 *' })).error?.code).toBe('cron-never')
+      expect((await gateway.taskCreate({ title: 'x', prompt: 'y', workspaceId: 'ghost' })).error?.code).toBe('workspace-not-found')
+      expect((await gateway.taskCreate({ title: 'x', prompt: 'y', cron: 'bad cron' })).error?.code).toBe('task-create')
+    })
+
+    it('update rejects empty titles, running tasks, invalid statuses, and never-firing crons', async () => {
+      const { gateway } = await harness()
+      const created = await gateway.taskCreate({ title: 'a', prompt: 'b' })
+      if ('error' in created) throw new Error(created.error.message)
+      const id = created.task.id
+      expect((await gateway.taskUpdate({ id, title: ' ' })).error?.code).toBe('task-update')
+      expect((await gateway.taskUpdate({ id, status: 'done' })).error?.code).toBe('task-update')
+      expect((await gateway.taskUpdate({ id, cron: '0 0 30 2 *' })).error?.code).toBe('task-update')
+      const cleared = await gateway.taskUpdate({ id, cron: null })
+      if ('error' in cleared) throw new Error(cleared.error.message)
+      expect(cleared.task.cron).toBeNull()
+      expect(cleared.task.nextRunAt).toBeNull()
+      // A running task is immutable through update: the second whenIdle hangs.
+      let idleCalls = 0
+      const hanging = {
+        whenIdle: vi.fn(() => {
+          idleCalls += 1
+          return idleCalls === 1 ? Promise.resolve() : new Promise(() => {})
+        }),
+        followup: vi.fn(),
+        session: { seq: 10, events: [], id: 's-hang' },
+      }
+      const stuck = await harness({ createAgent: () => hanging })
+      const created2 = await stuck.gateway.taskCreate({ title: 'c', prompt: 'd' })
+      if ('error' in created2) throw new Error(created2.error.message)
+      const started = await stuck.gateway.taskRun({ id: created2.task.id })
+      if ('error' in started) throw new Error(started.error.message)
+      expect((await stuck.gateway.taskUpdate({ id: created2.task.id, title: 'x' })).error?.code).toBe('task-update')
+    })
+
+    it('rebinds and clears the task workspace through update', async () => {
+      const root = await tempRoot()
+      const { gateway } = await harness({ workspaces: [{ id: 'w1', path: root }] })
+      const created = await gateway.taskCreate({ title: 'a', prompt: 'b' })
+      if ('error' in created) throw new Error(created.error.message)
+      const id = created.task.id
+      expect(created.task.workspaceId).toBeNull()
+
+      const bound = await gateway.taskUpdate({ id, workspaceId: 'w1' })
+      if ('error' in bound) throw new Error(bound.error.message)
+      expect(bound.task.workspaceId).toBe('w1')
+
+      // An omitted field keeps the binding; only an explicit null clears it.
+      const kept = await gateway.taskUpdate({ id, title: 'renamed' })
+      if ('error' in kept) throw new Error(kept.error.message)
+      expect(kept.task.workspaceId).toBe('w1')
+
+      const cleared = await gateway.taskUpdate({ id, workspaceId: null })
+      if ('error' in cleared) throw new Error(cleared.error.message)
+      expect(cleared.task.workspaceId).toBeNull()
+
+      expect((await gateway.taskUpdate({ id, workspaceId: 'ghost' })).error?.code).toBe('workspace-not-found')
+    })
+
+    it('runs a task to completion and writes the result back', async () => {
+      const { gateway } = await harness()
+      const created = await gateway.taskCreate({ title: 'run', prompt: 'do it', cron: '* * * * *' })
+      if ('error' in created) throw new Error(created.error.message)
+      const started = await gateway.taskRun({ id: created.task.id })
+      if ('error' in started) throw new Error(started.error.message)
+      expect(started.started).toBe(true)
+      expect(started.sessionId).not.toBeNull()
+      expect((await gateway.taskRun({ id: created.task.id })).error?.code).toBe('task-already-running')
+      await settleUntil(async () => {
+        const list = await gateway.taskList()
+        const record = list.tasks.find(task => task.id === created.task.id)!
+        if (record.status !== 'done') throw new Error('not done yet')
+        expect(record).toMatchObject({
+          status: 'done',
+          result: { reasonKind: 'completed', summary: 'all done' },
+        })
+        expect(record.nextRunAt).toBeGreaterThan(Date.now())
+      })
+    })
+
+    it('fails the task when the run cannot start and releases the admission lock', async () => {
+      const { gateway, setCreate } = await harness()
+      const created = await gateway.taskCreate({ title: 'x', prompt: 'y' })
+      if ('error' in created) throw new Error(created.error.message)
+      setCreate(async () => { throw new Error('no factory') })
+      expect((await gateway.taskRun({ id: created.task.id })).error?.code).toBe('task-run')
+      setCreate(async () => ({
+        agent: fakeAgent(completedEvents()),
+        dispose: async () => {},
+      }))
+      expect((await gateway.taskRun({ id: created.task.id })).error).toBeUndefined()
+    })
+
+    it('settles an execution fault as a failed task', async () => {
+      const { gateway } = await harness({
+        createAgent: () => fakeAgent(completedEvents()),
+        flush: async () => { throw new Error('persistence down') },
+      })
+      const created = await gateway.taskCreate({ title: 'x', prompt: 'y' })
+      if ('error' in created) throw new Error(created.error.message)
+      const started = await gateway.taskRun({ id: created.task.id })
+      if ('error' in started) throw new Error(started.error.message)
+      await settleUntil(async () => {
+        const list = await gateway.taskList()
+        const record = list.tasks.find(task => task.id === created.task.id)!
+        if (record.status !== 'failed') throw new Error('not failed yet')
+        expect(record.result).toMatchObject({ errorCode: 'run-failed', reasonKind: 'interrupted' })
+      })
+    })
+
+    it('schedules a due cron task on boot and recomputes its next run', async () => {
+      const pool = new MemoryMediaPool()
+      const due = taskBase('task-due', {
+        status: 'planned',
+        cron: '* * * * *',
+        nextRunAt: Date.now() - 5_000,
+      })
+      await seedRecord(pool, due)
+      const { gateway } = await harness({ pool })
+      await settleUntil(async () => {
+        const list = await gateway.taskList()
+        const record = list.tasks.find(task => task.id === 'task-due')!
+        if (record.status !== 'done') throw new Error('not done yet')
+        expect(record.nextRunAt).toBeGreaterThan(Date.now())
+      })
+    })
+
+    it('recovers interrupted runs as failed after a host restart', async () => {
+      const pool = new MemoryMediaPool()
+      await seedRecord(pool, taskBase('task-stuck', { status: 'running', sessionId: 's-old' as never }))
+      const { gateway } = await harness({ pool })
+      const record = (await gateway.taskList()).tasks.find(task => task.id === 'task-stuck')!
+      expect(record).toMatchObject({
+        status: 'failed',
+        result: { reasonKind: 'interrupted', errorCode: 'host-restart' },
+      })
+    })
+
+    it('runs a task in a workspace root and rejects an unknown run workspace', async () => {
+      const root = await tempRoot()
+      const { gateway, create } = await harness({ workspaces: [{ id: 'w1', path: root }] })
+      const created = await gateway.taskCreate({ title: 'x', prompt: 'y', workspaceId: 'w1' })
+      if ('error' in created) throw new Error(created.error.message)
+      const started = await gateway.taskRun({ id: created.task.id, workspaceId: 'w1' })
+      if ('error' in started) throw new Error(started.error.message)
+      const options = create.mock.calls[0]![0]
+      expect(options.meta.cwd).toBe(root)
+      const ghost = await gateway.taskCreate({ title: 'g', prompt: 'y' })
+      if ('error' in ghost) throw new Error(ghost.error.message)
+      expect((await gateway.taskRun({ id: ghost.task.id, workspaceId: 'ghost' })).error?.code).toBe('workspace-not-found')
+    })
+  })
+
+  describe('git remotes', () => {
+    it('serves branches, log, checkout, status, diff, and mutations', async () => {
+      const root = await tempRoot()
+      const { gateway, subprocess } = await harness({ workspaces: [{ id: 'w1', path: root }] })
+      subprocess.enqueue({ stdout: 'main\n' })
+      subprocess.enqueue({ stdout: 'main\n' })
+      const branches = await gateway.gitBranches({ workspaceId: 'w1' })
+      if ('error' in branches) throw new Error(branches.error.message)
+      expect(branches.branches).toEqual([{ name: 'main', current: true }])
+
+      subprocess.enqueue({ stdout: 'h1\x1f\x1fA\x1f1\x1fsubject' })
+      subprocess.enqueue({ stdout: '' })
+      const log = await gateway.gitLog({ workspaceId: 'w1' })
+      if ('error' in log) throw new Error(log.error.message)
+      expect(log.commits[0]!.subject).toBe('subject')
+
+      subprocess.enqueue({ exitCode: 1, stderr: 'error: dirty\n' })
+      expect(await gateway.gitCheckout({ workspaceId: 'w1', branch: 'dev' })).toEqual({ ok: false, message: 'error: dirty' })
+
+      subprocess.enqueue({ stdout: ' M a.txt\0' })
+      const status = await gateway.gitStatus({ workspaceId: 'w1' })
+      if ('error' in status) throw new Error(status.error.message)
+      expect(status.entries).toEqual([{ path: 'a.txt', staged: ' ', unstaged: 'M' }])
+
+      subprocess.enqueue({ stdout: 'diff text' })
+      const diff = await gateway.gitDiff({ workspaceId: 'w1', path: 'a.txt', staged: true })
+      if ('error' in diff) throw new Error(diff.error.message)
+      expect(diff.text).toBe('diff text')
+
+      subprocess.enqueue({ exitCode: 0 })
+      expect(await gateway.gitStage({ workspaceId: 'w1', paths: ['a.txt'] })).toEqual({ ok: true })
+      subprocess.enqueue({ exitCode: 0 })
+      expect(await gateway.gitUnstage({ workspaceId: 'w1', paths: ['a.txt'] })).toEqual({ ok: true })
+      subprocess.enqueue({ exitCode: 0 })
+      expect(await gateway.gitDiscard({ workspaceId: 'w1', paths: ['a.txt'] })).toEqual({ ok: true })
+    })
+
+    it('answers errors for unknown workspaces', async () => {
+      const { gateway } = await harness()
+      expect((await gateway.gitBranches({ workspaceId: 'ghost' })).error?.code).toBe('workspace-not-found')
+      const failed = await gateway.gitStatus({ workspaceId: 'w-missing' })
+      expect(failed).toEqual({
+        error: { code: 'workspace-not-found', message: "workspace 'w-missing' does not exist" },
+      })
+    })
+  })
+
+  describe('fs remotes', () => {
+    it('lists, searches, reads, writes, and deletes within the workspace root', async () => {
+      const root = await tempRoot()
+      await writeFile(join(root, 'hello.txt'), 'hello world')
+      const { gateway } = await harness({ workspaces: [{ id: 'w1', path: root }] })
+      const list = await gateway.fsList({ workspaceId: 'w1' })
+      if ('error' in list) throw new Error(list.error.message)
+      expect(list.entries.map(entry => entry.name)).toEqual(['hello.txt'])
+      const search = await gateway.fsSearch({ workspaceId: 'w1', query: 'HELLO' })
+      if ('error' in search) throw new Error(search.error.message)
+      expect(search.entries[0]!.path).toBe('hello.txt')
+      const read = await gateway.fsRead({ workspaceId: 'w1', path: 'hello.txt' })
+      if ('error' in read) throw new Error(read.error.message)
+      expect(read).toMatchObject({ kind: 'text', content: 'hello world' })
+      expect(await gateway.fsWrite({ workspaceId: 'w1', path: 'out.txt', content: 'written' })).toEqual({ ok: true })
+      const readBack = await gateway.fsRead({ workspaceId: 'w1', path: 'out.txt' })
+      if ('error' in readBack) throw new Error(readBack.error.message)
+      expect(readBack).toMatchObject({ kind: 'text', content: 'written' })
+      expect(await gateway.fsDelete({ workspaceId: 'w1', path: 'out.txt' })).toEqual({ ok: true })
+      expect((await gateway.fsRead({ workspaceId: 'w1', path: 'out.txt' })).error?.code).toBe('not-found')
+    })
+
+    it('rejects unknown workspaces, unsafe paths, and directories', async () => {
+      const root = await tempRoot()
+      const { gateway } = await harness({ workspaces: [{ id: 'w1', path: root }] })
+      expect((await gateway.fsList({ workspaceId: 'ghost' })).error?.code).toBe('workspace-not-found')
+      expect((await gateway.fsRead({ workspaceId: 'w1', path: '../evil' })).error?.code).toBe('fs-read')
+      expect((await gateway.fsWrite({ workspaceId: 'w1', path: 'a/../b', content: 'x' })).error?.code).toBe('fs-write')
+      expect((await gateway.fsDelete({ workspaceId: 'w1', path: '..' })).error?.code).toBe('fs-delete')
+    })
+
+    it('converts a docx file into structural preview blocks', async () => {
+      const root = await tempRoot()
+      await writeFile(join(root, 'doc.docx'), docxBytes(docxXml()))
+      const { gateway } = await harness({ workspaces: [{ id: 'w1', path: root }] })
+      const preview = await gateway.fsOfficePreview({ workspaceId: 'w1', path: 'doc.docx' })
+      if ('error' in preview) throw new Error(preview.error.message)
+      expect(preview.kind).toBe('docx')
+      expect(preview.blocks).toEqual([
+        { type: 'h1', text: 'Title' },
+        { type: 'p', text: 'Hello world' },
+        { type: 'li', text: 'Item' },
+        { type: 'table', rows: [['A', 'B'], ['1', '2']] },
+      ])
+    })
+
+    it('converts an xlsx file into a bounded table block', async () => {
+      const root = await tempRoot()
+      await writeFile(join(root, 'sheet.xlsx'), xlsxBytes(xlsxXml()))
+      const { gateway } = await harness({ workspaces: [{ id: 'w1', path: root }] })
+      const preview = await gateway.fsOfficePreview({ workspaceId: 'w1', path: 'sheet.xlsx' })
+      if ('error' in preview) throw new Error(preview.error.message)
+      expect(preview.kind).toBe('xlsx')
+      expect(preview.blocks).toEqual([{ type: 'table', rows: [['Alpha', '42'], ['Beta', '7']] }])
+    })
+
+    it('answers office-specific errors for unsupported, oversized, and broken files', async () => {
+      const root = await tempRoot()
+      await writeFile(join(root, 'legacy.doc'), Buffer.from('not a real doc'))
+      await writeFile(join(root, 'big.docx'), Buffer.alloc(64)) // small but replaced below
+      const { gateway } = await harness({ workspaces: [{ id: 'w1', path: root }] })
+      expect((await gateway.fsOfficePreview({ workspaceId: 'w1', path: 'legacy.doc' })).error?.code).toBe('office-unsupported')
+      // Over the 5 MiB default cap.
+      await writeFile(join(root, 'big.docx'), Buffer.alloc(5 * 1024 * 1024 + 1))
+      expect((await gateway.fsOfficePreview({ workspaceId: 'w1', path: 'big.docx' })).error?.code).toBe('office-too-large')
+      // A zip that is not an Office document.
+      await writeFile(join(root, 'bad.xlsx'), Buffer.from('PK\x03\x04 not a zip'))
+      expect((await gateway.fsOfficePreview({ workspaceId: 'w1', path: 'bad.xlsx' })).error?.code).toBe('office-invalid')
+      // Unknown workspace and unsafe paths keep the fs guards.
+      expect((await gateway.fsOfficePreview({ workspaceId: 'ghost', path: 'x.docx' })).error?.code).toBe('workspace-not-found')
+      expect((await gateway.fsOfficePreview({ workspaceId: 'w1', path: '../x.docx' })).error?.code).toBe('office-preview')
+    })
+  })
+
+  describe('balance remote', () => {
+    it('returns the parsed balance view', async () => {
+      process.env.WEB_ENHANCED_TEST_KEY = 'sk-test'
+      vi.stubGlobal('fetch', vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ is_available: true, balance_infos: [{ currency: 'CNY', total_balance: '9.9' }] }),
+      })))
+      const { gateway } = await harness({})
+      const view = await gateway.balanceGet()
+      expect(view).toMatchObject({
+        isAvailable: true,
+        infos: [{ currency: 'CNY', totalBalance: 9.9, grantedBalance: 0, toppedUpBalance: 0 }],
+      })
+    })
+  })
+})

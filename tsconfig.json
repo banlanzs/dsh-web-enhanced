@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "composite": true,
+    "tsBuildInfoFile": "node_modules/.cache/web-enhanced.tsbuildinfo"
+  },
+  "include": ["src"]
+}
