@@ -223,7 +223,7 @@ describe('WebEnhancedGateway', () => {
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet',
       'gitBranches', 'gitLog', 'gitCommit', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
-      'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview',
+      'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',
     ])
   })
 

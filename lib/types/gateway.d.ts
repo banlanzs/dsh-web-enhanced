@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
 /** Plugin config; every bound defaults when unset. */
 export interface Config {
     cronIntervalMs?: number;
@@ -26,6 +26,7 @@ export interface Config {
     searchMaxDepth?: number;
     searchMaxEntries?: number;
     officeMaxBytes?: number;
+    browseMaxEntries?: number;
 }
 export declare const Config: z<Config>;
 /** Field defaults applied when the gateway is constructed directly. */
@@ -87,6 +88,15 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     fsDelete(request: FsDeleteRequest): Promise<FsWriteResult>;
     /** Convert an Office file (docx/xlsx) into preview blocks. */
     fsOfficePreview(request: FsOfficePreviewRequest): Promise<FsOfficePreviewResult>;
+    /**
+     * List one absolute directory anywhere on the host (the mention browser).
+     *
+     * Deliberately NOT workspace-scoped: a mention is a path string, and the
+     * path the user wants may sit outside the project. Reads, writes, and
+     * previews stay behind the workspace root — this returns names, kinds, and
+     * sizes only.
+     */
+    fsBrowse(request: FsBrowseRequest): Promise<FsBrowseResult>;
     /**
      * Whether the balance describes the account one model route bills.
      *

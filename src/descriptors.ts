@@ -226,4 +226,16 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
   unary('fsWrite', 'FsWriteRequest', 'FsWriteResult', okOrError(z.object({ ok: z.boolean() }))),
   unary('fsDelete', 'FsDeleteRequest', 'FsWriteResult', okOrError(z.object({ ok: z.boolean() }))),
   unary('fsOfficePreview', 'FsOfficePreviewRequest', 'FsOfficePreviewResult', okOrError(officePreviewSchema)),
+  unary('fsBrowse', 'FsBrowseRequest', 'FsBrowseResult', okOrError(z.object({
+    path: z.string(),
+    parent: z.string().nullable(),
+    home: z.string(),
+    entries: z.array(z.object({
+      name: z.string(),
+      path: z.string(),
+      kind: z.enum(['file', 'dir']),
+      size: z.number().optional(),
+    })),
+    truncated: z.boolean(),
+  }))),
 ]

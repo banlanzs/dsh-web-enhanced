@@ -69,6 +69,39 @@ export declare function createOverlay(): {
     actions: OverlayActions;
 };
 /**
+ * The host-wide file browser the mention pickers open.
+ *
+ * It is `root`-scoped like every other overlay, but the mention it produces
+ * belongs to ONE session's composer, so the opening session rides the state.
+ * Kept separate from {@link OverlayState} because it carries that payload —
+ * folding it in would give the board and the graph fields that mean nothing
+ * to them.
+ */
+export interface BrowseState {
+    /** Whether the browser is open. */
+    readonly open: boolean;
+    /** Which entries may be chosen. */
+    readonly kind: 'file' | 'dir';
+    /** Session whose composer receives the mention. */
+    readonly sessionId: string;
+}
+/** Browser actions handed to components through their inject face. */
+export interface BrowseActions {
+    /**
+     * Open the browser for one session's composer.
+     * @param kind - whether files or folders may be chosen.
+     * @param sessionId - the session whose draft receives the mention.
+     */
+    readonly openBrowse: (kind: 'file' | 'dir', sessionId: string) => void;
+    /** Close the browser; a no-op when it is already closed. */
+    readonly closeBrowse: () => void;
+}
+/** Create the browser cell and its bound actions. */
+export declare function createBrowse(): {
+    cell: Cell<BrowseState>;
+    actions: BrowseActions;
+};
+/**
  * Browsing state of the workspace view.
  *
  * The view is a tab in the conversation's view ring, so it owns no geometry —

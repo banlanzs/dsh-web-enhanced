@@ -37,9 +37,10 @@ import { createModelRoute } from './model-route.ts'
 import { applyMention, mentionOptions } from './mention.ts'
 import type { MentionDeps, MentionKind, MentionOption } from './mention.ts'
 import { workspaceOfSessionId } from './workspace.ts'
-import { createOverlay, createPanel, createPreview } from './stores.ts'
+import { createBrowse, createOverlay, createPanel, createPreview } from './stores.ts'
 import { BoardSidebarEntry, GraphSidebarEntry } from './board/SidebarEntry.tsx'
 import { BoardOverlay } from './board/BoardOverlay.tsx'
+import { BrowseOverlay } from './browse/BrowseOverlay.tsx'
 import { BranchStrip } from './git/BranchStrip.tsx'
 import { GraphOverlay } from './git/GraphOverlay.tsx'
 import { WorkspaceView } from './panel/WorkspaceView.tsx'
@@ -79,48 +80,68 @@ interface ConversationFace {
 }
 
 /**
+ * Append one mention to a session's composer draft.
+ *
+ * `ctx.conversation` owns the per-session input machine and is read
+ * uninjected, so a deployment composed without it degrades this one gesture
+ * rather than the whole plugin.
+ * @param ctx - client root context.
+ * @param sessionId - the session whose draft receives the text.
+ * @param text - the mention, trailing separator included.
+ */
+function appendMentionTo(ctx: ClientContext, sessionId: string, text: string): void {
+  const conversation = ctx.get('conversation' as never) as unknown as ConversationFace | undefined
+  // Same declaration-merge collision as `openSession`: this package's program
+  // carries both the Web runtime's SessionRuntime (which has `scope`) and the
+  // host's SessionStore (which does not), and the node one wins the lookup —
+  // so the scope face is named explicitly rather than casting the whole
+  // service away.
+  const scopes = ctx.sessions as unknown as { scope(id: string): unknown }
+  const actx = scopes.scope(sessionId)
+  if (conversation === undefined || actx === undefined) return
+  const input = conversation.input.for(actx)
+  const draft = input.state.getSnapshot().draft
+  // A separator only where one is missing: appending to an empty draft or to
+  // text that already ends in whitespace must not add a stray space.
+  input.setDraft(draft === '' || /\s$/u.test(draft) ? draft + text : `${draft} ${text}`)
+}
+
+/**
  * Register the file and folder mention pickers into the composer's `+` menu.
  *
  * A no-op disposer when the deployment composes no command menu — the rest of
  * this plugin does not depend on one.
  * @param ctx - client root context.
  * @param remote - the envelope-free host facade.
+ * @param openBrowse - opener of the host-wide browser (the out-of-project path).
  * @returns the disposer.
  */
-function registerMentionCommands(ctx: ClientContext, remote: WebEnhancedRemote): () => void {
+function registerMentionCommands(
+  ctx: ClientContext,
+  remote: WebEnhancedRemote,
+  openBrowse: (kind: MentionKind, sessionId: string) => void,
+): () => void {
   const commandUi = ctx.get('commandUi' as never) as unknown as CommandUiFace | undefined
   if (commandUi === undefined) return () => {}
   const t = ctx.locale.bind(NS)
   const deps: MentionDeps = {
     remote,
     workspaceOf: sessionId => workspaceOfSessionId(sessionId, ctx.workspaces.list.getSnapshot())?.workspaceId,
-    appendDraft: (sessionId, text) => {
-      const conversation = ctx.get('conversation' as never) as unknown as ConversationFace | undefined
-      // Same declaration-merge collision as `openSession`: this package's
-      // program carries both the Web runtime's SessionRuntime (which has
-      // `scope`) and the host's SessionStore (which does not), and the node
-      // one wins the lookup — so the scope face is named explicitly rather
-      // than casting the whole service away.
-      const scopes = ctx.sessions as unknown as { scope(id: string): unknown }
-      const actx = scopes.scope(sessionId)
-      if (conversation === undefined || actx === undefined) return
-      const input = conversation.input.for(actx)
-      const draft = input.state.getSnapshot().draft
-      // A separator only where one is missing: appending to an empty draft or
-      // to text that already ends in whitespace must not add a stray space.
-      input.setDraft(draft === '' || /\s$/u.test(draft) ? draft + text : `${draft} ${text}`)
-    },
+    appendDraft: (sessionId, text) => { appendMentionTo(ctx, sessionId, text) },
+    openBrowse,
+    browseLabel: () => t('mention.browse'),
   }
   const picker = (kind: MentionKind, name: string, description: string): () => void =>
     commandUi.register({
       name,
       description,
-      // The pickers list a PROJECT; an ungrouped session has no root to list.
-      available: session => deps.workspaceOf(String(session.sessionId)) !== undefined,
+      // Always available: a session with no project still gets the browse row,
+      // because nothing about an ungrouped session forbids naming a path.
+      available: () => true,
       ui: {
         kind: 'popupSelect',
         options: session => mentionOptions(deps, kind, String(session.sessionId)),
-        onSelect: (option, session) => { applyMention(deps, String(session.sessionId), option.id) },
+        onSelect: (option, session) => { applyMention(deps, kind, String(session.sessionId), option.id) },
       },
     })
   const disposers = [
@@ -152,6 +173,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'web-enhanced: dictionaries')
 
   const overlay = createOverlay()
+  const browse = createBrowse()
   const panel = createPanel()
   const preview = createPreview()
   // Uninjected on purpose: ui-model-selection is optional, and its absence
@@ -179,6 +201,7 @@ export function apply(ctx: ClientContext): void {
         const face = (): WebEnhancedInject => ({
           remote,
           modelRoute,
+          appendMention: (sessionId, text) => { appendMentionTo(ctx, sessionId, text) },
           openSession: (sessionId) => {
             // `Context.sessions` carries two declaration merges in this
             // package's program: the Web runtime's SessionsService (which has
@@ -191,8 +214,14 @@ export function apply(ctx: ClientContext): void {
             const navigation = ctx.sessions as unknown as { open(id: never): void }
             navigation.open(sessionId as never)
           },
-          hooks: { overlay: overlay.cell, panel: panel.cell, preview: preview.cell },
+          hooks: {
+            overlay: overlay.cell,
+            browse: browse.cell,
+            panel: panel.cell,
+            preview: preview.cell,
+          },
           ...overlay.actions,
+          ...browse.actions,
           ...panel.actions,
           ...preview.actions,
         })
@@ -226,6 +255,13 @@ export function apply(ctx: ClientContext): void {
             locale: NS,
             inject: face,
           }, GraphOverlay)),
+          ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+            name: 'shell.overlay',
+            id: 'web-enhanced-browse-overlay',
+            order: 30,
+            locale: NS,
+            inject: face,
+          }, BrowseOverlay)),
           ctx.slots.inject('conversation.view', () => ctx.slots.register({
             name: 'conversation.view',
             id: 'web-enhanced-workspace',
@@ -250,7 +286,7 @@ export function apply(ctx: ClientContext): void {
             locale: NS,
             inject: face,
           }, BalanceLine)),
-          registerMentionCommands(ctx, remote),
+          registerMentionCommands(ctx, remote, browse.actions.openBrowse),
         )
       },
       (error: unknown) => { console.error('[web-enhanced] remote mount failed:', error) },
@@ -262,6 +298,6 @@ export function apply(ctx: ClientContext): void {
   }, 'web-enhanced: remote mount + registrations')
 }
 
-export { createOverlay, createPanel, createPreview } from './stores.ts'
+export { createBrowse, createOverlay, createPanel, createPreview } from './stores.ts'
 export type { WebEnhancedInject, WebEnhancedInjected } from './contract.ts'
 export { workspaceOfSession } from './workspace.ts'

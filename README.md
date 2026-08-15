@@ -19,7 +19,7 @@ Developed and built independently of the deepseek-harness repo — the plugin on
 | **Task board** | Sidebar entry opens a board with five columns (Planned / To do / Running / Done / Failed). 「Run」opens a real DSH agent session that executes the task prompt — composed from the deployment's agent preset (so it has bash / read_file / write_file) and attached to the task's project — and the status and result write back automatically when it finishes. 「View session」jumps to the execution session. **Each card has an inline edit form** (title / prompt / cron / column — done or failed tasks reopen via planned/todo). Supports 5-field cron scheduling (e.g. `0 23 * * *`): runs automatically at the due time, catches up after a host restart, and recovers interrupted runs. |
 | **Git graph** | Sidebar entry opens a graph overlay; branch lanes + commit history rendered as SVG (first-parent continuous lanes + horizontal merge links). The header's branch dropdown filters which commits the graph DRAWS (all branches, or one) and changes nothing in the repository; clicking a commit expands its full hash, parents, author and email, date, message body, and per-file added/removed line counts. The branch strip above the composer is the other operation — it checks a branch out. |
 | **Workspace view** | A **Workspace** tab in the conversation's view ring, beside Chat and Trajectory, with three panes (Files / Preview / Changes). The file tree expands, searches by name, and opens files in preview; preview supports markdown (GFM tables, HTML tables, and inline HTML) / HTML (sandboxed iframe) / code / **diff** (line-highlighted unified diff) / CSV / images / PDF / text / **Office docx & xlsx** (host-side structural conversion) with source / **split** (editor + preview side by side) / view modes and save. The Changes pane is backed by real `git status` with stage / unstage / discard and per-file diffs. The active pane and the open directories persist per workspace. |
-| **File mentions** | 「Mention file」and「Mention folder」in the composer's `+` menu: pick a workspace entry and its `@path` is inserted into the draft (paths with spaces are quoted). |
+| **File mentions** | 「Mention file」and「Mention folder」in the composer's `+` menu: a flat, locally filterable list of the project's entries, with a first row「Browse elsewhere…」that opens the plugin's own file browser and walks **any directory outside the project** (breadcrumbs / parent / home / filter by name). Picking one inserts its `@path` into the draft (paths with spaces are quoted). |
 | **Balance line** | Shows the DeepSeek API balance (`GET /user/balance`) below the composer, with a refresh button and a muted error state. **Only while the session's model route actually bills that account** — switching to another channel (or repointing `deepseek-official` at a private gateway) hides the whole line, because the number would then be about somebody else's account. |
 
 ## Screenshots
@@ -41,7 +41,7 @@ The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # recommended
 # or:
-# dsh plugin --profile web add ./dsh-web-enhanced-0.4.0.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.5.0.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -82,7 +82,7 @@ reinstalling from a packed tarball instead:
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.4.0.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.5.0.tgz
 ```
 
 On Windows, tarball installs need real symlink permission (pnpm's
@@ -108,6 +108,7 @@ Plugin-row `config` fields (all have defaults):
 | `gitMaxCount` | 100 | `git log` row cap |
 | `searchMaxDepth` / `searchMaxEntries` | 8 / 200 | File search depth and entry caps |
 | `officeMaxBytes` | 5 MiB | Office preview (docx/xlsx) file size cap |
+| `browseMaxEntries` | 500 | Entry cap of one directory level in the mention browser |
 
 ## Architecture
 
@@ -126,13 +127,14 @@ Plugin-row `config` fields (all have defaults):
 - **Task execution**: `agentPresets.resolve()` names the deployment preset, it is recorded on `meta.agentPreset` and mounted inside `setup` (the host's own `ensureSession` order), then `workspace.attachSession` records the run's session on its project; the run itself is `followup` + `whenIdle` + `sessions.flush` and the result is written back from the `turn/end` reason. A deployment with no preset roster still runs tasks — its sessions just carry whatever the host root registered.
 - **Persistence**: task records live in the `ctx.storageDomain` domain `web_enhanced` (JSON backend); restart recovery settles `running` → `failed` (host-restart). Panel geometry (width, collapsed, expanded directories) persists to `localStorage` keyed per workspace.
 - **Path safety**: every fs/git path is validated against the workspace root (absolute paths, `..`, and backslashes are rejected); a single-ref argument rejects a leading `-`, `..` ranges, and whitespace or globs, so one argument can never become two or become an option; git output is collected with bounds; file reads have byte caps and binary sniffing. Office files are converted on the host (fflate) into bounded structural blocks — headings, paragraphs, list items, tables (≤ 2000 blocks, ≤ 200×50 table) — never raw HTML.
+- **The one exception, `fsBrowse`**: it lists any absolute directory and is deliberately not workspace-scoped, because a mention produces a path STRING and the path the user wants may sit outside the project. It returns names, kinds, and sizes only; reads, writes, and previews all stay behind the workspace root.
 - **Preview safety**: Markdown, CSV, diff, tables, and Office previews render as React elements, never `dangerouslySetInnerHTML`. HTML inside Markdown maps through an allow list to real elements; an unknown tag loses its markup and keeps its text, and `script`/`style` lose both. `javascript:`/`data:` link targets degrade to literal text (a `data:image/*` picture is the exception), and HTML file previews load in a `sandbox=""` iframe (no scripts, no same-origin access).
 
 ## Development
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + full tests + build (164 tests)
+pnpm run check   # typecheck + full tests + build (173 tests)
 ```
 
 Build outputs:
@@ -156,7 +158,8 @@ Prereqs: `dsh`/`pnpm` on PATH, and the main repo's web build output (playwright 
 
 - The workspace surface is a view tab, not a side-by-side column: it replaces the transcript while active rather than sitting next to it, and it owns no width or collapse of its own.
 - HTML inside Markdown renders through an allow list: `<table>` is read structurally and inline tags map to real elements, everything else keeps only its text. `<details>`, inline `style`, and custom elements are not reproduced.
-- The mention pickers list one bounded pass of the host search (`searchMaxEntries`, 200 by default); the popup's own search filters that batch locally rather than re-querying per keystroke.
+- The mention pickers' in-project list is one bounded pass of the host search (`searchMaxEntries`, 200 by default); the popup's own search filters that batch locally rather than re-querying per keystroke. Past that cap, and past the project boundary, is the first row's「Browse elsewhere…」.
+- The mention browser is an in-app file manager, not an operating-system dialog: the host's `host.pickDirectory` picks directories only and only under the `native` capability, and a browser's `<input type="file">` withholds absolute paths by design.
 - Office preview is structural: docx headings/paragraphs/lists/tables and the first xlsx worksheet are rendered; inline styles (bold, colors), images, and multi-sheet workbooks are not. Legacy `.doc`/`.xls` binaries are not previewable.
 - Scheduled tasks are best-effort: 30s tick granularity; windows missed while the host is down are caught up once at startup, no backlog is kept.
 - The balance key shares its source with the model provider (env var); when unconfigured it shows an error state rather than failing. On a route outside `balanceProviders` the line is hidden entirely.

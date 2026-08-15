@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.5.0] - 2026-08-15
+
+### 修复：任务执行的会话既没有工具也没有项目
+
+两条根因叠加。其一，任务会话是用 `agents.create` 裸建的，**没有组合 agent preset**——而 `bash` / `read_file` / `write_file` 这些工具是由 preset 所组合的插件注册的，不是宿主根注册的，所以任务会话只剩下根上那几个（现场表现是工具列表只有 `render_ui` 与 `validate_dsh_ui`），提示词再对也做不成事。其二，会话创建后**没有 `workspace.attachSession`**，于是 UI 里那个会话不属于任何项目。
+
+现在按宿主 `api-proxy` 自己的 `ensureSession` 口径来：`agentPresets.resolve()` 先拿到 preset id（必须在建会话前，因为会话边界会在 setup 开始前就把 `meta` 定格）→ 写进 `meta.agentPreset` → 在 `setup` 内 `mount`（放在 setup 里，组合失败就整体回滚，而不是留下一个能力装了一半的会话）→ 建成后再 `attachSession`（注册表要拿会话头的 canonical cwd 去校验，所以必须后于会话存在）。附着被拒只记一条告警：会话已经在正确目录里跑起来了，为一次记账失败丢掉它更糟。没有 preset 名册的部署照常运行。
+
+### 新增：余额行按当前模型渠道显隐
+
+余额端点服务的是**一个供应商的一个账户**。会话切到别家渠道后那个数字说的是另一个账户，比不显示更糟。`balanceGet` 现在带上会话当前的 `provider`，宿主用 `llm.listConfigurableProviders()` 找到该路由的设置节，再从 `settings` 里读出它**实际配置的 baseURL**，与余额端点同主机才回 `applicable: true`，否则整行不渲染、也不发请求。把 `deepseek-official` 改指到自建网关同样会隐藏。新增 config `balanceProviders`（默认 `["deepseek-official"]`）。
+
+### 新增：Git 图谱的分支筛选与提交详情
+
+- 图谱标题栏加分支下拉（全部分支 / 单分支）。它**只**决定图谱从哪段历史画泳道，不动仓库——输入框上方那个分支条才是 checkout，两个控件回答两个不同的问题。
+- commit 行可点开：新增 `gitCommit` 远程（`git show --first-parent --numstat`）返回完整 hash、父提交、作者与邮箱、时间、提交正文，以及逐文件增删行数。二进制文件 git 报 `-`，这里也照样显示 `—` 而不是伪造成 0。合并提交按首父统计，因此只显示它带进来的改动。
+
+### 新增：输入框 `+` 菜单里的文件 / 文件夹 mention
+
+用 `ctx.commandUi.register` 注册 `mention-file` / `mention-folder` 两个客户端命令（popupSelect），选中后向草稿追加 `@路径`，含空格的路径自动加引号。
+
+写入必须**晚于**弹层自己消费 `/mention-file` token 的那一步——那步带 draftRev CAS，先改草稿会让 CAS 失效、命令文字留在输入框——所以走一个宏任务延后，有测试盯着这个顺序。
+
+**项目外的路径**：popupSelect 是一次性取数 + 本地过滤的扁平列表，走不了目录，所以第一行是「浏览其他位置…」，点开插件自己的浏览器浮层。新增 `fsBrowse` 远程列出**任意绝对目录**（目录在前、文件在后，各自按名排序，有条数上限并如实报 `truncated`）——这是本插件唯一不受工作区根约束的 fs 能力，理由是 mention 产出的只是一个**路径字符串**；读、写、预览仍然全部锁在工作区内。新增 config `browseMaxEntries`（默认 500）。
+
+浏览器浮层做的是应用内的文件资源管理器（面包屑、上一级、主目录、按名过滤），而不是调系统对话框：宿主的 `host.pickDirectory` 只选**目录**且只在 `native` 能力下可用，而浏览器的 `<input type="file">` 出于安全根本不给绝对路径——两条都满足不了「文件 + 绝对路径 + Web 部署」。
+
+### 修复：预览里的 markdown 表格与 HTML 语法
+
+- 新增 GFM 管道表格：`:---:` 三种对齐、`\|` 转义、按表头宽度补齐或裁掉参差的行。表格只由「表头 + 分隔行」这一**对**认领，所以孤立的竖线行仍是段落、正文下面的 `---` 仍是分割线。
+- 新增 HTML `<table>` 的结构化解析（文档里表达不了的单元格常改用它，扁平化会把每个单元格挤成一段话）。
+- 行内 HTML 走白名单映射到真实元素（`b/strong`、`i/em/var/cite`、`code/kbd/samp/tt`、`del/s/strike`、`a`、`img`、`br`）；未知标签只丢标记、保留文字（sanitizer 的形状），`script`/`style` 连内容一起丢；并解码手写文档里常见的实体。
+- 仍然不用 `dangerouslySetInnerHTML`——整个预览是 React 元素，所以任意 HTML 本就不可能原样执行；`javascript:`/`data:` 链接照旧降级为字面文本，`data:image/*` 的图片是唯一例外（那是自包含文档嵌图片的常规写法，渲染的是位图，不是标记）。
+
+### 安全
+
+- 新的分支 / commit 参数会作为 git 参数拼进命令行，因此加了单 ref 校验：拒绝 `-` 开头（会被当成选项）、`..` 范围、空白与通配（一个参数会变成两个）。
+
+### 变更：工作区表面改为会话视图标签页
+
+文件 / 预览 / 变更从 `shell.overlay` 的右侧停靠浮层，改为注册到 `conversation.view`——「对话」「轨迹」所在的那个视图环。视图环一次只渲染一个条目、占满整列，所以这个表面**不再拥有任何几何**：宽度拖拽、双击把手复位、折叠状态与宽度按项目持久化这三项随之取消（它们归框架管，一个 tab 去抢会和框架打架）。留下的持久化是当前面板 + 展开的目录（后者仍按 workspace 分）。持久化键升到 `dsh.webEnhanced.panel.v2`。
+
+### 接口变化
+
+- 远程方法 20 → 22：新增 `gitCommit`、`fsBrowse`；`balanceGet` 从无参改为带 `{ provider? }`（descriptor 的参数元数就是宿主签名，有 arity 守卫测试）。
+- `BalanceView` 新增 `applicable`；`GitLogRequest` 新增 `branch`。
+- config 新增 `balanceProviders`、`browseMaxEntries`。
+- 测试 148 → 173。
+
 ## [0.4.0] - 2026-08-14
 ### 客户端重写 + 两处运行时阻断修复
 

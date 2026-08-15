@@ -6,8 +6,8 @@
  * @module dsh-web-enhanced/src/client/contract
  */
 import type { InjectFace, PropsLocale, PropsRuntime, SlotMap } from '@deepseek-ai/dsh-client-ui-slots';
-import type { BalanceGetRequest, BalanceView, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from '../types.ts';
-import type { Observable, OverlayActions, OverlayState, PanelActions, PanelState, PreviewActions, PreviewState } from './stores.ts';
+import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from '../types.ts';
+import type { BrowseActions, BrowseState, Observable, OverlayActions, OverlayState, PanelActions, PanelState, PreviewActions, PreviewState } from './stores.ts';
 /**
  * The remote facade components call. Every member mirrors one `@Remote`
  * method of `WebEnhancedGateway`, and the request types are the gateway's own
@@ -41,9 +41,10 @@ export interface WebEnhancedRemote {
     fsWrite(request: FsWriteRequest): Promise<FsWriteResult>;
     fsDelete(request: FsDeleteRequest): Promise<FsWriteResult>;
     fsOfficePreview(request: FsOfficePreviewRequest): Promise<FsOfficePreviewResult>;
+    fsBrowse(request: FsBrowseRequest): Promise<FsBrowseResult>;
 }
 /** Re-exported payload types (components, tests, and preview helpers). */
-export type { ApiError, BalanceGetRequest, BalanceView, FsDeleteRequest, FsEntryView, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchView, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitDetailView, GitCommitFileView, GitCommitRequest, GitCommitResult, GitCommitView, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskStatus, TaskUpdateRequest, TaskUpdateResult, } from '../types.ts';
+export type { ApiError, BalanceGetRequest, BalanceView, FsBrowseEntry, FsBrowseRequest, FsBrowseResult, FsBrowseView, FsDeleteRequest, FsEntryView, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchView, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitDetailView, GitCommitFileView, GitCommitRequest, GitCommitResult, GitCommitView, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskStatus, TaskUpdateRequest, TaskUpdateResult, } from '../types.ts';
 /** Right-panel tab selection. */
 export type PanelTab = 'files' | 'preview' | 'scm';
 /**
@@ -125,7 +126,7 @@ export interface ModelRouteFace {
  * Injecting a second one would intersect two translate signatures at the
  * component and lose the key checking.
  */
-export interface WebEnhancedInject extends OverlayActions, PanelActions, PreviewActions {
+export interface WebEnhancedInject extends OverlayActions, BrowseActions, PanelActions, PreviewActions {
     /** Host capabilities of this plugin's Typert namespace. */
     readonly remote: WebEnhancedRemote;
     /**
@@ -135,9 +136,19 @@ export interface WebEnhancedInject extends OverlayActions, PanelActions, Preview
     readonly openSession: (sessionId: string) => void;
     /** Which model route a session runs on (the balance line's visibility test). */
     readonly modelRoute: ModelRouteFace;
+    /**
+     * Append one mention to a session's composer draft.
+     *
+     * The browser overlay is `root`-scoped and writes into a `session`-scoped
+     * composer, so the write goes through the face rather than a slot prop.
+     * @param sessionId - the session whose draft receives the text.
+     * @param text - the mention, trailing separator included.
+     */
+    readonly appendMention: (sessionId: string, text: string) => void;
     /** Shared state sources; delivered to components as selector hooks. */
     readonly hooks: {
         readonly overlay: Observable<OverlayState>;
+        readonly browse: Observable<BrowseState>;
         readonly panel: Observable<PanelState>;
         readonly preview: Observable<PreviewState>;
     };

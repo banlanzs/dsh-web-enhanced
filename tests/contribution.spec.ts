@@ -63,6 +63,13 @@ const payloads: Record<string, unknown[]> = {
     blocks: [{ type: 'p', text: 'x' }, { type: 'table', rows: [['a']] }],
     truncated: false,
   }, errorPayload],
+  fsBrowse: [{
+    path: '/home/u',
+    parent: '/home',
+    home: '/home/u',
+    entries: [{ name: 'a', path: '/home/u/a', kind: 'dir' }, { name: 'b.txt', path: '/home/u/b.txt', kind: 'file', size: 2 }],
+    truncated: false,
+  }, { path: '/', parent: null, home: '/home/u', entries: [], truncated: true }, errorPayload],
 }
 
 describe('webEnhancedRemote contribution', () => {
@@ -93,10 +100,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 21 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 22 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(21)
+    expect(methods).toHaveLength(22)
   })
 
   it('every result schema accepts its success and error payloads', () => {

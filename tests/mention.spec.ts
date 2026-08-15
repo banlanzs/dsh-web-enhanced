@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { applyMention, mentionOptions } from '../src/client/mention.ts'
+import { applyMention, BROWSE_OPTION_ID, mentionOptions } from '../src/client/mention.ts'
 import type { MentionDeps } from '../src/client/mention.ts'
 import type { FsSearchResult, WebEnhancedRemote } from '../src/client/contract.ts'
 
@@ -15,11 +15,15 @@ const entries = [
   { name: 'note file.md', path: 'docs/note file.md', kind: 'file' as const, size: 9 },
 ]
 
+const browseRow = { id: BROWSE_OPTION_ID, label: 'browse…' }
+
 function deps(overrides: Partial<MentionDeps> = {}, result: FsSearchResult = { entries }): MentionDeps {
   return {
     remote: { fsSearch: vi.fn(async () => result) } as unknown as WebEnhancedRemote,
     workspaceOf: () => 'w1',
     appendDraft: vi.fn(),
+    openBrowse: vi.fn(),
+    browseLabel: () => 'browse…',
     // Run inline so the ordering contract is asserted separately, not awaited.
     defer: run => { run() },
     ...overrides,
@@ -29,16 +33,23 @@ function deps(overrides: Partial<MentionDeps> = {}, result: FsSearchResult = { e
 describe('mentionOptions', () => {
   it('offers only files to the file picker and only folders to the folder picker', async () => {
     expect(await mentionOptions(deps(), 'file', 's1')).toEqual([
+      browseRow,
       { id: 'src/a.ts', label: 'src/a.ts' },
       { id: 'docs/note file.md', label: 'docs/note file.md' },
     ])
-    expect(await mentionOptions(deps(), 'dir', 's1')).toEqual([{ id: 'src', label: 'src' }])
+    expect(await mentionOptions(deps(), 'dir', 's1')).toEqual([
+      browseRow,
+      { id: 'src', label: 'src' },
+    ])
   })
 
-  it('refuses a session that belongs to no project', async () => {
-    // The picker lists a project root; an ungrouped session has none.
-    await expect(mentionOptions(deps({ workspaceOf: () => undefined }), 'file', 's1'))
-      .rejects.toThrow('belongs to no project')
+  it('offers the browse row alone to a session that belongs to no project', async () => {
+    // There is no project to list, but nothing about an ungrouped session
+    // forbids naming a path.
+    const remote = { fsSearch: vi.fn() } as unknown as WebEnhancedRemote
+    expect(await mentionOptions(deps({ remote, workspaceOf: () => undefined }), 'file', 's1'))
+      .toEqual([browseRow])
+    expect(remote.fsSearch).not.toHaveBeenCalled()
   })
 
   it('surfaces a host listing failure to the shell error strip', async () => {
@@ -50,14 +61,25 @@ describe('mentionOptions', () => {
 describe('applyMention', () => {
   it('appends the path as an @ reference with a trailing space', () => {
     const appendDraft = vi.fn()
-    applyMention(deps({ appendDraft }), 's1', 'src/a.ts')
+    applyMention(deps({ appendDraft }), 'file', 's1', 'src/a.ts')
     expect(appendDraft).toHaveBeenCalledWith('s1', '@src/a.ts ')
   })
 
   it('quotes a path containing spaces so the reference stays one token', () => {
     const appendDraft = vi.fn()
-    applyMention(deps({ appendDraft }), 's1', 'docs/note file.md')
+    applyMention(deps({ appendDraft }), 'file', 's1', 'docs/note file.md')
     expect(appendDraft).toHaveBeenCalledWith('s1', '@"docs/note file.md" ')
+    // An absolute Windows path is exactly the case the browser produces.
+    applyMention(deps({ appendDraft }), 'file', 's1', 'C:\\Program Files\\x\\a.txt')
+    expect(appendDraft).toHaveBeenLastCalledWith('s1', '@"C:\\Program Files\\x\\a.txt" ')
+  })
+
+  it('opens the host-wide browser instead of inserting when the browse row is picked', () => {
+    const appendDraft = vi.fn()
+    const openBrowse = vi.fn()
+    applyMention(deps({ appendDraft, openBrowse }), 'dir', 's1', BROWSE_OPTION_ID)
+    expect(openBrowse).toHaveBeenCalledWith('dir', 's1')
+    expect(appendDraft).not.toHaveBeenCalled()
   })
 
   it('defers the write past the popup shell settle', () => {
@@ -66,7 +88,7 @@ describe('applyMention', () => {
     // the composer.
     const appendDraft = vi.fn()
     const deferred: Array<() => void> = []
-    applyMention(deps({ appendDraft, defer: run => deferred.push(run) }), 's1', 'src/a.ts')
+    applyMention(deps({ appendDraft, defer: run => deferred.push(run) }), 'file', 's1', 'src/a.ts')
     expect(appendDraft).not.toHaveBeenCalled()
     deferred[0]!()
     expect(appendDraft).toHaveBeenCalledTimes(1)

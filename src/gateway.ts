@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/cordis-plugin-loader'
 import z from '@deepseek-ai/schemastery'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import { BalanceClient } from './balance.ts'
+import { browseDirectory } from './browse.ts'
 import { balanceApplies } from './channel.ts'
 import { TaskBoard } from './board.ts'
 import type { BoardDeps } from './board.ts'
@@ -23,7 +24,8 @@ import { officePreviewView } from './office.ts'
 import type { OfficeLimits } from './office.ts'
 import type { PresetRoster, RunDeps } from './run-task.ts'
 import type {
-  ApiError, BalanceGetRequest, BalanceView, FsDeleteRequest, FsListRequest, FsListResult,
+  ApiError, BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest,
+  FsListRequest, FsListResult,
   FsOfficePreviewRequest,
   FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult,
   FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest,
@@ -69,6 +71,7 @@ export interface Config {
   searchMaxDepth?: number
   searchMaxEntries?: number
   officeMaxBytes?: number
+  browseMaxEntries?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -86,6 +89,7 @@ export const Config: z<Config> = z.object({
   searchMaxDepth: z.number().default(8),
   searchMaxEntries: z.number().default(200),
   officeMaxBytes: z.number().default(5_242_880),
+  browseMaxEntries: z.number().default(500),
 })
 
 /** Field defaults applied when the gateway is constructed directly. */
@@ -105,6 +109,7 @@ export function resolveConfig(config: Config): Required<Config> {
     searchMaxDepth: config.searchMaxDepth ?? 8,
     searchMaxEntries: config.searchMaxEntries ?? 200,
     officeMaxBytes: config.officeMaxBytes ?? 5_242_880,
+    browseMaxEntries: config.browseMaxEntries ?? 500,
   }
 }
 
@@ -332,6 +337,23 @@ export class WebEnhancedGateway extends TypertRemoteService {
       return await officePreviewView(root, request.path, this.officeLimits)
     } catch (error) {
       return { error: this.errorOf(error, 'office-preview') }
+    }
+  }
+
+  /**
+   * List one absolute directory anywhere on the host (the mention browser).
+   *
+   * Deliberately NOT workspace-scoped: a mention is a path string, and the
+   * path the user wants may sit outside the project. Reads, writes, and
+   * previews stay behind the workspace root — this returns names, kinds, and
+   * sizes only.
+   */
+  @Remote('fsBrowse')
+  async fsBrowse(request: FsBrowseRequest): Promise<FsBrowseResult> {
+    try {
+      return await browseDirectory(request.path, { maxEntries: this.resolved.browseMaxEntries })
+    } catch (error) {
+      return { error: this.errorOf(error, 'fs-browse') }
     }
   }
 

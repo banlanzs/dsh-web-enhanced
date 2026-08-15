@@ -10,7 +10,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  activeTabOf, createCell, createOverlay, createPanel, createPreview,
+  activeTabOf, createBrowse, createCell, createOverlay, createPanel, createPreview,
 } from '../src/client/stores.ts'
 import type { PreviewTab } from '../src/client/contract.ts'
 
@@ -77,6 +77,23 @@ describe('overlay', () => {
     actions.closeOverlay()
     const closed = cell.getSnapshot()
     actions.closeOverlay()
+    expect(cell.getSnapshot()).toBe(closed)
+  })
+})
+
+describe('mention browser', () => {
+  it('remembers which session and kind opened it, and closes idempotently', () => {
+    // The browser is root-scoped but writes into ONE session's composer, so
+    // the opening session has to ride the state.
+    const { cell, actions } = createBrowse()
+    expect(cell.getSnapshot().open).toBe(false)
+    actions.openBrowse('dir', 's1')
+    expect(cell.getSnapshot()).toEqual({ open: true, kind: 'dir', sessionId: 's1' })
+    actions.openBrowse('file', 's2')
+    expect(cell.getSnapshot()).toEqual({ open: true, kind: 'file', sessionId: 's2' })
+    actions.closeBrowse()
+    const closed = cell.getSnapshot()
+    actions.closeBrowse()
     expect(cell.getSnapshot()).toBe(closed)
   })
 })

@@ -293,6 +293,32 @@ export interface FsOfficePreviewRequest {
     readonly workspaceId: string;
     readonly path: string;
 }
+/** One entry of a host-wide browse level. */
+export interface FsBrowseEntry {
+    readonly name: string;
+    /** ABSOLUTE host path — this listing is not workspace-relative. */
+    readonly path: string;
+    readonly kind: 'file' | 'dir';
+    readonly size?: number;
+}
+/** One browsed directory level, with its parent and the host home. */
+export interface FsBrowseView {
+    readonly path: string;
+    /** Parent directory, or null at a filesystem root. */
+    readonly parent: string | null;
+    /** Host account home, so the browser can offer a stable starting point. */
+    readonly home: string;
+    readonly entries: readonly FsBrowseEntry[];
+    /** True when the level was cut at the entry cap. */
+    readonly truncated: boolean;
+}
+export type FsBrowseResult = FsBrowseView | {
+    readonly error: ApiError;
+};
+/** Browse one absolute directory; omitted path starts at the host home. */
+export interface FsBrowseRequest {
+    readonly path?: string;
+}
 /** One balance line of the DeepSeek account. */
 export interface BalanceInfo {
     readonly currency: string;

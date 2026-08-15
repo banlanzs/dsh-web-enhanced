@@ -36,6 +36,6 @@ export declare const inject: string[];
  * @param ctx - client root context.
  */
 export declare function apply(ctx: ClientContext): void;
-export { createOverlay, createPanel, createPreview } from './stores.ts';
+export { createBrowse, createOverlay, createPanel, createPreview } from './stores.ts';
 export type { WebEnhancedInject, WebEnhancedInjected } from './contract.ts';
 export { workspaceOfSession } from './workspace.ts';
