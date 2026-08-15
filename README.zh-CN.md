@@ -72,6 +72,35 @@ cd dsh-web-enhanced
 ./scripts/install.sh
 ```
 
+### 更新
+
+**不需要先卸载再装。** `dsh plugin` 是一个 pnpm 转发器：它把参数原样交给 profile 目录里的 `pnpm` 执行，再按**已安装状态**重新对齐 bundle 层列表。所以更新就是一条命令，然后重启 DSH：
+
+```sh
+dsh plugin --profile web update dsh-web-enhanced
+dsh --profile web
+```
+
+要点：**`install` 拉不到新提交，`update` 才行。** `github:banlanzs/dsh-web-enhanced` 这种没写 ref 的 spec 跟的是默认分支，但 pnpm 会把当时解析到的 commit 钉进 profile 的锁文件：
+
+```
+dsh-web-enhanced: github:banlanzs/dsh-web-enhanced
+  → codeload.github.com/banlanzs/dsh-web-enhanced/tar.gz/<commit>
+```
+
+`pnpm install` 尊重锁文件、只会重装同一个 commit；`update` 会重新解析分支 HEAD 并改写锁文件。
+
+层列表按「已安装状态」而不是「依赖差异」对齐是刻意的：这样某个包在新版本里**才开始**声明 `dsh.bundle` 时，`update` 也能把它加进层栈。
+
+万一某次 `update` 没动（pnpm 对 git 依赖偶尔会啃缓存），退路依次是 `--force`，再不行才是 remove + add：
+
+```sh
+dsh plugin --profile web update --force dsh-web-enhanced
+# 仍然不动时的兜底
+dsh plugin --profile web remove dsh-web-enhanced
+dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git
+```
+
 ### 开发迭代
 
 本插件**不能**用 `link:`（见上文提示——它会复制一份宿主包，从而静默地让所有

@@ -72,6 +72,35 @@ cd dsh-web-enhanced
 ./scripts/install.sh
 ```
 
+### Updating
+
+**No uninstall-then-reinstall needed.** `dsh plugin` is a pnpm forwarder: it hands your arguments verbatim to `pnpm` in the profile directory, then reconciles the bundle layer list against the **installed state**. So an update is one command, then a restart:
+
+```sh
+dsh plugin --profile web update dsh-web-enhanced
+dsh --profile web
+```
+
+The thing to know: **`install` will not pick up new commits, `update` will.** A ref-less spec like `github:banlanzs/dsh-web-enhanced` tracks the default branch, but pnpm pins whichever commit it resolved into the profile's lockfile:
+
+```
+dsh-web-enhanced: github:banlanzs/dsh-web-enhanced
+  → codeload.github.com/banlanzs/dsh-web-enhanced/tar.gz/<commit>
+```
+
+`pnpm install` honours that lock and reinstalls the same commit; `update` re-resolves the branch head and rewrites it.
+
+Reconciling by installed state rather than by dependency diff is deliberate: it is what lets `update` activate a package that only started declaring `dsh.bundle` in a newer version.
+
+If an update ever fails to move (pnpm can hold on to a cached git resolution), the fallbacks in order are `--force`, and only then remove + add:
+
+```sh
+dsh plugin --profile web update --force dsh-web-enhanced
+# last resort
+dsh plugin --profile web remove dsh-web-enhanced
+dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git
+```
+
 ### Developer iteration
 
 `link:` is NOT usable for this plugin (see the note above — it duplicates the
