@@ -23,6 +23,15 @@ export interface OverlayShellProps {
   readonly onClose: () => void
   /** Controls rendered next to the title (refresh, create, …). */
   readonly actions?: ReactNode
+  /**
+   * Let the body OWN the panel's height instead of scrolling as one document.
+   *
+   * The default suits content that reads top to bottom: it flows and the body
+   * scrolls. A surface made of columns or a list wants the opposite — fill the
+   * panel, scroll its own regions — and without this it lays out against its
+   * content height instead, which is what leaves a tall panel half empty.
+   */
+  readonly fill?: boolean
   /** `data-testid` of the panel element. */
   readonly testId?: string
   /** Panel body. */
@@ -30,7 +39,7 @@ export interface OverlayShellProps {
 }
 
 /** Full-frame overlay chrome: backdrop, panel, title bar, dismissal. */
-export function OverlayShell({ title, closeLabel, onClose, actions, testId, children }: OverlayShellProps) {
+export function OverlayShell({ title, closeLabel, onClose, actions, fill, testId, children }: OverlayShellProps) {
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -73,7 +82,7 @@ export function OverlayShell({ title, closeLabel, onClose, actions, testId, chil
             ✕
           </button>
         </header>
-        <div className={css.body}>{children}</div>
+        <div className={css.body} data-fill={fill === true || undefined}>{children}</div>
       </div>
     </div>
   )

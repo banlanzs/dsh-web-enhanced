@@ -1,6 +1,6 @@
 {
   "name": "dsh-web-enhanced",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Web-enhanced plugin for DeepSeek Harness: task board with cron scheduling, git graph, preview/files/SCM right panel, and DeepSeek balance line",
   "type": "module",
   "main": "lib/index.js",

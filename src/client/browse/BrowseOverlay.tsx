@@ -103,6 +103,7 @@ export function BrowseOverlay({ useBrowse, remote, closeBrowse, appendMention, t
       closeLabel={t('browse.close')}
       onClose={closeBrowse}
       testId="browse-overlay"
+      fill
       actions={
         <>
           <input

@@ -20,7 +20,8 @@
 }
 
 .error {
-  margin: 0 0 10px;
+  flex: none;
+  margin: 0;
   border-radius: 5px;
   background: rgb(217 83 79 / 16%);
   color: #d9534f;
@@ -30,8 +31,8 @@
 
 .form {
   display: grid;
+  flex: none;
   gap: 8px;
-  margin-bottom: 12px;
   border: 1px solid rgb(128 128 128 / 26%);
   border-radius: 7px;
   padding: 10px 12px;
@@ -73,14 +74,32 @@
   gap: 6px;
 }
 
-/* Five columns that scroll horizontally rather than squeezing cards. */
+/* Five columns SHARING the panel width. `minmax(0, 1fr)` is the whole point:
+   a `1fr` track refuses to shrink below its content's min-content width, and
+   the earlier `minmax(230px, 1fr)` refused below 230px — five of those never
+   fit, so the board overflowed sideways AND the cards stayed narrow at the
+   same time. A floor belongs only where the columns would be unreadable, and
+   that is the media query below, not the default. */
 .columns {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(230px, 1fr);
+  flex: 1;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
-  overflow-x: auto;
-  align-items: start;
+  min-height: 0;
+  align-items: stretch;
+}
+
+/* Genuinely too narrow for five readable columns: only here does horizontal
+   scrolling buy anything. The viewport is a sound proxy for the panel here —
+   the panel is `min(1180px, 100%)` inside a fixed 32px-padded backdrop, so
+   its width is a pure function of the viewport's. */
+@media (width <= 900px) {
+  .columns {
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    grid-auto-columns: minmax(200px, 1fr);
+    overflow-x: auto;
+  }
 }
 
 .column {
@@ -88,10 +107,12 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  min-height: 0;
 }
 
 .columnTitle {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 6px;
   margin: 0;
@@ -108,16 +129,23 @@
   padding: 0 6px;
 }
 
+/* Each column scrolls on its own: the board's height is the panel's, so a
+   long column must not push the others or leave dead space under the short
+   ones. */
 .cards {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 8px;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 2px 0 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .empty {
+  flex: none;
   margin: 0;
   font-size: 11px;
   opacity: 0.55;

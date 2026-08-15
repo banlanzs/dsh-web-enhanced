@@ -1,11 +1,13 @@
 .card {
   display: flex;
+  flex: none;
   flex-direction: column;
   gap: 6px;
   border: 1px solid rgb(128 128 128 / 26%);
   border-radius: 7px;
   padding: 9px 10px;
   background: rgb(128 128 160 / 8%);
+  min-width: 0;
 }
 
 .card[data-status='running'] {
@@ -20,17 +22,21 @@
   margin: 0;
   font-size: 13px;
   font-weight: 600;
+  /* A task title is often a path or a command: break inside a long run
+     rather than pushing the card past its column. */
+  overflow-wrap: anywhere;
 }
 
+/* No line clamp anywhere on the card: the column scrolls, so a card may grow
+   to whatever it has to say. Clamping traded a tidy grid for prompts and run
+   results that could not be read at all. */
 .prompt {
   margin: 0;
   font-size: 12px;
   line-height: 1.45;
   opacity: 0.8;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .meta {
@@ -44,6 +50,7 @@
 
 .metaRow {
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .result,
@@ -54,10 +61,8 @@
   line-height: 1.4;
   padding: 4px 6px;
   background: rgb(128 128 160 / 16%);
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .resultError {

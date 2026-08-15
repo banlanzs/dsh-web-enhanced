@@ -26,12 +26,12 @@
 
 .crumbs {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   border-bottom: 1px solid rgb(128 128 128 / 18%);
   padding-bottom: 6px;
-  margin-bottom: 6px;
 }
 
 .crumb {
@@ -55,11 +55,19 @@
   opacity: 0.4;
 }
 
+/* The list OWNS the remaining panel height, and fills its width in as many
+   columns as fit. A single column on a 1100px-wide dialog wastes most of the
+   surface; a fixed `max-height` wasted the rest of the height below it. */
 .rows {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  align-content: start;
+  gap: 2px 10px;
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 52vh;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -99,6 +107,7 @@
 }
 
 .name {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -108,10 +117,20 @@
 .empty,
 .notice,
 .error {
-  margin: 12px 0;
+  margin: 0;
   font-size: 12px;
   opacity: 0.7;
   list-style: none;
+}
+
+/* A message inside the entry grid speaks for the whole level, not one cell. */
+.empty {
+  grid-column: 1 / -1;
+}
+
+.notice,
+.error {
+  flex: none;
 }
 
 .error {

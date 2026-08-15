@@ -89,6 +89,7 @@ export function BoardOverlay({
       closeLabel={t('board.close')}
       onClose={closeOverlay}
       testId="board-overlay"
+      fill
       actions={(
         <button type="button" className={css.action} data-testid="board-create-toggle" onClick={() => { setCreating(value => !value) }}>
           {t('board.create')}

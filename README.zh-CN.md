@@ -41,7 +41,7 @@
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # 推荐
 # 或：
-# dsh plugin --profile web add ./dsh-web-enhanced-0.5.0.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.5.1.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -110,7 +110,7 @@ host 能力失效）。改用打包重装来迭代：
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.5.0.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.5.1.tgz
 ```
 
 Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPackage` 步骤）。

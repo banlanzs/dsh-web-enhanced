@@ -72,3 +72,19 @@
   overflow: auto;
   padding: 14px;
 }
+
+/* Fill mode: the body stops being a scrolling document and becomes the
+   column its content lays out in, so a surface made of columns or a list
+   stretches to the panel instead of ending wherever its content does — and
+   owns its own scrolling regions. `min-width: 0` is what lets a grid child
+   inside actually shrink rather than forcing the panel to overflow.
+   `overflow: auto` rather than `hidden`: in the normal case nothing overflows
+   and no scrollbar appears, but a fixed-height sibling taller than the panel
+   (an open create form on a short window) must stay reachable, not clipped. */
+.body[data-fill] {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  overflow: auto;
+}
