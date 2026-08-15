@@ -46,11 +46,3 @@
   min-height: 0;
   overflow: auto;
 }
-
-.about {
-  margin: 0;
-  max-width: 60ch;
-  font-size: 14px;
-  line-height: 1.7;
-  opacity: 0.75;
-}

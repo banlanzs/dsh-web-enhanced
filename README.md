@@ -43,7 +43,7 @@ The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # recommended
 # or:
-# dsh plugin --profile web add ./dsh-web-enhanced-0.11.0.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.11.1.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -113,7 +113,7 @@ reinstalling from a packed tarball instead:
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.11.0.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.11.1.tgz
 ```
 
 On Windows, tarball installs need real symlink permission (pnpm's

@@ -1,0 +1,103 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+  min-height: 0;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.version {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  border: 1px solid rgb(128 128 128 / 22%);
+  border-radius: 4px;
+  padding: 1px 8px;
+  background: rgb(128 128 128 / 8%);
+}
+
+.dot {
+  opacity: 0.5;
+}
+
+.description,
+.note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  max-width: 62ch;
+}
+
+.note {
+  opacity: 0.65;
+  white-space: pre-wrap;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid rgb(128 128 128 / 18%);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature {
+  border: 1px solid rgb(128 128 128 / 20%);
+  border-radius: 14px;
+  background: rgb(128 128 128 / 6%);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 3px 12px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.link {
+  color: inherit;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.link:hover {
+  opacity: 1;
+}

@@ -8,9 +8,9 @@
  * shell's own id allowlist (an unknown id gets the generic one) and nothing
  * else about the nav is ours to decide.
  *
- * The page carries its own tabs because it hosts two unrelated things: managing
- * what the profile has installed, and describing what this plugin is. Neither
- * deserves a separate nav row.
+ * The page carries its own tabs because it hosts three unrelated things:
+ * managing what the profile has installed, configuring image understanding,
+ * and describing what this plugin is. None deserves a separate nav row.
  * @module dsh-web-enhanced/src/client/settings/SettingsSection
  */
 
@@ -18,6 +18,7 @@ import { useState } from 'react'
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { WebEnhancedProps } from '../contract.ts'
+import { AboutPanel } from './AboutPanel.tsx'
 import { PluginManager } from './PluginManager.tsx'
 import { VisionStatusPanel } from './VisionStatusPanel.tsx'
 import css from './SettingsSection.module.css'
@@ -55,7 +56,7 @@ export function SettingsSection({ remote, t }: SettingsSectionProps) {
       <div className={css.body}>
         {tab === 'plugins' && <PluginManager remote={remote} t={t} />}
         {tab === 'vision' && <VisionStatusPanel remote={remote} t={t} />}
-        {tab === 'about' && <p className={css.about}>{t('about.body')}</p>}
+        {tab === 'about' && <AboutPanel t={t} />}
       </div>
     </div>
   )
