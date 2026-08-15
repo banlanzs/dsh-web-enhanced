@@ -226,6 +226,11 @@
   background: rgb(128 128 160 / 16%);
 }
 
+.inlineImage {
+  max-width: 100%;
+  vertical-align: middle;
+}
+
 .diffLine {
   display: block;
 }

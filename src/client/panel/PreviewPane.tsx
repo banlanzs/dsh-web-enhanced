@@ -16,7 +16,7 @@ import type { OfficeBlock, PreviewMode, PreviewTab, WebEnhancedProps } from '../
 import { dataUrlOf, extensionOf, hasRenderedForm, isEditable } from '../preview.ts'
 import { activeTabOf } from '../stores.ts'
 import { diffLineKind, parseDelimited, parseMarkdown } from './markdown.ts'
-import type { MdSpan } from './markdown.ts'
+import type { MdBlock, MdSpan } from './markdown.ts'
 import css from './PreviewPane.module.css'
 
 /** Props of the preview pane. */
@@ -178,12 +178,48 @@ function Spans({ spans }: { spans: readonly MdSpan[] }): ReactNode {
       case 'code': return <code className={css.inlineCode} key={index}>{span.text}</code>
       case 'strong': return <strong key={index}>{span.text}</strong>
       case 'em': return <em key={index}>{span.text}</em>
+      case 'del': return <del key={index}>{span.text}</del>
+      case 'break': return <br key={index} />
+      // The source may be any workspace file, so an image reference is loaded
+      // only when it already resolves on its own (an absolute URL or a data
+      // URI). A workspace-relative path has no browser-resolvable origin here.
+      case 'image': return <img className={css.inlineImage} key={index} src={span.href} alt={span.text} />
       // Previewed documents are untrusted: opening in a new context without
       // an opener keeps a link from reaching back into the app.
       case 'link': return <a key={index} href={span.href} target="_blank" rel="noreferrer noopener">{span.text}</a>
       case 'text': return <span key={index}>{span.text}</span>
     }
   })
+}
+
+/** A parsed Markdown or HTML table, with its per-column alignment. */
+function MarkdownTable({ block }: { block: Extract<MdBlock, { type: 'table' }> }) {
+  return (
+    <table className={css.table}>
+      {block.header.length > 0 && (
+        <thead>
+          <tr>
+            {block.header.map((cell, index) => (
+              <th key={index} style={block.align[index] === undefined ? undefined : { textAlign: block.align[index] }}>
+                <Spans spans={cell} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+      )}
+      <tbody>
+        {block.rows.map((row, rowIndex) => (
+          <tr key={rowIndex}>
+            {row.map((cell, index) => (
+              <td key={index} style={block.align[index] === undefined ? undefined : { textAlign: block.align[index] }}>
+                <Spans spans={cell} />
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
 }
 
 /** Structural Markdown rendering. */
@@ -200,6 +236,7 @@ function MarkdownView({ source }: { source: string }) {
           case 'code': return <pre className={css.codeBlock} key={index} data-lang={block.lang}><code>{block.code}</code></pre>
           case 'quote': return <blockquote key={index}><Spans spans={block.spans} /></blockquote>
           case 'rule': return <hr key={index} />
+          case 'table': return <MarkdownTable block={block} key={index} />
           case 'list': {
             const Tag = block.ordered ? 'ol' : 'ul'
             return (
