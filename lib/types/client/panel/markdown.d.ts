@@ -23,10 +23,21 @@ export type MdSpan = {
     readonly type: 'em';
     readonly text: string;
 } | {
+    readonly type: 'del';
+    readonly text: string;
+} | {
     readonly type: 'link';
     readonly text: string;
     readonly href: string;
+} | {
+    readonly type: 'image';
+    readonly text: string;
+    readonly href: string;
+} | {
+    readonly type: 'break';
 };
+/** Column alignment of a GFM table, from its delimiter row. */
+export type MdAlign = 'left' | 'center' | 'right' | undefined;
 /** One block-level Markdown element. */
 export type MdBlock = {
     readonly type: 'heading';
@@ -48,6 +59,11 @@ export type MdBlock = {
     readonly spans: readonly MdSpan[];
 } | {
     readonly type: 'rule';
+} | {
+    readonly type: 'table';
+    readonly header: readonly (readonly MdSpan[])[];
+    readonly align: readonly MdAlign[];
+    readonly rows: readonly (readonly (readonly MdSpan[])[])[];
 };
 /**
  * Parse inline Markdown into spans.
@@ -61,6 +77,16 @@ export declare function parseInline(text: string): MdSpan[];
  * @returns the block list; an unterminated fence still yields its code block.
  */
 export declare function parseMarkdown(source: string): MdBlock[];
+/**
+ * Read one `<table>` element into a table block.
+ *
+ * Cells keep their inline content (so `<br>`, `<b>`, and Markdown inside a
+ * cell still render); a `<th>` anywhere in the first row makes it the header,
+ * and a table with no rows is not a table.
+ * @param html - the element's source, opening tag through closing tag.
+ * @returns the block, or undefined when nothing row-shaped was found.
+ */
+export declare function parseHtmlTable(html: string): MdBlock | undefined;
 /**
  * Parse delimiter-separated text into rows, honouring quoted fields.
  *

@@ -76,6 +76,74 @@ describe('GitClient', () => {
     await expect(git.log(5)).rejects.toThrow('fatal: bad config')
   })
 
+  it('log walks every ref by default and one branch when the graph filters', async () => {
+    const { fake, git } = client()
+    fake.enqueue({ stdout: '' })
+    fake.enqueue({ stdout: '' })
+    await git.log(5)
+    expect(fake.calls[0]!.argv).toContain('--all')
+
+    fake.enqueue({ stdout: '' })
+    fake.enqueue({ stdout: '' })
+    await git.log(5, 'feature')
+    // Named ref instead of --all: the filter decides which history is drawn.
+    expect(fake.calls[2]!.argv).toContain('feature')
+    expect(fake.calls[2]!.argv).not.toContain('--all')
+  })
+
+  it('log refuses a branch that could become an option, a range, or two arguments', async () => {
+    const { git } = client()
+    await expect(git.log(5, '--upload-pack=evil')).rejects.toThrow("must not start with '-'")
+    await expect(git.log(5, 'main..dev')).rejects.toThrow('characters a single ref may not')
+    await expect(git.log(5, 'main dev')).rejects.toThrow('characters a single ref may not')
+    await expect(git.log(5, 'main^')).rejects.toThrow('characters a single ref may not')
+  })
+
+  it('commit reads identity, body, and per-file counts', async () => {
+    const { fake, git } = client()
+    fake.enqueue({
+      stdout: [
+        'abc123\x1fp1 p2\x1fAlice\x1falice@example.com\x1f1700000000\x1fsubject line\x1fbody line one',
+        'body line two\x1e',
+        '',
+        '3\t1\tsrc/a.ts',
+        '-\t-\tassets/logo.png',
+        '',
+      ].join('\n'),
+    })
+    expect(await git.commit('abc123')).toEqual({
+      hash: 'abc123',
+      parents: ['p1', 'p2'],
+      author: 'Alice',
+      email: 'alice@example.com',
+      date: 1700000000,
+      subject: 'subject line',
+      body: 'body line one\nbody line two',
+      files: [
+        { path: 'src/a.ts', added: 3, removed: 1 },
+        // A binary file has no line counts; git says `-` and so does this.
+        { path: 'assets/logo.png', added: null, removed: null },
+      ],
+    })
+    expect(fake.calls[0]!.argv).toContain('--numstat')
+  })
+
+  it('commit throws for an unknown revision and refuses an option-shaped one', async () => {
+    const { fake, git } = client()
+    fake.enqueue({ exitCode: 128, stderr: "fatal: bad object nope\n" })
+    await expect(git.commit('nope')).rejects.toThrow('fatal: bad object nope')
+    await expect(git.commit('-x')).rejects.toThrow("must not start with '-'")
+    await expect(git.commit('')).rejects.toThrow('must not be empty')
+  })
+
+  it('commit tolerates output with no numstat section', async () => {
+    const { fake, git } = client()
+    fake.enqueue({ stdout: 'abc\x1f\x1fA\x1fa@b\x1f1\x1fs\x1f' })
+    const detail = await git.commit('abc')
+    expect(detail.files).toEqual([])
+    expect(detail.parents).toEqual([])
+  })
+
   it('checkout succeeds or carries the rejection message', async () => {
     const { fake, git } = client()
     fake.enqueue({ exitCode: 0 })

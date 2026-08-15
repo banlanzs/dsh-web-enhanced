@@ -16,10 +16,11 @@
 
 | 功能 | 说明 |
 |---|---|
-| **任务看板** | 侧边栏入口打开看板；任务按五列组织（待规划 / 待办 / 进行中 / 已完成 / 已失败）；卡片「执行」在宿主上开一个真实 DSH 智能体会话运行任务提示词，完成后状态与结果自动回写；「查看会话」跳转到执行会话；**每张卡片带内联编辑表单**（title / prompt / cron / 状态列——done/failed 改回 planned/todo 即重开）；支持 5 字段 cron 定时（如 `0 23 * * *`），到期自动运行，宿主重启后补跑并恢复中断任务。 |
-| **Git 图谱** | 侧边栏入口打开图谱覆盖层；分支泳道 + 提交历史以 SVG 渲染（首父连续泳道 + 合并横向连线）；输入框上方分支选择条（切换分支、最近提交、打开图谱）。 |
-| **工作区视图** | 会话顶部视图栏中的「工作区」标签页，与「对话」「轨迹」并列，内含文件 / 预览 / 变更三个面板。文件树支持整行展开、文件名搜索、点击打开预览；预览支持 markdown / HTML（sandbox iframe）/ 代码 / **diff**（行级高亮 unified diff）/ CSV / 图片 / PDF / 文本 / **Office（docx/xlsx，宿主侧结构化转换）**，且支持**源码 / 分屏 / 预览**三态与保存；变更页基于真实 git status，支持 stage / unstage / discard 与逐文件 diff。当前面板与展开的目录按工作区持久化。 |
-| **余额显示** | 输入框下方显示 DeepSeek API 余额（`GET /user/balance`），带刷新与弱化错误态。 |
+| **任务看板** | 侧边栏入口打开看板；任务按五列组织（待规划 / 待办 / 进行中 / 已完成 / 已失败）；卡片「执行」在宿主上开一个真实 DSH 智能体会话运行任务提示词，会话按部署的 agent preset 组合（因此拿得到 bash / read_file / write_file 等工具）并附着到任务绑定的项目上，完成后状态与结果自动回写；「查看会话」跳转到执行会话；**每张卡片带内联编辑表单**（title / prompt / cron / 状态列——done/failed 改回 planned/todo 即重开）；支持 5 字段 cron 定时（如 `0 23 * * *`），到期自动运行，宿主重启后补跑并恢复中断任务。 |
+| **Git 图谱** | 侧边栏入口打开图谱覆盖层；分支泳道 + 提交历史以 SVG 渲染（首父连续泳道 + 合并横向连线）；标题栏的分支下拉只筛选图谱显示的提交（全部分支 / 单分支），不切换仓库；点击任一提交展开详情：完整 hash、父提交、作者与邮箱、时间、提交正文，以及逐文件增删行数。输入框上方另有分支选择条（切换分支、最近提交、打开图谱）——那是真正的 checkout，与图谱筛选是两回事。 |
+| **工作区视图** | 会话顶部视图栏中的「工作区」标签页，与「对话」「轨迹」并列，内含文件 / 预览 / 变更三个面板。文件树支持整行展开、文件名搜索、点击打开预览；预览支持 markdown（含 GFM 表格、HTML 表格与行内 HTML）/ HTML（sandbox iframe）/ 代码 / **diff**（行级高亮 unified diff）/ CSV / 图片 / PDF / 文本 / **Office（docx/xlsx，宿主侧结构化转换）**，且支持**源码 / 分屏 / 预览**三态与保存；变更页基于真实 git status，支持 stage / unstage / discard 与逐文件 diff。当前面板与展开的目录按工作区持久化。 |
+| **文件 mention** | 输入框 `+` 菜单里的「引用文件」「引用文件夹」两项：弹出工作区条目选择器，选中后把 `@路径` 插入草稿（含空格的路径自动加引号）。 |
+| **余额显示** | 输入框下方显示 DeepSeek API 余额（`GET /user/balance`），带刷新与弱化错误态。**仅在当前会话的模型路由确实指向该余额所属账户时显示**——切到别家渠道（或把 deepseek-official 改指到自建网关）后整行隐藏，因为那时的数字说的是另一个账户。 |
 
 ## 截图
 
@@ -96,6 +97,7 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 | `balanceApiKeyEnv` | `DEEPSEEK_API_KEY` | 余额查询的 API key 环境变量 |
 | `balanceCacheTtlMs` | 60000 | 余额视图缓存时长 |
 | `balanceBaseUrl` | `https://api.deepseek.com` | 余额端点基址 |
+| `balanceProviders` | `[deepseek-official]` | 余额行只对这些模型渠道显示；渠道另配了 baseURL 时还要与端点同主机 |
 | `skipDirs` | `[node_modules]` | 文件树/搜索跳过的目录（`.git` 恒跳过） |
 | `readMaxBytes` | 1 MiB | 文本读取上限（超出截断标记） |
 | `writeMaxBytes` | 2 MiB | 文件写入上限 |
@@ -107,17 +109,19 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 
 ## 架构要点
 
-- **零仓库改动**：客户端 UI 只注册到既有槽位——`sidebar.footer.action`（看板/图谱入口）、`shell.overlay`（看板与图谱浮层本体）、`conversation.view`（工作区视图标签页）、`conversation.input.dock`（分支条）、`conversation.composer.dock`（余额行）。未占用布局的 `details` 槽：那是已被 ui-conversation 的 `DetailsPanel` 占据的 `single` 槽，注册进去会顶掉工具详情列。
+- **零仓库改动**：客户端 UI 只注册到既有槽位——`sidebar.footer.action`（看板/图谱入口）、`shell.overlay`（看板与图谱浮层本体）、`conversation.view`（工作区视图标签页）、`conversation.input.dock`（分支条）、`conversation.composer.dock`（余额行），外加通过 `ctx.commandUi.register` 注册的两个客户端命令（`+` 菜单里的文件 / 文件夹 mention）。未占用布局的 `details` 槽：那是已被 ui-conversation 的 `DetailsPanel` 占据的 `single` 槽，注册进去会顶掉工具详情列。
+- **可选服务一律非注入读取**：`agentPresets`、`llm`、`settings`、`credentials`、`modelDirectories`、`commandUi`、`conversation` 都用 `ctx.get()` 取，缺任何一个只让对应的那一小块降级，不会让插件入口卡住不启动。
+- **任务执行**：`agentPresets.resolve()` 解析部署默认 preset → 写进 `meta.agentPreset` → 在 `setup` 里 `mount`（与宿主 `ensureSession` 同序），随后 `workspace.attachSession` 把会话记到项目上；之后 `followup` + `whenIdle` + `sessions.flush`，结果按 `turn/end` reason 回写。没有 preset 名册的部署照常运行，只是会话只带宿主根注册的工具。
 - **手写 remote contribution**：host 方法用 `@Remote` 装饰器（Typert SRC 模式，宿主网关自动发现 `ctx.webEnhanced` 服务）；客户端在 apply 里 `ctx.remote.$mount()` 手写的 src-json contribution，无需 typert 生成管线。
-- **任务执行**：`agents.create` + `followup` + `whenIdle` + `sessions.flush`（headless 同款驱动序列），结果按 `turn/end` reason 回写。
 - **持久化**：任务记录存 `ctx.storageDomain` 域 `web_enhanced`（JSON 后端），重启恢复 running → failed（host-restart）。
-- **路径安全**：所有 fs/git 路径经工作区根校验（拒绝绝对路径、`..`、反斜杠）；git 输出有界收集；文件读有字节上限与二进制嗅探。Office 文件在宿主侧用 fflate 解包为有界结构化 blocks（标题/段落/列表/表格，≤ 2000 块、≤ 200×50 表格），绝不产出原始 HTML。
+- **路径安全**：所有 fs/git 路径经工作区根校验（拒绝绝对路径、`..`、反斜杠）；单 ref 参数拒绝 `-` 开头、`..` 范围与空白/通配（防止一个参数变成两个或变成选项）；git 输出有界收集；文件读有字节上限与二进制嗅探。Office 文件在宿主侧用 fflate 解包为有界结构化 blocks（标题/段落/列表/表格，≤ 2000 块、≤ 200×50 表格），绝不产出原始 HTML。
+- **预览安全**：markdown / CSV / diff / Office / 表格全部渲染为 React 元素，从不 `dangerouslySetInnerHTML`。markdown 里的 HTML 走白名单映射到对应元素，未知标签只丢标记保留文字，`script`/`style` 连内容一起丢；`javascript:`/`data:` 链接降级为字面文本（`data:image/*` 的图片除外），HTML 文件预览进 `sandbox=""` iframe。
 
 ## 开发
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + 全部测试 + 构建（148 个测试）
+pnpm run check   # typecheck + 全部测试 + 构建（164 个测试）
 ```
 
 构建产物：
@@ -140,10 +144,12 @@ node scripts/e2e.mjs --capture   # 顺带刷新本 README 使用的 assets/*.png
 ## 已知限制
 
 - 工作区为视图标签页而非并排列：激活时取代对话记录显示，而不是与其并排；它自身不拥有宽度与折叠状态。
+- markdown 中的 HTML 只做白名单渲染：`<table>` 按结构解析，行内标签映射到对应元素，其余标签只保留文字。`<details>`、内联 `style`、自定义元素不还原。
+- mention 选择器一次性列出宿主搜索上限（`searchMaxEntries`，默认 200）内的条目，弹层内的搜索是对这批结果的本地过滤，不是逐键重新查询。
 - Office 预览为结构化视图：docx 的标题/段落/列表/表格与 xlsx 首个工作表可预览；内联样式（加粗/颜色）、图片与多工作表不保留。旧版 `.doc`/`.xls` 二进制格式不支持预览。
 - 定时任务为 best-effort：tick 粒度 30s，宿主关机期间错过的窗口在启动时补跑一次，不留积压。
-- 余额 key 与模型提供商同源（环境变量）；未配置时显示错误态而非报错。
-- 图谱泳道为简化算法（首父连续性），非 git 完整拓扑着色。
+- 余额 key 与模型提供商同源（环境变量）；未配置时显示错误态而非报错。切到非 `balanceProviders` 的渠道时整行隐藏。
+- 图谱泳道为简化算法（首父连续性），非 git 完整拓扑着色；提交详情的文件清单按首父 diff 统计，合并提交因此只显示它带进来的改动。
 
 ## License
 

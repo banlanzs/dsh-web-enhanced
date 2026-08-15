@@ -108,6 +108,25 @@ export interface GitCommitView {
     readonly date: number;
     readonly subject: string;
 }
+/** One file a commit touched, with its line counts. */
+export interface GitCommitFileView {
+    readonly path: string;
+    /** Added lines; `null` for a binary file, which git reports as `-`. */
+    readonly added: number | null;
+    /** Removed lines; `null` for a binary file. */
+    readonly removed: number | null;
+}
+/** One commit's full identity and per-file change counts. */
+export interface GitCommitDetailView {
+    readonly hash: string;
+    readonly parents: readonly string[];
+    readonly author: string;
+    readonly email: string;
+    readonly date: number;
+    readonly subject: string;
+    readonly body: string;
+    readonly files: readonly GitCommitFileView[];
+}
 /**
  * One porcelain-v1 status entry. `path` is always the entry's CURRENT path,
  * so it is what stage/unstage/discard pass to git; a rename or copy carries
@@ -127,6 +146,11 @@ export type GitBranchesResult = {
 };
 export type GitLogResult = {
     readonly commits: readonly GitCommitView[];
+} | {
+    readonly error: ApiError;
+};
+export type GitCommitResult = {
+    readonly commit: GitCommitDetailView;
 } | {
     readonly error: ApiError;
 };
@@ -161,6 +185,16 @@ export interface GitStatusRequest {
 export interface GitLogRequest {
     readonly workspaceId: string;
     readonly maxCount?: number;
+    /**
+     * Draw only this ref's history. Omitted walks every ref, which is the
+     * graph's default view. This is the GRAPH's own filter — the composer's
+     * branch strip switches the checked-out branch, a different operation.
+     */
+    readonly branch?: string;
+}
+export interface GitCommitRequest {
+    readonly workspaceId: string;
+    readonly hash: string;
 }
 export interface GitCheckoutRequest {
     readonly workspaceId: string;
@@ -268,8 +302,21 @@ export interface BalanceInfo {
 }
 /** Result of the balance query; `error` is a field, never a throw. */
 export interface BalanceView {
+    /**
+     * Whether this balance describes the account the session's current model
+     * route bills. `false` hides the line: the number would be about a
+     * different account than the one paying for the conversation.
+     */
+    readonly applicable: boolean;
     readonly isAvailable: boolean;
     readonly infos: readonly BalanceInfo[];
     readonly cachedAt: number;
     readonly error?: ApiError;
 }
+/** One balance query, naming the session's current model route. */
+export interface BalanceGetRequest {
+    /** Provider route of the current selection; omitted when the client has none yet. */
+    readonly provider?: string;
+}
+/** The balance itself, before the channel decision is folded in. */
+export type BalanceReading = Omit<BalanceView, 'applicable'>;

@@ -16,10 +16,11 @@ Developed and built independently of the deepseek-harness repo — the plugin on
 
 | Feature | Description |
 |---|---|
-| **Task board** | Sidebar entry opens a board with five columns (Planned / To do / Running / Done / Failed). 「Run」opens a real DSH agent session that executes the task prompt; the status and result write back automatically when it finishes. 「View session」jumps to the execution session. **Each card has an inline edit form** (title / prompt / cron / column — done or failed tasks reopen via planned/todo). Supports 5-field cron scheduling (e.g. `0 23 * * *`): runs automatically at the due time, catches up after a host restart, and recovers interrupted runs. |
-| **Git graph** | Sidebar entry opens a graph overlay; branch lanes + commit history rendered as SVG (first-parent continuous lanes + horizontal merge links). A branch strip above the composer switches branches, shows recent commits, and opens the graph. |
-| **Workspace view** | A **Workspace** tab in the conversation's view ring, beside Chat and Trajectory, with three panes (Files / Preview / Changes). The file tree expands, searches by name, and opens files in preview; preview supports markdown / HTML (sandboxed iframe) / code / **diff** (line-highlighted unified diff) / CSV / images / PDF / text / **Office docx & xlsx** (host-side structural conversion) with source / **split** (editor + preview side by side) / view modes and save. The Changes pane is backed by real `git status` with stage / unstage / discard and per-file diffs. The active pane and the open directories persist per workspace. |
-| **Balance line** | Shows the DeepSeek API balance (`GET /user/balance`) below the composer, with a refresh button and a muted error state. |
+| **Task board** | Sidebar entry opens a board with five columns (Planned / To do / Running / Done / Failed). 「Run」opens a real DSH agent session that executes the task prompt — composed from the deployment's agent preset (so it has bash / read_file / write_file) and attached to the task's project — and the status and result write back automatically when it finishes. 「View session」jumps to the execution session. **Each card has an inline edit form** (title / prompt / cron / column — done or failed tasks reopen via planned/todo). Supports 5-field cron scheduling (e.g. `0 23 * * *`): runs automatically at the due time, catches up after a host restart, and recovers interrupted runs. |
+| **Git graph** | Sidebar entry opens a graph overlay; branch lanes + commit history rendered as SVG (first-parent continuous lanes + horizontal merge links). The header's branch dropdown filters which commits the graph DRAWS (all branches, or one) and changes nothing in the repository; clicking a commit expands its full hash, parents, author and email, date, message body, and per-file added/removed line counts. The branch strip above the composer is the other operation — it checks a branch out. |
+| **Workspace view** | A **Workspace** tab in the conversation's view ring, beside Chat and Trajectory, with three panes (Files / Preview / Changes). The file tree expands, searches by name, and opens files in preview; preview supports markdown (GFM tables, HTML tables, and inline HTML) / HTML (sandboxed iframe) / code / **diff** (line-highlighted unified diff) / CSV / images / PDF / text / **Office docx & xlsx** (host-side structural conversion) with source / **split** (editor + preview side by side) / view modes and save. The Changes pane is backed by real `git status` with stage / unstage / discard and per-file diffs. The active pane and the open directories persist per workspace. |
+| **File mentions** | 「Mention file」and「Mention folder」in the composer's `+` menu: pick a workspace entry and its `@path` is inserted into the draft (paths with spaces are quoted). |
+| **Balance line** | Shows the DeepSeek API balance (`GET /user/balance`) below the composer, with a refresh button and a muted error state. **Only while the session's model route actually bills that account** — switching to another channel (or repointing `deepseek-official` at a private gateway) hides the whole line, because the number would then be about somebody else's account. |
 
 ## Screenshots
 
@@ -98,6 +99,7 @@ Plugin-row `config` fields (all have defaults):
 | `balanceApiKeyEnv` | `DEEPSEEK_API_KEY` | Env var for the balance query API key |
 | `balanceCacheTtlMs` | 60000 | Balance view cache duration |
 | `balanceBaseUrl` | `https://api.deepseek.com` | Balance endpoint base URL |
+| `balanceProviders` | `[deepseek-official]` | Model routes the balance line is shown for; a route with its own configured `baseURL` must also share the endpoint's host |
 | `skipDirs` | `[node_modules]` | Directories skipped by the file tree/search (`.git` is always skipped) |
 | `readMaxBytes` | 1 MiB | Text read cap (truncated with a marker beyond it) |
 | `writeMaxBytes` | 2 MiB | File write cap |
@@ -116,20 +118,21 @@ Plugin-row `config` fields (all have defaults):
   - `conversation.input.dock` — the branch strip (above the composer), aligned to the input card through the column's shared width variables.
   - `conversation.composer.dock` — the balance line (below the composer).
 
-  Nothing registers into the layout's `details` slot: that is a `single` slot already occupied by ui-conversation's `DetailsPanel`, so registering there would replace the tool-details column and remove the `conversation.details.tool` seat it declares.
+  Nothing registers into the layout's `details` slot: that is a `single` slot already occupied by ui-conversation's `DetailsPanel`, so registering there would replace the tool-details column and remove the `conversation.details.tool` seat it declares. Beside the slots, two client commands are registered through `ctx.commandUi.register` — the file and folder mention pickers in the composer's `+` menu.
+- **Optional services are read uninjected**: `agentPresets`, `llm`, `settings`, `credentials`, `modelDirectories`, `commandUi`, and `conversation` all come from `ctx.get()`. A deployment composed without one degrades exactly that surface instead of leaving this plugin's entry waiting on a service it may never get.
 - **One request object per remote method**: the Typert gateway maps `descriptor.parameters` positionally onto the host method (`Reflect.apply`) and both halves reject a mismatched argument count, so a descriptor's parameter list *is* the host signature. Every method here declares exactly one `request` parameter; `tests/contribution.spec.ts` guards it.
 - **Hand-written remote contribution**: host methods use the `@Remote` decorator (Typert SRC mode; the host gateway auto-discovers the `ctx.webEnhanced` service); the client mounts a hand-declared src-json contribution in `apply` — no typert generation pipeline.
 - **Cross-scope shared state**: the overlays are `root`-scoped and the branch strip and balance line are `session`-scoped, so a single slot-store handle cannot serve both ("one handle, one scope"). Shared state lives in `apply` as plain observables and reaches components through each registration's inject `hooks` compartment.
-- **Task execution**: `agents.create` + `followup` + `whenIdle` + `sessions.flush` (the same headless driving sequence), the result is written back from the `turn/end` reason.
+- **Task execution**: `agentPresets.resolve()` names the deployment preset, it is recorded on `meta.agentPreset` and mounted inside `setup` (the host's own `ensureSession` order), then `workspace.attachSession` records the run's session on its project; the run itself is `followup` + `whenIdle` + `sessions.flush` and the result is written back from the `turn/end` reason. A deployment with no preset roster still runs tasks — its sessions just carry whatever the host root registered.
 - **Persistence**: task records live in the `ctx.storageDomain` domain `web_enhanced` (JSON backend); restart recovery settles `running` → `failed` (host-restart). Panel geometry (width, collapsed, expanded directories) persists to `localStorage` keyed per workspace.
-- **Path safety**: every fs/git path is validated against the workspace root (absolute paths, `..`, and backslashes are rejected); git output is collected with bounds; file reads have byte caps and binary sniffing. Office files are converted on the host (fflate) into bounded structural blocks — headings, paragraphs, list items, tables (≤ 2000 blocks, ≤ 200×50 table) — never raw HTML.
-- **Preview safety**: Markdown, CSV, diff, and Office previews render as React elements, never `dangerouslySetInnerHTML`. `javascript:`/`data:` link targets degrade to literal text, and HTML previews load in a `sandbox=""` iframe (no scripts, no same-origin access).
+- **Path safety**: every fs/git path is validated against the workspace root (absolute paths, `..`, and backslashes are rejected); a single-ref argument rejects a leading `-`, `..` ranges, and whitespace or globs, so one argument can never become two or become an option; git output is collected with bounds; file reads have byte caps and binary sniffing. Office files are converted on the host (fflate) into bounded structural blocks — headings, paragraphs, list items, tables (≤ 2000 blocks, ≤ 200×50 table) — never raw HTML.
+- **Preview safety**: Markdown, CSV, diff, tables, and Office previews render as React elements, never `dangerouslySetInnerHTML`. HTML inside Markdown maps through an allow list to real elements; an unknown tag loses its markup and keeps its text, and `script`/`style` lose both. `javascript:`/`data:` link targets degrade to literal text (a `data:image/*` picture is the exception), and HTML file previews load in a `sandbox=""` iframe (no scripts, no same-origin access).
 
 ## Development
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + full tests + build (148 tests)
+pnpm run check   # typecheck + full tests + build (164 tests)
 ```
 
 Build outputs:
@@ -152,10 +155,12 @@ Prereqs: `dsh`/`pnpm` on PATH, and the main repo's web build output (playwright 
 ## Known limitations
 
 - The workspace surface is a view tab, not a side-by-side column: it replaces the transcript while active rather than sitting next to it, and it owns no width or collapse of its own.
+- HTML inside Markdown renders through an allow list: `<table>` is read structurally and inline tags map to real elements, everything else keeps only its text. `<details>`, inline `style`, and custom elements are not reproduced.
+- The mention pickers list one bounded pass of the host search (`searchMaxEntries`, 200 by default); the popup's own search filters that batch locally rather than re-querying per keystroke.
 - Office preview is structural: docx headings/paragraphs/lists/tables and the first xlsx worksheet are rendered; inline styles (bold, colors), images, and multi-sheet workbooks are not. Legacy `.doc`/`.xls` binaries are not previewable.
 - Scheduled tasks are best-effort: 30s tick granularity; windows missed while the host is down are caught up once at startup, no backlog is kept.
-- The balance key shares its source with the model provider (env var); when unconfigured it shows an error state rather than failing.
-- The graph lanes use a simplified algorithm (first-parent continuity), not git's full topology coloring.
+- The balance key shares its source with the model provider (env var); when unconfigured it shows an error state rather than failing. On a route outside `balanceProviders` the line is hidden entirely.
+- The graph lanes use a simplified algorithm (first-parent continuity), not git's full topology coloring; a commit's file list is the first-parent diff, so a merge shows only what it brought in.
 
 ## License
 

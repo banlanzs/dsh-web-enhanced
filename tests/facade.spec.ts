@@ -40,11 +40,15 @@ describe('createRemoteFacade', () => {
     expect(await facade.fsList({ workspaceId: 'w1' })).toEqual({ error: { code: 'not-found', message: 'no such Remote method' } })
   })
 
-  it('keeps a failed balance query a renderable BalanceView', async () => {
+  it('keeps a failed balance query a renderable, still-applicable BalanceView', async () => {
     // BalanceView is not a union — it carries its own optional error — so the
-    // fallback must still satisfy the shape the line renders from.
+    // fallback must still satisfy the shape the line renders from. It stays
+    // applicable: an unreachable host says nothing about which channel the
+    // session runs on, and hiding on a transport blip would read as "this
+    // model has no balance".
     const facade = createRemoteFacade(rawWith({ balanceGet: vi.fn(async () => carrierFailure) }), () => 1234)
-    expect(await facade.balanceGet()).toEqual({
+    expect(await facade.balanceGet({ provider: 'deepseek-official' })).toEqual({
+      applicable: true,
       isAvailable: false,
       infos: [],
       cachedAt: 1234,

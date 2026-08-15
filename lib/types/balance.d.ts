@@ -9,7 +9,7 @@
  * Failures are result fields.
  * @module dsh-web-enhanced/src/balance
  */
-import type { BalanceView } from './types.ts';
+import type { BalanceReading } from './types.ts';
 /** Balance client configuration (deployment config, not tunables). */
 export interface BalanceConfig {
     readonly apiKeyEnv: string;
@@ -35,7 +35,7 @@ export declare class BalanceClient {
      */
     constructor(config: BalanceConfig, resolveCredential?: ResolveCredential | undefined);
     /** Cached or freshly fetched balance view. */
-    get(): Promise<BalanceView>;
+    get(): Promise<BalanceReading>;
     /** Drop the cached view (the settings plane can force a refresh). */
     clear(): void;
     /**

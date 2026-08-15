@@ -10,7 +10,7 @@
  * @module dsh-web-enhanced/src/balance
  */
 
-import type { BalanceInfo, BalanceView } from './types.ts'
+import type { BalanceInfo, BalanceReading } from './types.ts'
 
 /** Balance client configuration (deployment config, not tunables). */
 export interface BalanceConfig {
@@ -30,7 +30,7 @@ export type ResolveCredential = (ref: string) => Promise<string | undefined>
 
 /** Balance query client with a short-lived view cache. */
 export class BalanceClient {
-  private cache: { readonly at: number; readonly value: BalanceView } | null = null
+  private cache: { readonly at: number; readonly value: BalanceReading } | null = null
 
   /**
    * @param config - key reference, cache TTL, and endpoint base.
@@ -42,7 +42,7 @@ export class BalanceClient {
   ) {}
 
   /** Cached or freshly fetched balance view. */
-  async get(): Promise<BalanceView> {
+  async get(): Promise<BalanceReading> {
     const now = Date.now()
     if (this.cache !== null && now - this.cache.at < this.config.cacheTtlMs) return this.cache.value
     const view = await this.fetchBalance(now)
@@ -68,7 +68,7 @@ export class BalanceClient {
     return ambient === undefined || ambient.trim() === '' ? undefined : ambient
   }
 
-  private async fetchBalance(now: number): Promise<BalanceView> {
+  private async fetchBalance(now: number): Promise<BalanceReading> {
     const key = await this.apiKey()
     if (key === undefined) {
       return {
@@ -110,7 +110,7 @@ export class BalanceClient {
 }
 
 /** Validate and project the endpoint payload; malformed lines are dropped. */
-function parseBalanceBody(body: unknown, now: number): BalanceView {
+function parseBalanceBody(body: unknown, now: number): BalanceReading {
   if (typeof body !== 'object' || body === null) {
     return {
       isAvailable: false, infos: [], cachedAt: now,

@@ -30,9 +30,13 @@ import { webEnhancedRemote } from './remote.ts'
 import { en, zh } from './locales.ts'
 // The LocaleNamespaceMap merge for 'webEnhanced' rides this import.
 import type {} from './locale-keys.ts'
-import type { WebEnhancedInject } from './contract.ts'
+import type { WebEnhancedInject, WebEnhancedRemote } from './contract.ts'
 import { createRemoteFacade } from './facade.ts'
 import type { RawWebEnhancedNamespace } from './facade.ts'
+import { createModelRoute } from './model-route.ts'
+import { applyMention, mentionOptions } from './mention.ts'
+import type { MentionDeps, MentionKind, MentionOption } from './mention.ts'
+import { workspaceOfSessionId } from './workspace.ts'
 import { createOverlay, createPanel, createPreview } from './stores.ts'
 import { BoardSidebarEntry, GraphSidebarEntry } from './board/SidebarEntry.tsx'
 import { BoardOverlay } from './board/BoardOverlay.tsx'
@@ -43,6 +47,88 @@ import { BalanceLine } from './balance/BalanceLine.tsx'
 
 /** Locale namespace owned by this plugin. */
 const NS = 'webEnhanced'
+
+/**
+ * The two optional services the mention pickers need, structurally.
+ *
+ * Both are read uninjected: `commandUi` owns the composer's `+` menu and
+ * `conversation` owns the draft, and a deployment composed without either must
+ * still get the rest of this plugin rather than an entry that never starts.
+ */
+interface CommandUiFace {
+  register(contribution: {
+    readonly name: string
+    readonly description: string
+    available(session: { readonly sessionId: string }): boolean
+    readonly ui: {
+      readonly kind: 'popupSelect'
+      options(session: { readonly sessionId: string }, signal: AbortSignal): Promise<readonly MentionOption[]>
+      onSelect(option: MentionOption, session: { readonly sessionId: string }): void | Promise<void>
+    }
+  }): () => void
+}
+
+/** The per-session draft face (`ctx.conversation.input`), structurally. */
+interface ConversationFace {
+  readonly input: {
+    for(actx: unknown): {
+      setDraft(text: string): void
+      readonly state: { getSnapshot(): { readonly draft: string } }
+    }
+  }
+}
+
+/**
+ * Register the file and folder mention pickers into the composer's `+` menu.
+ *
+ * A no-op disposer when the deployment composes no command menu — the rest of
+ * this plugin does not depend on one.
+ * @param ctx - client root context.
+ * @param remote - the envelope-free host facade.
+ * @returns the disposer.
+ */
+function registerMentionCommands(ctx: ClientContext, remote: WebEnhancedRemote): () => void {
+  const commandUi = ctx.get('commandUi' as never) as unknown as CommandUiFace | undefined
+  if (commandUi === undefined) return () => {}
+  const t = ctx.locale.bind(NS)
+  const deps: MentionDeps = {
+    remote,
+    workspaceOf: sessionId => workspaceOfSessionId(sessionId, ctx.workspaces.list.getSnapshot())?.workspaceId,
+    appendDraft: (sessionId, text) => {
+      const conversation = ctx.get('conversation' as never) as unknown as ConversationFace | undefined
+      // Same declaration-merge collision as `openSession`: this package's
+      // program carries both the Web runtime's SessionRuntime (which has
+      // `scope`) and the host's SessionStore (which does not), and the node
+      // one wins the lookup — so the scope face is named explicitly rather
+      // than casting the whole service away.
+      const scopes = ctx.sessions as unknown as { scope(id: string): unknown }
+      const actx = scopes.scope(sessionId)
+      if (conversation === undefined || actx === undefined) return
+      const input = conversation.input.for(actx)
+      const draft = input.state.getSnapshot().draft
+      // A separator only where one is missing: appending to an empty draft or
+      // to text that already ends in whitespace must not add a stray space.
+      input.setDraft(draft === '' || /\s$/u.test(draft) ? draft + text : `${draft} ${text}`)
+    },
+  }
+  const picker = (kind: MentionKind, name: string, description: string): () => void =>
+    commandUi.register({
+      name,
+      description,
+      // The pickers list a PROJECT; an ungrouped session has no root to list.
+      available: session => deps.workspaceOf(String(session.sessionId)) !== undefined,
+      ui: {
+        kind: 'popupSelect',
+        options: session => mentionOptions(deps, kind, String(session.sessionId)),
+        onSelect: (option, session) => { applyMention(deps, String(session.sessionId), option.id) },
+      },
+    })
+  const disposers = [
+    picker('file', 'mention-file', t('mention.fileDescription')),
+    picker('dir', 'mention-folder', t('mention.folderDescription')),
+  ]
+  return () => { for (const dispose of disposers.reverse()) dispose() }
+}
 
 /**
  * Services this client plugin requires.
@@ -68,6 +154,11 @@ export function apply(ctx: ClientContext): void {
   const overlay = createOverlay()
   const panel = createPanel()
   const preview = createPreview()
+  // Uninjected on purpose: ui-model-selection is optional, and its absence
+  // must not keep this plugin's entry from starting.
+  const modelRoute = createModelRoute({
+    directories: () => ctx.get('modelDirectories' as never) as never,
+  })
 
   ctx.effect(() => {
     const disposers: Array<() => void> = []
@@ -87,6 +178,7 @@ export function apply(ctx: ClientContext): void {
 
         const face = (): WebEnhancedInject => ({
           remote,
+          modelRoute,
           openSession: (sessionId) => {
             // `Context.sessions` carries two declaration merges in this
             // package's program: the Web runtime's SessionsService (which has
@@ -158,6 +250,7 @@ export function apply(ctx: ClientContext): void {
             locale: NS,
             inject: face,
           }, BalanceLine)),
+          registerMentionCommands(ctx, remote),
         )
       },
       (error: unknown) => { console.error('[web-enhanced] remote mount failed:', error) },

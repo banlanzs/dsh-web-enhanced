@@ -2,13 +2,18 @@
  * Balance line under the composer: the DeepSeek account balance from the host
  * remote, with a refresh affordance and a muted error state. The host caches
  * the view, so mounting several sessions does not fan out to the endpoint.
+ *
+ * The line is tied to the session's model route. The endpoint serves ONE
+ * account at one vendor, so a session switched to another channel gets no line
+ * at all rather than a number about somebody else's account — the host makes
+ * that call (it knows where each route points) and answers `applicable`.
  * @module dsh-web-enhanced/src/client/balance/BalanceLine
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { BalanceView, WebEnhancedProps } from '../contract.ts'
+import type { BalanceView, ModelRouteFace, WebEnhancedProps } from '../contract.ts'
 import css from './BalanceLine.module.css'
 
 /** Full composed props of the balance line. */
@@ -19,10 +24,21 @@ function summaryOf(view: BalanceView): string {
   return view.infos.map(info => `${info.currency} ${info.totalBalance.toFixed(2)}`).join(' · ')
 }
 
+/** The session's live provider route, re-read whenever the selection moves. */
+function useProvider(modelRoute: ModelRouteFace, sessionId: string): string | undefined {
+  const subscribe = useMemo(
+    () => (listener: () => void) => modelRoute.subscribe(sessionId, listener),
+    [modelRoute, sessionId],
+  )
+  const read = useCallback(() => modelRoute.provider(sessionId), [modelRoute, sessionId])
+  return useSyncExternalStore(subscribe, read, read)
+}
+
 /** The balance line: one muted row under the composer. */
-export function BalanceLine({ remote, t }: BalanceLineProps) {
+export function BalanceLine({ remote, modelRoute, sessionId, t }: BalanceLineProps) {
   const [view, setView] = useState<BalanceView | null>(null)
   const [busy, setBusy] = useState(false)
+  const provider = useProvider(modelRoute, String(sessionId))
   // Unmounting mid-request must not set state on a dead component; the ref is
   // the only thing the resolved promise is allowed to read.
   const live = useRef(true)
@@ -31,16 +47,16 @@ export function BalanceLine({ remote, t }: BalanceLineProps) {
   const refresh = useCallback(async (): Promise<void> => {
     setBusy(true)
     try {
-      const next = await remote.balanceGet()
+      const next = await remote.balanceGet(provider === undefined ? {} : { provider })
       if (live.current) setView(next)
     } finally {
       if (live.current) setBusy(false)
     }
-  }, [remote])
+  }, [provider, remote])
 
   useEffect(() => { void refresh() }, [refresh])
 
-  if (view === null) return null
+  if (view === null || !view.applicable) return null
   const summary = summaryOf(view)
   return (
     <div className={css.line} data-testid="balance-line">

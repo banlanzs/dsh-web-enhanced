@@ -3,13 +3,20 @@
  * session's workspace. Registered into `shell.overlay` and rendered only
  * while the overlay state selects it, so an unopened graph costs one
  * subscription and nothing else.
+ *
+ * The branch selector here is the GRAPH's own filter: it decides which
+ * history the lanes are drawn from and changes nothing in the repository.
+ * The composer's branch strip is the other operation — it checks a branch
+ * out. Two controls because they are two different questions.
  * @module dsh-web-enhanced/src/client/git/GraphOverlay
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
-import type { GitCommitView, WebEnhancedProps } from '../contract.ts'
+import type {
+  GitBranchView, GitCommitDetailView, GitCommitView, WebEnhancedProps, WebEnhancedRemote,
+} from '../contract.ts'
 import { OverlayShell } from '../shell/OverlayShell.tsx'
 import { workspaceOfSession } from '../workspace.ts'
 import { laneColor, layoutLanes, shortHash } from './lanes.ts'
@@ -27,10 +34,19 @@ const ROW_HEIGHT = 34
 /** Number of lane colours the stylesheet defines. */
 const PALETTE_SIZE = 6
 
+/** The filter value meaning "every ref", distinct from any branch name. */
+const ALL_BRANCHES = ''
+
 /** Load state of the commit list. */
 type Commits =
   | { readonly phase: 'loading' }
   | { readonly phase: 'ready'; readonly items: readonly GitCommitView[] }
+  | { readonly phase: 'error'; readonly message: string }
+
+/** Load state of one expanded commit's detail. */
+type Detail =
+  | { readonly phase: 'loading' }
+  | { readonly phase: 'ready'; readonly value: GitCommitDetailView }
   | { readonly phase: 'error'; readonly message: string }
 
 /** The git graph overlay. */
@@ -43,22 +59,41 @@ export function GraphOverlay({
   const workspaceId = workspaceOfSession(sessions, workspaces)?.workspaceId
 
   const [commits, setCommits] = useState<Commits>({ phase: 'loading' })
+  const [branches, setBranches] = useState<readonly GitBranchView[]>([])
+  const [branch, setBranch] = useState<string>(ALL_BRANCHES)
+  const [expanded, setExpanded] = useState<string | null>(null)
   const live = useRef(true)
   useEffect(() => () => { live.current = false }, [])
 
   const load = useCallback(async (): Promise<void> => {
     if (workspaceId === undefined) return
     setCommits({ phase: 'loading' })
-    const result = await remote.gitLog({ workspaceId })
+    const result = await remote.gitLog({
+      workspaceId,
+      ...branch === ALL_BRANCHES ? {} : { branch },
+    })
     if (!live.current) return
     setCommits('error' in result
       ? { phase: 'error', message: result.error.message }
       : { phase: 'ready', items: result.commits })
-  }, [remote, workspaceId])
+  }, [branch, remote, workspaceId])
+
+  useEffect(() => {
+    if (!open || workspaceId === undefined) return
+    // The filter list is repository state, not view state: it is loaded with
+    // the overlay and left alone while the user switches filters.
+    void (async () => {
+      const result = await remote.gitBranches({ workspaceId })
+      if (live.current && !('error' in result)) setBranches(result.branches)
+    })()
+  }, [open, remote, workspaceId])
 
   useEffect(() => {
     if (open) void load()
   }, [load, open])
+
+  // A filter change re-cuts the list, so an open detail no longer has a row.
+  useEffect(() => { setExpanded(null) }, [branch])
 
   if (!open) return null
 
@@ -71,9 +106,25 @@ export function GraphOverlay({
       actions={workspaceId === undefined
         ? null
         : (
-            <button type="button" className={css.action} onClick={() => { void load() }}>
-              {t('graph.refresh')}
-            </button>
+            <>
+              <label className={css.filter}>
+                <span className={css.filterLabel}>{t('graph.filter')}</span>
+                <select
+                  className={css.select}
+                  value={branch}
+                  data-testid="graph-branch-filter"
+                  onChange={event => { setBranch(event.target.value) }}
+                >
+                  <option value={ALL_BRANCHES}>{t('graph.allBranches')}</option>
+                  {branches.map(item => (
+                    <option key={item.name} value={item.name}>{item.name}</option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" className={css.action} onClick={() => { void load() }}>
+                {t('graph.refresh')}
+              </button>
+            </>
           )}
     >
       {workspaceId === undefined
@@ -82,64 +133,153 @@ export function GraphOverlay({
           ? <p className={css.empty}>{t('graph.loading')}</p>
           : commits.phase === 'error'
             ? <p className={css.error}>{t('graph.error', { message: commits.message })}</p>
-            : <GraphBody commits={commits.items} empty={t('graph.empty')} />}
+            : (
+                <GraphBody
+                  commits={commits.items}
+                  empty={t('graph.empty')}
+                  expanded={expanded}
+                  workspaceId={workspaceId}
+                  remote={remote}
+                  onToggle={hash => { setExpanded(current => (current === hash ? null : hash)) }}
+                  t={t}
+                />
+              )}
     </OverlayShell>
   )
 }
 
+/** Props the laid-out list needs beyond the commits themselves. */
+interface GraphBodyProps {
+  readonly commits: readonly GitCommitView[]
+  readonly empty: string
+  readonly expanded: string | null
+  readonly workspaceId: string
+  readonly remote: WebEnhancedRemote
+  readonly onToggle: (hash: string) => void
+  readonly t: GraphOverlayProps['t']
+}
+
 /** The laid-out commit list; the lane math itself lives in `./lanes.ts`. */
-function GraphBody({ commits, empty }: { commits: readonly GitCommitView[]; empty: string }) {
+function GraphBody({ commits, empty, expanded, workspaceId, remote, onToggle, t }: GraphBodyProps) {
   if (commits.length === 0) return <p className={css.empty}>{empty}</p>
   const layout = layoutLanes(commits)
   const railWidth = (layout.width + 1) * LANE_STEP
   return (
     <ol className={css.rows} data-testid="graph-rows">
       {layout.rows.map(row => (
-        <li className={css.row} key={row.commit.hash}>
-          <svg className={css.rail} width={railWidth} height={ROW_HEIGHT} aria-hidden>
-            {/* Rails passing this row untouched. */}
-            {row.through.map(lane => (
-              <line
-                key={`through-${String(lane)}`}
-                className={css.edge}
-                data-lane={laneColor(lane, PALETTE_SIZE)}
-                x1={(lane + 1) * LANE_STEP}
-                y1={0}
-                x2={(lane + 1) * LANE_STEP}
-                y2={ROW_HEIGHT}
+        <li className={css.entry} key={row.commit.hash}>
+          <button
+            type="button"
+            className={css.row}
+            aria-expanded={expanded === row.commit.hash}
+            data-testid="graph-row"
+            onClick={() => { onToggle(row.commit.hash) }}
+          >
+            <svg className={css.rail} width={railWidth} height={ROW_HEIGHT} aria-hidden>
+              {/* Rails passing this row untouched. */}
+              {row.through.map(lane => (
+                <line
+                  key={`through-${String(lane)}`}
+                  className={css.edge}
+                  data-lane={laneColor(lane, PALETTE_SIZE)}
+                  x1={(lane + 1) * LANE_STEP}
+                  y1={0}
+                  x2={(lane + 1) * LANE_STEP}
+                  y2={ROW_HEIGHT}
+                />
+              ))}
+              {/* Edges from this commit down to each parent's lane. */}
+              {row.parentLanes.map(lane => (
+                <line
+                  key={`parent-${String(lane)}`}
+                  className={css.edge}
+                  data-lane={laneColor(lane, PALETTE_SIZE)}
+                  x1={(row.lane + 1) * LANE_STEP}
+                  y1={ROW_HEIGHT / 2}
+                  x2={(lane + 1) * LANE_STEP}
+                  y2={ROW_HEIGHT}
+                />
+              ))}
+              <circle
+                className={css.dot}
+                data-lane={laneColor(row.lane, PALETTE_SIZE)}
+                cx={(row.lane + 1) * LANE_STEP}
+                cy={ROW_HEIGHT / 2}
+                r={4}
               />
+            </svg>
+            <span className={css.hash}>{shortHash(row.commit.hash)}</span>
+            <span className={css.subject} title={row.commit.subject}>{row.commit.subject}</span>
+            {row.commit.refs.map(ref => (
+              <span className={css.ref} key={ref}>{ref}</span>
             ))}
-            {/* Edges from this commit down to each parent's lane. */}
-            {row.parentLanes.map(lane => (
-              <line
-                key={`parent-${String(lane)}`}
-                className={css.edge}
-                data-lane={laneColor(lane, PALETTE_SIZE)}
-                x1={(row.lane + 1) * LANE_STEP}
-                y1={ROW_HEIGHT / 2}
-                x2={(lane + 1) * LANE_STEP}
-                y2={ROW_HEIGHT}
-              />
-            ))}
-            <circle
-              className={css.dot}
-              data-lane={laneColor(row.lane, PALETTE_SIZE)}
-              cx={(row.lane + 1) * LANE_STEP}
-              cy={ROW_HEIGHT / 2}
-              r={4}
-            />
-          </svg>
-          <span className={css.hash}>{shortHash(row.commit.hash)}</span>
-          <span className={css.subject} title={row.commit.subject}>{row.commit.subject}</span>
-          {row.commit.refs.map(ref => (
-            <span className={css.ref} key={ref}>{ref}</span>
-          ))}
-          <span className={css.author}>{row.commit.author}</span>
-          <time className={css.date} dateTime={new Date(row.commit.date * 1000).toISOString()}>
-            {new Date(row.commit.date * 1000).toLocaleDateString()}
-          </time>
+            <span className={css.author}>{row.commit.author}</span>
+            <time className={css.date} dateTime={new Date(row.commit.date * 1000).toISOString()}>
+              {new Date(row.commit.date * 1000).toLocaleDateString()}
+            </time>
+          </button>
+          {expanded === row.commit.hash && (
+            <CommitDetail hash={row.commit.hash} workspaceId={workspaceId} remote={remote} t={t} />
+          )}
         </li>
       ))}
     </ol>
+  )
+}
+
+/** One expanded commit: identity, message body, and the files it touched. */
+function CommitDetail({ hash, workspaceId, remote, t }: {
+  readonly hash: string
+  readonly workspaceId: string
+  readonly remote: WebEnhancedRemote
+  readonly t: GraphOverlayProps['t']
+}) {
+  const [detail, setDetail] = useState<Detail>({ phase: 'loading' })
+  const live = useRef(true)
+  useEffect(() => () => { live.current = false }, [])
+
+  useEffect(() => {
+    setDetail({ phase: 'loading' })
+    void (async () => {
+      const result = await remote.gitCommit({ workspaceId, hash })
+      if (!live.current) return
+      setDetail('error' in result
+        ? { phase: 'error', message: result.error.message }
+        : { phase: 'ready', value: result.commit })
+    })()
+  }, [hash, remote, workspaceId])
+
+  if (detail.phase === 'loading') return <p className={css.empty}>{t('graph.loading')}</p>
+  if (detail.phase === 'error') return <p className={css.error}>{t('graph.error', { message: detail.message })}</p>
+  const commit = detail.value
+  return (
+    <div className={css.detail} data-testid="graph-detail">
+      <dl className={css.facts}>
+        <dt>{t('graph.detail.hash')}</dt>
+        <dd className={css.mono}>{commit.hash}</dd>
+        <dt>{t('graph.detail.parents')}</dt>
+        <dd className={css.mono}>
+          {commit.parents.length === 0 ? '—' : commit.parents.map(shortHash).join(' ')}
+        </dd>
+        <dt>{t('graph.detail.author')}</dt>
+        <dd>{commit.email === '' ? commit.author : `${commit.author} <${commit.email}>`}</dd>
+        <dt>{t('graph.detail.date')}</dt>
+        <dd>{new Date(commit.date * 1000).toLocaleString()}</dd>
+      </dl>
+      {commit.body !== '' && <pre className={css.body}>{commit.body}</pre>}
+      <p className={css.filesTitle}>{t('graph.detail.files', { count: String(commit.files.length) })}</p>
+      {commit.files.length > 0 && (
+        <ul className={css.files}>
+          {commit.files.map(file => (
+            <li className={css.file} key={file.path}>
+              <span className={css.filePath} title={file.path}>{file.path}</span>
+              {/* A binary file has no line counts; git says `-` and so does this. */}
+              <span className={css.added}>{file.added === null ? '—' : `+${String(file.added)}`}</span>
+              <span className={css.removed}>{file.removed === null ? '—' : `-${String(file.removed)}`}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }

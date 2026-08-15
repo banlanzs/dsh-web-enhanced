@@ -9,13 +9,14 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceView, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
 /** Plugin config; every bound defaults when unset. */
 export interface Config {
     cronIntervalMs?: number;
     balanceApiKeyEnv?: string;
     balanceCacheTtlMs?: number;
     balanceBaseUrl?: string;
+    balanceProviders?: string[];
     skipDirs?: string[];
     readMaxBytes?: number;
     writeMaxBytes?: number;
@@ -54,12 +55,14 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     taskRemove(request: TaskRemoveRequest): Promise<TaskRemoveResult>;
     /** Start one task immediately in a fresh agent session. */
     taskRun(request: TaskRunRequest): Promise<TaskRunResult>;
-    /** One balance view (cached). */
-    balanceGet(): Promise<BalanceView>;
+    /** One balance view (cached), hidden when the route bills another account. */
+    balanceGet(request: BalanceGetRequest): Promise<BalanceView>;
     /** Local branches; the current branch carries the flag. */
     gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>;
-    /** Recent commits across all refs with branch markers. */
+    /** Recent commits with branch markers; one branch when the graph filters. */
     gitLog(request: GitLogRequest): Promise<GitLogResult>;
+    /** One commit's identity, message, and per-file line counts. */
+    gitCommit(request: GitCommitRequest): Promise<GitCommitResult>;
     /** Check out one branch; a rejected switch carries its stderr message. */
     gitCheckout(request: GitCheckoutRequest): Promise<GitCheckoutResult>;
     /** Worktree status (porcelain v1). */
@@ -84,6 +87,17 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     fsDelete(request: FsDeleteRequest): Promise<FsWriteResult>;
     /** Convert an Office file (docx/xlsx) into preview blocks. */
     fsOfficePreview(request: FsOfficePreviewRequest): Promise<FsOfficePreviewResult>;
+    /**
+     * Whether the balance describes the account one model route bills.
+     *
+     * The provider's endpoint is read from the settings section its own adapter
+     * declares, through `ctx.llm`'s configurable-provider directory — both read
+     * uninjected, because a deployment that composes neither still has a working
+     * gateway and simply falls back to the allow list.
+     */
+    private balanceApplies;
+    /** Configured endpoint of one provider route, when its settings declare one. */
+    private providerBaseUrl;
     private get fsLimits();
     private get gitLimits();
     private get officeLimits();

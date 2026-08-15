@@ -232,7 +232,10 @@ export class TaskBoard {
     }
     this.runs.add(current.id)
     try {
-      const { agent, sessionId } = await createTaskAgent(this.deps, this.deps.workspaceRoot(workspaceId))
+      const { agent, sessionId } = await createTaskAgent(this.deps, {
+        cwd: this.deps.workspaceRoot(workspaceId),
+        workspaceId,
+      })
       /* v8 ignore next -- admission lock above makes the already-running race unreachable */
       await table.update(current.id, record => record.status === 'running'
         ? record
@@ -293,7 +296,10 @@ export class TaskBoard {
     if (current === undefined || current.status === 'running' || this.runs.has(id)) return
     this.runs.add(id)
     try {
-      const { agent, sessionId } = await createTaskAgent(this.deps, this.deps.workspaceRoot(current.workspaceId))
+      const { agent, sessionId } = await createTaskAgent(this.deps, {
+        cwd: this.deps.workspaceRoot(current.workspaceId),
+        workspaceId: current.workspaceId,
+      })
       /* v8 ignore next -- admission lock above makes the already-running race unreachable */
       await table.update(id, record => record.status === 'running'
         ? record

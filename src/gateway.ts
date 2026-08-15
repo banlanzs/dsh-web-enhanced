@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/cordis-plugin-loader'
 import z from '@deepseek-ai/schemastery'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import { BalanceClient } from './balance.ts'
+import { balanceApplies } from './channel.ts'
 import { TaskBoard } from './board.ts'
 import type { BoardDeps } from './board.ts'
 import { deleteFileView, listDirectory, readFileView, searchFiles, writeFileView } from './files.ts'
@@ -20,16 +21,37 @@ import { GitClient } from './git.ts'
 import type { GitLimits } from './git.ts'
 import { officePreviewView } from './office.ts'
 import type { OfficeLimits } from './office.ts'
-import type { RunDeps } from './run-task.ts'
+import type { PresetRoster, RunDeps } from './run-task.ts'
 import type {
-  ApiError, BalanceView, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest,
+  ApiError, BalanceGetRequest, BalanceView, FsDeleteRequest, FsListRequest, FsListResult,
+  FsOfficePreviewRequest,
   FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult,
   FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest,
-  GitCheckoutResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest,
+  GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
+  GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, TaskCreateRequest, TaskCreateResult,
   TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
   TaskUpdateRequest, TaskUpdateResult, WorkspaceId,
 } from './types.ts'
+
+/**
+ * The provider directory face, structurally.
+ *
+ * Declared locally rather than imported: `dsh-llm` is the host's dependency,
+ * and this gateway only needs to know where a route keeps its settings.
+ */
+interface LlmDirectoryFace {
+  listConfigurableProviders(): ReadonlyArray<{
+    readonly provider: string
+    readonly settingsNs: string
+    readonly settingsPath: readonly string[]
+  }>
+}
+
+/** The settings read face, structurally (see {@link LlmDirectoryFace}). */
+interface SettingsReadFace {
+  get(ns: never): unknown
+}
 
 /** Plugin config; every bound defaults when unset. */
 export interface Config {
@@ -37,6 +59,7 @@ export interface Config {
   balanceApiKeyEnv?: string
   balanceCacheTtlMs?: number
   balanceBaseUrl?: string
+  balanceProviders?: string[]
   skipDirs?: string[]
   readMaxBytes?: number
   writeMaxBytes?: number
@@ -53,6 +76,7 @@ export const Config: z<Config> = z.object({
   balanceApiKeyEnv: z.string().default('DEEPSEEK_API_KEY'),
   balanceCacheTtlMs: z.number().default(60_000),
   balanceBaseUrl: z.string().default('https://api.deepseek.com'),
+  balanceProviders: z.array(z.string()).default(['deepseek-official']),
   skipDirs: z.array(z.string()).default(['node_modules']),
   readMaxBytes: z.number().default(1_048_576),
   writeMaxBytes: z.number().default(2_097_152),
@@ -71,6 +95,7 @@ export function resolveConfig(config: Config): Required<Config> {
     balanceApiKeyEnv: config.balanceApiKeyEnv ?? 'DEEPSEEK_API_KEY',
     balanceCacheTtlMs: config.balanceCacheTtlMs ?? 60_000,
     balanceBaseUrl: config.balanceBaseUrl ?? 'https://api.deepseek.com',
+    balanceProviders: config.balanceProviders ?? ['deepseek-official'],
     skipDirs: config.skipDirs ?? ['node_modules'],
     readMaxBytes: config.readMaxBytes ?? 1_048_576,
     writeMaxBytes: config.writeMaxBytes ?? 2_097_152,
@@ -155,10 +180,13 @@ export class WebEnhancedGateway extends TypertRemoteService {
     return this.board.run(request)
   }
 
-  /** One balance view (cached). */
+  /** One balance view (cached), hidden when the route bills another account. */
   @Remote('balanceGet')
-  async balanceGet(): Promise<BalanceView> {
-    return this.balance.get()
+  async balanceGet(request: BalanceGetRequest): Promise<BalanceView> {
+    if (!this.balanceApplies(request.provider)) {
+      return { applicable: false, isAvailable: false, infos: [], cachedAt: Date.now() }
+    }
+    return { ...await this.balance.get(), applicable: true }
   }
 
   // ── git ──────────────────────────────────────────────────────────────────
@@ -169,13 +197,19 @@ export class WebEnhancedGateway extends TypertRemoteService {
     return this.withGit(request.workspaceId, async client => ({ branches: await client.branches() }))
   }
 
-  /** Recent commits across all refs with branch markers. */
+  /** Recent commits with branch markers; one branch when the graph filters. */
   @Remote('gitLog')
   async gitLog(request: GitLogRequest): Promise<GitLogResult> {
     return this.withGit(request.workspaceId, async client => {
       const maxCount = request.maxCount === undefined ? this.resolved.gitMaxCount : request.maxCount
-      return { commits: await client.log(maxCount) }
+      return { commits: await client.log(maxCount, request.branch) }
     })
+  }
+
+  /** One commit's identity, message, and per-file line counts. */
+  @Remote('gitCommit')
+  async gitCommit(request: GitCommitRequest): Promise<GitCommitResult> {
+    return this.withGit(request.workspaceId, async client => ({ commit: await client.commit(request.hash) }))
   }
 
   /** Check out one branch; a rejected switch carries its stderr message. */
@@ -303,6 +337,40 @@ export class WebEnhancedGateway extends TypertRemoteService {
 
   // ── internals ────────────────────────────────────────────────────────────
 
+  /**
+   * Whether the balance describes the account one model route bills.
+   *
+   * The provider's endpoint is read from the settings section its own adapter
+   * declares, through `ctx.llm`'s configurable-provider directory — both read
+   * uninjected, because a deployment that composes neither still has a working
+   * gateway and simply falls back to the allow list.
+   */
+  private balanceApplies(provider: string | undefined): boolean {
+    return balanceApplies({
+      provider,
+      allowed: this.resolved.balanceProviders,
+      balanceBaseUrl: this.resolved.balanceBaseUrl,
+      providerBaseUrl: provider === undefined ? undefined : this.providerBaseUrl(provider),
+    })
+  }
+
+  /** Configured endpoint of one provider route, when its settings declare one. */
+  private providerBaseUrl(provider: string): string | undefined {
+    const llm = this.ctx.get('llm' as never) as unknown as LlmDirectoryFace | undefined
+    const settings = this.ctx.get('settings' as never) as unknown as SettingsReadFace | undefined
+    if (llm === undefined || settings === undefined) return undefined
+    const entry = llm.listConfigurableProviders().find(candidate => candidate.provider === provider)
+    if (entry === undefined || entry.settingsNs === '') return undefined
+    let value = settings.get(entry.settingsNs as never)
+    for (const step of entry.settingsPath) {
+      if (typeof value !== 'object' || value === null) return undefined
+      value = (value as Record<string, unknown>)[step]
+    }
+    if (typeof value !== 'object' || value === null) return undefined
+    const baseUrl = (value as Record<string, unknown>)['baseURL']
+    return typeof baseUrl === 'string' && baseUrl.trim() !== '' ? baseUrl : undefined
+  }
+
   private get fsLimits(): FsLimits {
     return {
       skipDirs: this.resolved.skipDirs,
@@ -329,6 +397,29 @@ export class WebEnhancedGateway extends TypertRemoteService {
       sessions: ctx.sessions,
       agentDefaultModel: ctx.agentDefaultModel,
       awaitLoader: loader === undefined ? undefined : () => loader.await(),
+      // Read uninjected and per call: the roster is what carries a session's
+      // tools, but a deployment composed without one must still run tasks, and
+      // the service may mount after this gateway does.
+      presets: () => ctx.get('agentPresets' as never) as unknown as PresetRoster | undefined,
+      attachWorkspaceSession: async (workspaceId, sessionId) => {
+        // Never fatal to the run: the session already exists and already works
+        // in the right directory, so a refused membership is a reportable miss
+        // rather than a reason to lose a started run. The registry validates
+        // the session header's canonical cwd against the workspace path, which
+        // is the realistic refusal (a path that moved under the record).
+        try {
+          const workspace = this.ctx.workspaceRegistry.get(workspaceId)
+          if (workspace === undefined) {
+            throw new Error(`workspace '${workspaceId}' is no longer registered`)
+          }
+          await workspace.attachSession(sessionId)
+        } catch (error) {
+          ctx.logger.warn(
+            `web-enhanced could not record run session '${sessionId}' on workspace '${workspaceId}': `
+            + (error instanceof Error ? error.message : String(error)),
+          )
+        }
+      },
     }
   }
 

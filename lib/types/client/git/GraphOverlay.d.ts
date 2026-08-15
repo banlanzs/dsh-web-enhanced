@@ -3,6 +3,11 @@
  * session's workspace. Registered into `shell.overlay` and rendered only
  * while the overlay state selects it, so an unopened graph costs one
  * subscription and nothing else.
+ *
+ * The branch selector here is the GRAPH's own filter: it decides which
+ * history the lanes are drawn from and changes nothing in the repository.
+ * The composer's branch strip is the other operation — it checks a branch
+ * out. Two controls because they are two different questions.
  * @module dsh-web-enhanced/src/client/git/GraphOverlay
  */
 import type { WebEnhancedProps } from '../contract.ts';

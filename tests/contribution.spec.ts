@@ -21,13 +21,17 @@ const task = {
   workspaceId: null, sessionId: null, result: null, createdAt: 1, updatedAt: 2, lastRunAt: null,
 }
 const commit = { hash: 'a', parents: [], refs: ['main'], author: 'x', date: 1, subject: 's' }
+const commitDetail = {
+  hash: 'a', parents: ['b'], author: 'x', email: 'x@y', date: 1, subject: 's', body: '',
+  files: [{ path: 'a.ts', added: 1, removed: 2 }, { path: 'bin', added: null, removed: null }],
+}
 const entry = { name: 'a', path: 'a', kind: 'file', size: 3 }
 
 /**
  * Methods invoked with no argument at all. Everything else takes exactly one
  * request object — see the arity guard below.
  */
-const nullaryMethods = new Set(['taskList', 'balanceGet'])
+const nullaryMethods = new Set(['taskList'])
 
 /** One representative payload per method, both the success and the error branch. */
 const payloads: Record<string, unknown[]> = {
@@ -36,9 +40,13 @@ const payloads: Record<string, unknown[]> = {
   taskUpdate: [{ task }, errorPayload],
   taskRemove: [{ removed: true }, errorPayload],
   taskRun: [{ started: true, sessionId: null }, errorPayload],
-  balanceGet: [{ isAvailable: true, infos: [{ currency: 'CNY', totalBalance: 1, grantedBalance: 2, toppedUpBalance: 3 }], cachedAt: 4 }],
+  balanceGet: [
+    { applicable: true, isAvailable: true, infos: [{ currency: 'CNY', totalBalance: 1, grantedBalance: 2, toppedUpBalance: 3 }], cachedAt: 4 },
+    { applicable: false, isAvailable: false, infos: [], cachedAt: 4 },
+  ],
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
+  gitCommit: [{ commit: commitDetail }, errorPayload],
   gitCheckout: [{ ok: true, message: 'm' }, errorPayload],
   gitStatus: [{ entries: [{ path: 'a', staged: 'M', unstaged: '' }] }, { entries: [{ path: 'new', origPath: 'old', staged: 'R', unstaged: ' ' }] }, errorPayload],
   gitDiff: [{ text: 'diff' }, errorPayload],
@@ -85,10 +93,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 20 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 21 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(20)
+    expect(methods).toHaveLength(21)
   })
 
   it('every result schema accepts its success and error payloads', () => {

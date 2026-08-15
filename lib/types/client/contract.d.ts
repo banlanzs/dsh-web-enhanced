@@ -6,7 +6,7 @@
  * @module dsh-web-enhanced/src/client/contract
  */
 import type { InjectFace, PropsLocale, PropsRuntime, SlotMap } from '@deepseek-ai/dsh-client-ui-slots';
-import type { BalanceView, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from '../types.ts';
+import type { BalanceGetRequest, BalanceView, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from '../types.ts';
 import type { Observable, OverlayActions, OverlayState, PanelActions, PanelState, PreviewActions, PreviewState } from './stores.ts';
 /**
  * The remote facade components call. Every member mirrors one `@Remote`
@@ -25,9 +25,10 @@ export interface WebEnhancedRemote {
     taskUpdate(request: TaskUpdateRequest): Promise<TaskUpdateResult>;
     taskRemove(request: TaskRemoveRequest): Promise<TaskRemoveResult>;
     taskRun(request: TaskRunRequest): Promise<TaskRunResult>;
-    balanceGet(): Promise<BalanceView>;
+    balanceGet(request: BalanceGetRequest): Promise<BalanceView>;
     gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>;
     gitLog(request: GitLogRequest): Promise<GitLogResult>;
+    gitCommit(request: GitCommitRequest): Promise<GitCommitResult>;
     gitCheckout(request: GitCheckoutRequest): Promise<GitCheckoutResult>;
     gitStatus(request: GitStatusRequest): Promise<GitStatusResult>;
     gitDiff(request: GitDiffRequest): Promise<GitDiffResult>;
@@ -42,7 +43,7 @@ export interface WebEnhancedRemote {
     fsOfficePreview(request: FsOfficePreviewRequest): Promise<FsOfficePreviewResult>;
 }
 /** Re-exported payload types (components, tests, and preview helpers). */
-export type { ApiError, BalanceView, FsDeleteRequest, FsEntryView, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchView, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitView, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskStatus, TaskUpdateRequest, TaskUpdateResult, } from '../types.ts';
+export type { ApiError, BalanceGetRequest, BalanceView, FsDeleteRequest, FsEntryView, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchView, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitDetailView, GitCommitFileView, GitCommitRequest, GitCommitResult, GitCommitView, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskStatus, TaskUpdateRequest, TaskUpdateResult, } from '../types.ts';
 /** Right-panel tab selection. */
 export type PanelTab = 'files' | 'preview' | 'scm';
 /**
@@ -86,6 +87,30 @@ export interface PreviewTab {
     readonly size: number;
 }
 /**
+ * Read of the model route one session currently runs on.
+ *
+ * The provider decides whether the balance line means anything: the endpoint
+ * it queries belongs to one account at one vendor, so a session routed
+ * elsewhere would be shown a number about a different account. Resolved from
+ * the model-selection plugin when the deployment composes one; a deployment
+ * without it reports `undefined`, which keeps the line visible.
+ */
+export interface ModelRouteFace {
+    /**
+     * Provider route of one session's current selection.
+     * @param sessionId - the session to read.
+     * @returns the route, or undefined before the first load / without the plugin.
+     */
+    provider(sessionId: string): string | undefined;
+    /**
+     * Subscribe to that session's selection changes.
+     * @param sessionId - the session to watch.
+     * @param listener - called after every change.
+     * @returns the unsubscribe.
+     */
+    subscribe(sessionId: string, listener: () => void): () => void;
+}
+/**
  * The face every web-enhanced registration injects. Built once in `apply`, so
  * components never reach for a service themselves.
  *
@@ -108,6 +133,8 @@ export interface WebEnhancedInject extends OverlayActions, PanelActions, Preview
      * @param sessionId - a session id the host minted.
      */
     readonly openSession: (sessionId: string) => void;
+    /** Which model route a session runs on (the balance line's visibility test). */
+    readonly modelRoute: ModelRouteFace;
     /** Shared state sources; delivered to components as selector hooks. */
     readonly hooks: {
         readonly overlay: Observable<OverlayState>;

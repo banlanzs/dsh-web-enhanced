@@ -5,7 +5,19 @@
  * @module dsh-web-enhanced/src/git
  */
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess';
-import type { GitBranchView, GitCommitView, GitStatusEntry } from './types.ts';
+import type { GitBranchView, GitCommitDetailView, GitCommitView, GitStatusEntry } from './types.ts';
+/**
+ * Read `git show --numstat` output into one commit detail.
+ *
+ * The header is everything before the record separator the format appends;
+ * the numstat rows follow it, one `<added>\t<removed>\t<path>` per file, with
+ * `-` for a binary file's counts. A rename is emitted as three NUL-free
+ * fields where the path is `old => new` inside braces, so it is kept verbatim
+ * — the display shows what git says rather than guessing at the halves.
+ * @param stdout - the command's output.
+ * @returns the parsed detail; a missing separator yields an empty file list.
+ */
+export declare function parseCommitDetail(stdout: string): GitCommitDetailView;
 /** Output bounds for one git invocation (deployment config, not tunables). */
 export interface GitLimits {
     readonly outputMaxBytes: number;
@@ -27,8 +39,25 @@ export declare class GitClient {
     isRepo(): Promise<boolean>;
     /** Local branches with the checked-out marker. */
     branches(): Promise<GitBranchView[]>;
-    /** Recent commits across all refs, newest first, with branch markers. */
-    log(maxCount: number): Promise<GitCommitView[]>;
+    /**
+     * Recent commits, newest first, with branch markers.
+     * @param maxCount - row cap.
+     * @param branch - walk only this ref's history; omitted walks every ref.
+     * @returns the commit rows.
+     */
+    log(maxCount: number, branch?: string): Promise<GitCommitView[]>;
+    /**
+     * One commit's identity and per-file change counts.
+     *
+     * `--numstat` against the FIRST parent only: a merge diffed against every
+     * parent lists the same file once per side and would read as several
+     * changes, and the useful question about a merge is what it brought in.
+     * A binary file reports `-` for both counts, which stays `null` here rather
+     * than becoming a fake zero.
+     * @param hash - the commit to describe.
+     * @returns identity, message body, and changed files.
+     */
+    commit(hash: string): Promise<GitCommitDetailView>;
     /** Branch names per commit hash (heads and remotes). */
     private collectRefs;
     /** Check out one branch; a rejected switch returns its stderr. */

@@ -59,6 +59,10 @@ interface HarnessOptions {
   createAgent?: () => unknown
   flush?: () => Promise<unknown>
   workspaces?: Array<{ id: string; path: string }>
+  /** Roster the runs compose against; omitted means a deployment without one. */
+  presets?: { resolve: (id?: string) => Promise<{ id: string }>; mount: (agentCtx: unknown, id?: string) => Promise<unknown> }
+  /** Membership refusal, so the run-survives-a-refused-attach path is reachable. */
+  attachFails?: string
 }
 
 async function harness(options: HarnessOptions = {}): Promise<{
@@ -67,6 +71,8 @@ async function harness(options: HarnessOptions = {}): Promise<{
   pool: MemoryMediaPool
   subprocess: FakeSubprocess
   create: ReturnType<typeof vi.fn>
+  attached: Array<[string, string]>
+  warnings: string[]
   setCreate: (fn: (options: unknown) => Promise<unknown>) => void
 }> {
   const pool = options.pool ?? new MemoryMediaPool()
@@ -78,7 +84,26 @@ async function harness(options: HarnessOptions = {}): Promise<{
   ctx.storage.mount('domain', facility)
   ctx.provide('storageDomain', facility)
   const workspaces = options.workspaces ?? []
-  ctx.provide('workspaceRegistry', { list: () => workspaces } as never)
+  const attached: Array<[string, string]> = []
+  const entityOf = (id: string): unknown => ({
+    ...workspaces.find(workspace => workspace.id === id),
+    attachSession: async (sessionId: string) => {
+      if (options.attachFails !== undefined) throw new Error(options.attachFails)
+      attached.push([id, sessionId])
+    },
+  })
+  ctx.provide('workspaceRegistry', {
+    list: () => workspaces,
+    get: (id: string) => (workspaces.some(workspace => workspace.id === id) ? entityOf(id) : undefined),
+  } as never)
+  const warnings: string[] = []
+  const baseWarn = ctx.logger.warn.bind(ctx.logger)
+  ctx.logger.warn = ((...args: unknown[]) => {
+    warnings.push(args.map(String).join(' '))
+    // Silence only what this gateway reports; anything else still prints.
+    if (!warnings[warnings.length - 1]!.startsWith('web-enhanced')) baseWarn(...args as [unknown])
+  }) as typeof ctx.logger.warn
+  if (options.presets !== undefined) ctx.provide('agentPresets' as never, options.presets as never)
   // Constructing the Service subclass registers it as ctx.subprocess.
   const subprocess = new FakeSubprocess(ctx)
   const createRef: { current: (options: unknown) => Promise<unknown> } = {
@@ -94,7 +119,7 @@ async function harness(options: HarnessOptions = {}): Promise<{
   await ctx.plugin(WebEnhancedGateway, { balanceApiKeyEnv: 'WEB_ENHANCED_TEST_KEY' })
   const gateway = ctx.get('webEnhanced') as WebEnhancedGateway
   return {
-    ctx, gateway, pool, subprocess, create,
+    ctx, gateway, pool, subprocess, create, attached, warnings,
     setCreate: (fn) => { createRef.current = fn },
   }
 }
@@ -196,7 +221,7 @@ describe('WebEnhancedGateway', () => {
     expect(gateway.typertRemote).toMatchObject({ serviceKey: 'webEnhanced', namespace: 'webEnhanced' })
     expect(remoteMethods(gateway).map(entry => entry.method)).toEqual([
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet',
-      'gitBranches', 'gitLog', 'gitCheckout', 'gitStatus', 'gitDiff',
+      'gitBranches', 'gitLog', 'gitCommit', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview',
     ])
@@ -364,16 +389,55 @@ describe('WebEnhancedGateway', () => {
 
     it('runs a task in a workspace root and rejects an unknown run workspace', async () => {
       const root = await tempRoot()
-      const { gateway, create } = await harness({ workspaces: [{ id: 'w1', path: root }] })
+      const { gateway, create, attached } = await harness({ workspaces: [{ id: 'w1', path: root }] })
       const created = await gateway.taskCreate({ title: 'x', prompt: 'y', workspaceId: 'w1' })
       if ('error' in created) throw new Error(created.error.message)
       const started = await gateway.taskRun({ id: created.task.id, workspaceId: 'w1' })
       if ('error' in started) throw new Error(started.error.message)
       const options = create.mock.calls[0]![0]
       expect(options.meta.cwd).toBe(root)
+      // Without membership the run's session belongs to no project, and every
+      // workspace-derived surface (the board's own jump included) misses it.
+      expect(attached).toEqual([['w1', String(started.sessionId)]])
       const ghost = await gateway.taskCreate({ title: 'g', prompt: 'y' })
       if ('error' in ghost) throw new Error(ghost.error.message)
       expect((await gateway.taskRun({ id: ghost.task.id, workspaceId: 'ghost' })).error?.code).toBe('workspace-not-found')
+    })
+
+    it('composes the deployment agent preset into the run session', async () => {
+      // The preset carries the tools: a run composed without one sees only what
+      // the host root registered, which is neither bash nor read_file.
+      const root = await tempRoot()
+      const mounted: string[] = []
+      const { gateway, create } = await harness({
+        workspaces: [{ id: 'w1', path: root }],
+        presets: {
+          resolve: async () => ({ id: 'coder' }),
+          mount: async (_agentCtx, id) => { mounted.push(id ?? '<none>') },
+        },
+      })
+      const created = await gateway.taskCreate({ title: 'x', prompt: 'y', workspaceId: 'w1' })
+      if ('error' in created) throw new Error(created.error.message)
+      const started = await gateway.taskRun({ id: created.task.id })
+      if ('error' in started) throw new Error(started.error.message)
+      expect(create.mock.calls[0]![0].meta).toEqual({ cwd: root, agentPreset: 'coder' })
+      await create.mock.calls[0]![0].setup(new Context())
+      expect(mounted).toEqual(['coder'])
+    })
+
+    it('starts the run even when the workspace refuses the session', async () => {
+      const root = await tempRoot()
+      const { gateway, warnings } = await harness({
+        workspaces: [{ id: 'w1', path: root }],
+        attachFails: 'cwd moved under the record',
+      })
+      const created = await gateway.taskCreate({ title: 'x', prompt: 'y', workspaceId: 'w1' })
+      if ('error' in created) throw new Error(created.error.message)
+      const started = await gateway.taskRun({ id: created.task.id })
+      // The session exists and works in the right directory; losing the run
+      // over a bookkeeping refusal would be the worse outcome.
+      expect(started).toMatchObject({ started: true })
+      expect(warnings.join('\n')).toContain('cwd moved under the record')
     })
   })
 
@@ -507,11 +571,39 @@ describe('WebEnhancedGateway', () => {
         json: async () => ({ is_available: true, balance_infos: [{ currency: 'CNY', total_balance: '9.9' }] }),
       })))
       const { gateway } = await harness({})
-      const view = await gateway.balanceGet()
+      const view = await gateway.balanceGet({})
       expect(view).toMatchObject({
+        applicable: true,
         isAvailable: true,
         infos: [{ currency: 'CNY', totalBalance: 9.9, grantedBalance: 0, toppedUpBalance: 0 }],
       })
+    })
+
+    it('answers inapplicable for a route the balance account does not bill', async () => {
+      // The endpoint serves ONE account; reporting it beside another vendor's
+      // model would be a number about somebody else's balance.
+      const fetched = vi.fn()
+      vi.stubGlobal('fetch', fetched)
+      const { gateway } = await harness({})
+      expect(await gateway.balanceGet({ provider: 'openai' })).toMatchObject({
+        applicable: false, isAvailable: false, infos: [],
+      })
+      // An inapplicable route never reaches the endpoint at all.
+      expect(fetched).not.toHaveBeenCalled()
+    })
+
+    it('answers inapplicable when the allowed route is repointed elsewhere', async () => {
+      process.env.WEB_ENHANCED_TEST_KEY = 'sk-test'
+      const { ctx, gateway } = await harness({})
+      ctx.provide('llm' as never, {
+        listConfigurableProviders: () => [
+          { provider: 'deepseek-official', settingsNs: 'llm-deepseek', settingsPath: [] },
+        ],
+      } as never)
+      ctx.provide('settings' as never, {
+        get: () => ({ baseURL: 'https://gateway.internal/v1' }),
+      } as never)
+      expect(await gateway.balanceGet({ provider: 'deepseek-official' })).toMatchObject({ applicable: false })
     })
   })
 })

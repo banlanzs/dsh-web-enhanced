@@ -6,7 +6,50 @@
  */
 
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
-import type { GitBranchView, GitCommitView, GitStatusEntry } from './types.ts'
+import type {
+  GitBranchView, GitCommitDetailView, GitCommitFileView, GitCommitView, GitStatusEntry,
+} from './types.ts'
+
+/**
+ * Read `git show --numstat` output into one commit detail.
+ *
+ * The header is everything before the record separator the format appends;
+ * the numstat rows follow it, one `<added>\t<removed>\t<path>` per file, with
+ * `-` for a binary file's counts. A rename is emitted as three NUL-free
+ * fields where the path is `old => new` inside braces, so it is kept verbatim
+ * — the display shows what git says rather than guessing at the halves.
+ * @param stdout - the command's output.
+ * @returns the parsed detail; a missing separator yields an empty file list.
+ */
+export function parseCommitDetail(stdout: string): GitCommitDetailView {
+  const split = stdout.indexOf('\x1e')
+  const header = split === -1 ? stdout : stdout.slice(0, split)
+  const rest = split === -1 ? '' : stdout.slice(split + 1)
+  const [hash = '', parents = '', author = '', email = '', at = '', subject = '', ...bodyParts] = header.split('\x1f')
+  const files: GitCommitFileView[] = []
+  for (const line of rest.split('\n')) {
+    const row = line.trimEnd()
+    if (row === '') continue
+    const fields = row.split('\t')
+    if (fields.length < 3) continue
+    const [added = '', removed = '', ...pathParts] = fields
+    files.push({
+      path: pathParts.join('\t'),
+      added: added === '-' ? null : Number(added),
+      removed: removed === '-' ? null : Number(removed),
+    })
+  }
+  return {
+    hash,
+    parents: parents === '' ? [] : parents.split(' '),
+    author,
+    email,
+    date: Number(at),
+    subject,
+    body: bodyParts.join('\x1f').trim(),
+    files,
+  }
+}
 
 /** Output bounds for one git invocation (deployment config, not tunables). */
 export interface GitLimits {
@@ -27,6 +70,17 @@ function assertSafeRelPath(path: string): void {
   const segments = path.split('/')
   if (segments.some(segment => segment === '..' || segment === '.')) {
     throw new Error(`path '${path}' must not contain '.' or '..' segments`)
+  }
+}
+
+/** Reject anything that could be read as a git option or a second revision. */
+function assertSafeRev(rev: string): void {
+  if (rev === '') throw new Error('revision must not be empty')
+  if (rev.startsWith('-')) throw new Error(`revision '${rev}' must not start with '-'`)
+  // `..`/`...` are range syntax and `^`/`~` walk elsewhere: a filter names ONE
+  // ref, and whitespace or a glob would let one argument become several.
+  if (/[\s~^:?*[\]\\]/u.test(rev) || rev.includes('..')) {
+    throw new Error(`revision '${rev}' contains characters a single ref may not`)
   }
 }
 
@@ -80,11 +134,23 @@ export class GitClient {
     }))
   }
 
-  /** Recent commits across all refs, newest first, with branch markers. */
-  async log(maxCount: number): Promise<GitCommitView[]> {
+  /**
+   * Recent commits, newest first, with branch markers.
+   * @param maxCount - row cap.
+   * @param branch - walk only this ref's history; omitted walks every ref.
+   * @returns the commit rows.
+   */
+  async log(maxCount: number, branch?: string): Promise<GitCommitView[]> {
     const fmt = '%H%x1f%P%x1f%an%x1f%at%x1f%s'
+    // `--all` and a named ref are alternatives, not modifiers of each other:
+    // the filter is what decides which history the lanes are drawn from.
+    let scope = ['--all']
+    if (branch !== undefined && branch !== '') {
+      assertSafeRev(branch)
+      scope = [branch]
+    }
     const run = await this.run([
-      'log', '--all', '--date-order', `--max-count=${maxCount}`, `--pretty=format:${fmt}`,
+      'log', ...scope, '--date-order', `--max-count=${maxCount}`, `--pretty=format:${fmt}`,
     ])
     if (run.exitCode !== 0) throw new Error(run.stderr.trim() || 'git log failed')
     const refs = await this.collectRefs()
@@ -99,6 +165,30 @@ export class GitClient {
         subject: rest.join('\x1f'),
       }
     })
+  }
+
+  /**
+   * One commit's identity and per-file change counts.
+   *
+   * `--numstat` against the FIRST parent only: a merge diffed against every
+   * parent lists the same file once per side and would read as several
+   * changes, and the useful question about a merge is what it brought in.
+   * A binary file reports `-` for both counts, which stays `null` here rather
+   * than becoming a fake zero.
+   * @param hash - the commit to describe.
+   * @returns identity, message body, and changed files.
+   */
+  async commit(hash: string): Promise<GitCommitDetailView> {
+    assertSafeRev(hash)
+    // The body is multi-line, so it goes LAST and a record separator closes
+    // the header: splitting on newlines alone could not tell a body line from
+    // the first numstat row.
+    const fmt = '%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%s%x1f%b%x1e'
+    const run = await this.run([
+      'show', '--no-color', '--first-parent', '-m', '--numstat', `--format=${fmt}`, hash,
+    ])
+    if (run.exitCode !== 0) throw new Error(run.stderr.trim() || 'git show failed')
+    return parseCommitDetail(run.stdout)
   }
 
   /** Branch names per commit hash (heads and remotes). */

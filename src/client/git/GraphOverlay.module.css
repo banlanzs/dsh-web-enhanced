@@ -8,10 +8,35 @@
   padding: 3px 10px;
 }
 
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.filterLabel {
+  opacity: 0.7;
+}
+
+.select {
+  border: 1px solid rgb(128 128 128 / 30%);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  max-width: 180px;
+  padding: 2px 6px;
+}
+
 .rows {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.entry {
+  border-bottom: 1px solid rgb(128 128 128 / 12%);
 }
 
 /* Height must match ROW_HEIGHT in GraphOverlay.tsx: the SVG rails are drawn
@@ -20,8 +45,16 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   height: 34px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
   font-size: 12px;
+  padding: 0;
+  text-align: start;
 }
 
 .row:hover {
@@ -97,3 +130,79 @@
   color: #d9534f;
   opacity: 1;
 }
+
+.detail {
+  border-inline-start: 2px solid rgb(106 143 216 / 45%);
+  margin: 0 0 8px 24px;
+  padding: 6px 0 6px 10px;
+  font-size: 12px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 10px;
+  margin: 0;
+}
+
+.facts dt {
+  opacity: 0.6;
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.body {
+  border-radius: 4px;
+  background: rgb(128 128 160 / 12%);
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
+.filesTitle {
+  margin: 8px 0 4px;
+  opacity: 0.6;
+}
+
+.files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filePath {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.added,
+.removed {
+  flex: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  min-width: 42px;
+  text-align: end;
+}
+
+.added { color: #4caf72; }
+.removed { color: #d9534f; }
