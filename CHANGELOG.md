@@ -16,6 +16,14 @@
 
 侧边栏底部的两个入口取消，改到「工作区」视图的 tablist 里统一显示：文件 / 预览 / 变更 / **任务看板** / **Git 图谱** 五页。实现上把 `BoardOverlay` / `GraphOverlay` 拆成无壳面板（`BoardPanel` / `GraphPanel`）与浮层壳两层，标签页直接复用面板——数据、轮询、展开逻辑只有一份；侧边栏 footer 与对应 `shell.overlay` 注册移除（mention 的 `fsBrowse` 浏览器浮层保留）。
 
+### 修复：宿主会话统计行整行完整显示
+
+余额行上面的宿主 StatsLine 用 `white-space: nowrap; overflow: hidden; text-overflow: ellipsis` 限制在 composer 宽度内，长会话会从「输出」之后被省略。本插件注入全局覆盖：以 `[data-slot='conversation.composer.dock'] > div:not([data-testid='balance-line'])` 结构选择器为主、`.FJxK0a_root` 哈希类名为兜底，把该行改成 `white-space: normal; overflow: visible; overflow-wrap: anywhere; max-width: none`——统计内容完整换行显示，同时不触碰本插件自己的余额行。
+
+### 调整：分支切换器移到会话标题行
+
+分支切换器（`BranchStrip`）从输入框上方的 `conversation.input.dock` 改注册到 `conversation.session.header.actions`——宿主把它渲染在标题旁的 `titleCluster` 动作行。组件改用框架注入的 `sessionId` 精确解析项目（不再依赖「当前会话」），CSS 从 composer 宽度列改为按内容收缩的内联控件；脏树确认与 git 拒绝信息仍堆在切换器下方。
+
 ### 接口变化
 
 - 远程方法 26 → 27：新增 `pricingGet`。

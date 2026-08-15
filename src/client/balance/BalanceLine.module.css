@@ -1,3 +1,23 @@
+/* The host's stats line (the row ABOVE this plugin's balance line) is
+   `white-space: nowrap; overflow: hidden; text-overflow: ellipsis` at the
+   composer width, so long sessions lose everything after the token group.
+   Override it structurally: any composer.dock child that is not this plugin's
+   row wraps instead of eliding. The class fallback covers hosts whose slot
+   anchor is not addressable; both stay out of the way of the balance line. */
+:global([data-slot='conversation.composer.dock'] > div:not([data-testid='balance-line'])),
+:global(.FJxK0a_root) {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  padding: 4px calc(var(--dsh-composer-side-clearance) + 16px) 0;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
 .line {
   /* Same width discipline as the host's stats line under the composer: the
      row lives in the bar's width column, so it must center on the chat

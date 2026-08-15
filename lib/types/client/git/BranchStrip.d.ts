@@ -1,13 +1,13 @@
 /**
- * Branch strip above the composer: the current branch, a switcher over the
- * local branches, and the entry to the commit graph. Rendered only for a
- * session whose workspace is a git repository — an unrelated project should
- * not grow a dead control.
+ * Branch switcher in the session header's action row (titleCluster): the
+ * current branch, a switcher over the local branches, and the dirty-tree
+ * confirmation. Rendered only for a session whose workspace is a git
+ * repository — an unrelated project should not grow a dead control.
  * @module dsh-web-enhanced/src/client/git/BranchStrip
  */
 import type { GitStatusEntry, WebEnhancedProps } from '../contract.ts';
 /** Full composed props of the branch strip. */
-export type BranchStripProps = WebEnhancedProps<'conversation.input.dock'>;
+export type BranchStripProps = WebEnhancedProps<'conversation.session.header.actions'>;
 /** How much uncommitted work a checkout would carry along. */
 export interface DirtySummary {
     readonly total: number;
@@ -28,4 +28,4 @@ export interface DirtySummary {
  */
 export declare function dirtySummary(entries: readonly GitStatusEntry[]): DirtySummary;
 /** The branch strip: current branch and the switcher. */
-export declare function BranchStrip({ useSessions, useWorkspaces, remote, t, }: BranchStripProps): import("react").JSX.Element | null;
+export declare function BranchStrip({ sessionId, useWorkspaces, remote, t, }: BranchStripProps): import("react").JSX.Element | null;

@@ -1,8 +1,8 @@
 /**
- * Branch strip above the composer: the current branch, a switcher over the
- * local branches, and the entry to the commit graph. Rendered only for a
- * session whose workspace is a git repository — an unrelated project should
- * not grow a dead control.
+ * Branch switcher in the session header's action row (titleCluster): the
+ * current branch, a switcher over the local branches, and the dirty-tree
+ * confirmation. Rendered only for a session whose workspace is a git
+ * repository — an unrelated project should not grow a dead control.
  * @module dsh-web-enhanced/src/client/git/BranchStrip
  */
 
@@ -10,11 +10,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { GitBranchView, GitStatusEntry, WebEnhancedProps } from '../contract.ts'
-import { workspaceOfSession } from '../workspace.ts'
+import { workspaceOfSessionId } from '../workspace.ts'
 import css from './BranchStrip.module.css'
 
 /** Full composed props of the branch strip. */
-export type BranchStripProps = WebEnhancedProps<'conversation.input.dock'>
+export type BranchStripProps = WebEnhancedProps<'conversation.session.header.actions'>
 
 /** Load state of the branch list. */
 type Branches =
@@ -51,12 +51,10 @@ export function dirtySummary(entries: readonly GitStatusEntry[]): DirtySummary {
 
 /** The branch strip: current branch and the switcher. */
 export function BranchStrip({
-  useSessions, useWorkspaces, remote, t,
+  sessionId, useWorkspaces, remote, t,
 }: BranchStripProps) {
-  const sessions = useSessions(state => state)
   const workspaces = useWorkspaces(state => state)
-  const workspace = workspaceOfSession(sessions, workspaces)
-  const workspaceId = workspace?.workspaceId
+  const workspaceId = workspaceOfSessionId(sessionId, workspaces)?.workspaceId
 
   const [branches, setBranches] = useState<Branches>({ phase: 'loading' })
   const [switching, setSwitching] = useState(false)
@@ -150,8 +148,7 @@ export function BranchStrip({
             <option key={branch.name} value={branch.name}>{branch.name}</option>
           ))}
         </select>
-        {/* No graph entry here: the sidebar already owns that action, and a
-            second entry above the composer duplicated it. */}
+        {/* No graph entry here: the workspace tab owns that surface. */}
       </div>
       {pending !== null && (
         <div className={css.confirm} data-testid="branch-dirty-confirm">
