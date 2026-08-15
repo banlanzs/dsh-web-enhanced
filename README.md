@@ -6,7 +6,7 @@
 
 </div>
 
-> A Web-enhanced plugin for DeepSeek Harness: task board with cron scheduling, git graph, preview/files/SCM right panel, and DeepSeek API balance line.
+> A Web-enhanced plugin for DeepSeek Harness: task board with cron scheduling, git graph, preview/files/SCM right panel, DeepSeek API balance line, and image understanding for text-only models.
 >
 > 🔌 Ecosystem: the repo carries the `#dsh` · `#dsh-plugin` topics — welcome to be listed by @dsh-plugin.
 
@@ -21,6 +21,7 @@ Developed and built independently of the deepseek-harness repo — the plugin on
 | **Workspace view** | A **Workspace** tab in the conversation's view ring, beside Chat and Trajectory, with five panes (Files / Preview / Changes / **Task Board** / **Git Graph**). The file tree expands, searches by name, and opens files in preview; preview supports markdown (GFM tables, HTML tables, and inline HTML) / HTML (sandboxed iframe) / code / **diff** (line-highlighted unified diff) / CSV / images / PDF / text / **Office docx & xlsx** (host-side structural conversion) with source / **split** (editor + preview side by side) / view modes and save. The Changes pane is backed by real `git status` with stage / unstage / discard and per-file diffs. The active pane and the open directories persist per workspace. |
 | **File mentions** | 「Mention file」and「Mention folder」in the composer's `+` menu: an indented project directory view (folders and files, locally filterable) whose folder rows **enter that folder** — they open the plugin's own file browser at it, which works like a file manager (breadcrumbs / parent / home / per-level listing / filter by name; a file click picks, a folder click enters). The first row opens the same browser at the project root, and it can also walk **outside the project**. Picking a file inserts its `@path` into the draft (paths with spaces are quoted). |
 | **Balance line** | Shows the DeepSeek API balance (`GET /user/balance`) below the composer, with a refresh button, a muted error state, and **an estimated cost of the current session's billed tokens** (prices fetched from models.dev, USD per million tokens). **Only while the session's model route actually bills that account** — switching to another channel (or repointing `deepseek-official` at a private gateway) hides the balance part, because the number would then be about somebody else's account; the cost part appears only when models.dev has a price for the exact provider/model selection. |
+| **Image understanding** | Transparent image support for text-only models, built in (supersedes `DSH-vision`). Sending an image to a text-only model passes the「model does not support images」gate and the `read_image` tool gate; the transcript keeps the image (the UI shows it exactly like on a multimodal route) while the model sees a `[图片内容描述]` text transcription; multimodal models are detected through the REAL pre-patch resolver and pass through untouched, so no token is spent describing images they can see. The transcription source order is: DSH-configured multimodal models (auto-detected, zero extra keys) → local Ollama (auto-detected) → a configured OpenAI-compatible endpoint with an ordered `visionFallbackModels` chain, content-hash cache, classified errors, anonymous-endpoint timeout caps, and cooldowns. A **Vision** tab on the Settings page shows the live state (admission patch, discovered models, endpoint/Ollama/key source, last failure). Configure it on the plugin row (`vision*` keys); it is on by default. |
 | **Settings page + plugin management** | One more row in the Settings nav, "Web Enhanced" (registered into `settings.section`). Its **Plugins** tab lists what the current profile has installed — name, version, dependency spec, whether it is an active layer — and offers **Update** and **Remove**. What it lists is the profile `package.json`'s `dependencies`, because that is the set pnpm can act on; template layers (`@deepseek-ai/dsh-base` and friends) are shown apart with no buttons, since no dependency provides them. **Only the profile this host started with is visible** (`dsh --profile web` lists web's dependencies and nothing else); the profile name and path are printed under the title. **Every operation takes effect on the next start** (the layer stack is composed at boot) and the UI says so. Removing this plugin itself is not blocked — the confirmation just spells out what it costs. |
 
 ## Screenshots
@@ -42,7 +43,7 @@ The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # recommended
 # or:
-# dsh plugin --profile web add ./dsh-web-enhanced-0.8.0.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.9.0.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -112,7 +113,7 @@ reinstalling from a packed tarball instead:
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.8.0.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.9.0.tgz
 ```
 
 On Windows, tarball installs need real symlink permission (pnpm's
@@ -146,6 +147,17 @@ Plugin-row `config` fields (all have defaults):
 | `browseMaxEntries` | 500 | Entry cap of one directory level in the mention browser |
 | `pluginOpTimeoutMs` | 300000 | Deadline for one pnpm operation (update/remove) |
 | `profileDir` | empty | Profile directory; empty walks up from this module. Only for a deployment whose profile is not an ancestor of the loaded plugin |
+| `visionEnabled` | true | Master switch of the image-understanding integration |
+| `visionPatchAdmission` | true | Wrap `llm.resolveModelInfo` so text-only models admit images past the send preflight and the `read_image` gate (reversible, unload-order safe) |
+| `visionProvider` / `visionModel` | empty | Pin the DSH-configured provider/model used for transcription; empty = auto-detect the first image-capable models from all configured providers |
+| `visionPrompt` / `visionMarker` | Chinese thorough-description prompt / `[图片内容描述]` | Transcription prompt and the marker the model sees instead of the image block |
+| `visionBaseUrl` / `visionApiKey` / `visionEndpointModel` | empty | OpenAI-compatible VLM endpoint (e.g. DashScope compatible mode); key falls back to `visionApiKeyEnv` → `VISION_API_KEY` → `DASHSCOPE_API_KEY`. Empty base URL or model disables this source |
+| `visionApiKeyEnv` / `visionAnonymous` | `VISION_API_KEY` / false | Env var for the endpoint key; `true` skips the Authorization header (free/local endpoints get a hard 20 s timeout cap) |
+| `visionTimeoutMs` / `visionMaxTokens` | 120000 / 4096 | VLM request timeout and output cap |
+| `visionAutoLocalOllama` | true | Probe `visionLocalOllamaUrl` at startup; when an Ollama is running, its first vision-capable model is prepended to the transcription chain (images stay on this machine) |
+| `visionLocalOllamaModel` / `visionLocalOllamaUrl` | empty / `http://localhost:11434/v1` | Preferred Ollama model (empty picks the first `*vl*`/`*vision*` model) and its OpenAI-compatible base URL |
+| `visionFallbackModels` | `[]` | Ordered fallback chain `{model, baseURL?, apiKey?, anonymous?, timeoutMs?}`; each entry may point at a different provider, keyless non-anonymous entries are skipped |
+| `visionCacheLimit` / `visionCooldownMs` | 200 / 60000 | In-process transcription cache entries (SHA-256 of image bytes) and how long an endpoint that just failed (429/timeout) is skipped |
 
 ## Architecture
 
@@ -157,6 +169,7 @@ Plugin-row `config` fields (all have defaults):
 
   Nothing registers into the layout's `details` slot: that is a `single` slot already occupied by ui-conversation's `DetailsPanel`, so registering there would replace the tool-details column and remove the `conversation.details.tool` seat it declares. Beside the slots, two client commands are registered through `ctx.commandUi.register` — the file and folder mention pickers in the composer's `+` menu.
 - **Optional services are read uninjected**: `agentPresets`, `llm`, `settings`, `credentials`, `modelDirectories`, `commandUi`, and `conversation` all come from `ctx.get()`. A deployment composed without one degrades exactly that surface instead of leaving this plugin's entry waiting on a service it may never get.
+- **Image understanding rides the host's model-visible surface, not adapter trickery**: a `visionIntegration` Cordis service reversibly wraps the shared `llm.resolveModelInfo` (marked wrapper; teardown restores it only while it is still the live function, so a foreign wrapper on top is never amputated). `agent/pre-step` transcribes image-bearing messages and files a `session` surface replacement (`surfaceOp: replace`) whose text the model derives while the append-original image stays in the transcript — a wrapped `session.deriveMessages` covers the first request of the step before the replacement microtask lands, and `tools/post-execute` rewrites `read_image` results the same way. Multimodal detection always reads the captured pre-patch resolver. The transcription engine (`VisionTranscriber`) then tries DSH-configured vision models via `llm.stream`, local Ollama, and an OpenAI-compatible endpoint chain (fallbacks, content-hash cache, classified errors, cooldowns) — the robustness parts ported from `dsh-vision-proxy`.
 - **One request object per remote method**: the Typert gateway maps `descriptor.parameters` positionally onto the host method (`Reflect.apply`) and both halves reject a mismatched argument count, so a descriptor's parameter list *is* the host signature. Every method here declares exactly one `request` parameter; `tests/contribution.spec.ts` guards it.
 - **Hand-written remote contribution**: host methods use the `@Remote` decorator (Typert SRC mode; the host gateway auto-discovers the `ctx.webEnhanced` service); the client mounts a hand-declared src-json contribution in `apply` — no typert generation pipeline.
 - **Cross-scope shared state**: the mention browser overlay is `root`-scoped and the branch strip and balance line are `session`-scoped, so a single slot-store handle cannot serve both ("one handle, one scope"). Shared state lives in `apply` as plain observables and reaches components through each registration's inject `hooks` compartment.
@@ -172,11 +185,11 @@ Plugin-row `config` fields (all have defaults):
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + full tests + build (266 tests)
+pnpm run check   # typecheck + full tests + build (287 tests)
 ```
 
 Build outputs:
-- `lib/index.js` — node half: the `web-enhanced` function plugin (mounts the `WebEnhancedGateway` Typert service: task*/git*/fs*/balanceGet/pricingGet + cron scheduler + restart recovery)
+- `lib/index.js` — node half: the `web-enhanced` function plugin (mounts the `WebEnhancedGateway` Typert service: task*/git*/fs*/balanceGet/pricingGet/visionStatus + cron scheduler + restart recovery, and the `VisionInterceptor` image-understanding service)
 - `lib/client.js` — browser half: module-loader closure format (`window.__ModuleLoader__.load`), declared by the `dsh.client` manifest
 - `cordis.patch.yml` — bundle patch: inserts the `web-enhanced` row (one row carries both the node and browser halves)
 
@@ -207,6 +220,10 @@ Prereqs: `dsh`/`pnpm` on PATH, and the main repo's web build output (playwright 
 - Plugin management does **not** reload the running process: Cordis composes the layer stack at boot, so an update or removal describes the next start. For the same reason it offers no enable/disable — that edits the profile's `cordis.patch.yml`, a different thing from installing.
 - Plugin management sees **only the profile this host started with**: `dsh --profile web` lists `~/.dsh/profiles/web`'s dependencies, and a plugin installed into another profile does not appear. The profile directory is pnpm's working directory, and acting across profiles would run pnpm in a directory whose layer stack is not the one composed right now. To manage another profile, start with it — or use `dsh plugin --profile <name>`.
 - Plugin management needs `pnpm` on PATH and the profile directory on this module's ancestor chain (true of any normal install; a source checkout or a test reports "nothing to manage" rather than an error). One pnpm operation runs at a time — a second request is told so rather than queued.
+- Image understanding needs at least one transcription source — a DSH-configured multimodal model, a local Ollama, or a `visionBaseUrl` endpoint. With none, images to text-only models are replaced by a placeholder description instead of crashing the turn, and the Vision tab shows why. Transcription quality is the chosen vision model's ceiling, not a plugin guarantee.
+- Endpoint transcription sends image bytes (base64, HTTPS) to the configured VLM endpoint; they leave the machine unless the endpoint is local (Ollama). Only the in-process content-hash cache is kept — nothing else is stored. The harness-model path re-identifies an image within one step but does not cache across turns; the endpoint path does cache across turns by image content.
+- Do not install `DSH-vision` (`dsh-image-vision`) alongside this plugin: both would patch admission and both would transcribe the same image. This plugin's admission wrapper is unload-order safe itself, but `DSH-vision`'s teardown restores whatever IT captured and can still clobber a wrapper installed after it.
+- Large-image downscaling (the optional `sharp` step `dsh-vision-proxy` has) is not bundled; endpoints receive the original bytes. `visionMaxTokens` caps the transcription output either way.
 
 ## License
 

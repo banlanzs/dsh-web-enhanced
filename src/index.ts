@@ -9,8 +9,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { InvocationDescriptor } from '@deepseek-ai/dsh-typert-protocol'
 import { WEB_ENHANCED_DESCRIPTORS, WEB_ENHANCED_PACKAGE } from './descriptors.ts'
 import { WebEnhancedGateway, Config } from './gateway.ts'
+import { VisionInterceptor } from './vision.ts'
 
 export { WebEnhancedGateway, Config }
+export { VisionInterceptor, VisionTranscriber } from './vision.ts'
+export type { VisionConfigSource, VisionSettings } from './vision.ts'
 
 /**
  * One package contribution as `TypertRegistry.register` accepts it.
@@ -84,5 +87,6 @@ export function apply(ctx: Context, config: Config = {}): void {
     model: { services: [], events: [], objects: [] },
     invocations: WEB_ENHANCED_DESCRIPTORS,
   }), 'web-enhanced: Remote definitions')
+  ctx.plugin(VisionInterceptor, config)
   ctx.plugin(WebEnhancedGateway, config)
 }

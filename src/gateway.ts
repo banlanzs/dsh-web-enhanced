@@ -26,6 +26,7 @@ import { PnpmRunner, pnpmFailureCode } from './pnpm.ts'
 import { ModelsDevPricing } from './pricing.ts'
 import { findProfileDir, readInventory } from './profile.ts'
 import type { PresetRoster, RunDeps } from './run-task.ts'
+import { DEFAULT_VISION_MARKER, DEFAULT_VISION_PROMPT } from './vision.ts'
 import type {
   ApiError, BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest,
   FsListRequest, FsListResult,
@@ -39,7 +40,7 @@ import type {
   PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
   TaskCreateRequest, TaskCreateResult,
   TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
-  TaskUpdateRequest, TaskUpdateResult, WorkspaceId,
+  TaskUpdateRequest, TaskUpdateResult, VisionStatusResult, VisionStatusView, WorkspaceId,
 } from './types.ts'
 
 /**
@@ -59,6 +60,20 @@ interface LlmDirectoryFace {
 /** The settings read face, structurally (see {@link LlmDirectoryFace}). */
 interface SettingsReadFace {
   get(ns: never): unknown
+}
+
+/** The vision integration service face the status remote reads, structurally. */
+interface VisionIntegrationFace {
+  status(): Promise<VisionStatusView>
+}
+
+/** One fallback vision endpoint entry, as declared in plugin config. */
+export interface VisionFallbackConfig {
+  model: string
+  baseURL?: string
+  apiKey?: string
+  anonymous?: boolean
+  timeoutMs?: number
 }
 
 /** Plugin config; every bound defaults when unset. */
@@ -85,6 +100,26 @@ export interface Config {
   browseMaxEntries?: number
   pluginOpTimeoutMs?: number
   profileDir?: string
+  // Image understanding (see `src/vision.ts` for the runtime half).
+  visionEnabled?: boolean
+  visionPatchAdmission?: boolean
+  visionPrompt?: string
+  visionMarker?: string
+  visionProvider?: string
+  visionModel?: string
+  visionBaseUrl?: string
+  visionApiKey?: string
+  visionApiKeyEnv?: string
+  visionEndpointModel?: string
+  visionAnonymous?: boolean
+  visionTimeoutMs?: number
+  visionMaxTokens?: number
+  visionAutoLocalOllama?: boolean
+  visionLocalOllamaModel?: string
+  visionLocalOllamaUrl?: string
+  visionFallbackModels?: VisionFallbackConfig[]
+  visionCacheLimit?: number
+  visionCooldownMs?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -116,6 +151,35 @@ export const Config: z<Config> = z.object({
   // Located by walking up from this module by default; naming it explicitly is
   // for a deployment whose profile is not an ancestor of the loaded plugin.
   profileDir: z.string().default(''),
+  // Image understanding. The interception core is transparent (images stay in
+  // the UI, text-only models see the description) and the transcription engine
+  // tries, in order: DSH-configured vision models, local Ollama, then the
+  // configured OpenAI-compatible endpoint with its fallback chain.
+  visionEnabled: z.boolean().default(true),
+  visionPatchAdmission: z.boolean().default(true),
+  visionPrompt: z.string().default(DEFAULT_VISION_PROMPT),
+  visionMarker: z.string().default(DEFAULT_VISION_MARKER),
+  visionProvider: z.string().default(''),
+  visionModel: z.string().default(''),
+  visionBaseUrl: z.string().default(''),
+  visionApiKey: z.string().role('secret').default(''),
+  visionApiKeyEnv: z.string().default('VISION_API_KEY'),
+  visionEndpointModel: z.string().default(''),
+  visionAnonymous: z.boolean().default(false),
+  visionTimeoutMs: z.number().default(120_000),
+  visionMaxTokens: z.number().default(4_096),
+  visionAutoLocalOllama: z.boolean().default(true),
+  visionLocalOllamaModel: z.string().default(''),
+  visionLocalOllamaUrl: z.string().default('http://localhost:11434/v1'),
+  visionFallbackModels: z.array(z.object({
+    model: z.string(),
+    baseURL: z.string().default(''),
+    apiKey: z.string().role('secret').default(''),
+    anonymous: z.boolean().default(false),
+    timeoutMs: z.number().default(0),
+  })).default([]),
+  visionCacheLimit: z.number().default(200),
+  visionCooldownMs: z.number().default(60_000),
 })
 
 /** Field defaults applied when the gateway is constructed directly. */
@@ -143,6 +207,25 @@ export function resolveConfig(config: Config): Required<Config> {
     browseMaxEntries: config.browseMaxEntries ?? 500,
     pluginOpTimeoutMs: config.pluginOpTimeoutMs ?? 300_000,
     profileDir: config.profileDir ?? '',
+    visionEnabled: config.visionEnabled ?? true,
+    visionPatchAdmission: config.visionPatchAdmission ?? true,
+    visionPrompt: config.visionPrompt ?? DEFAULT_VISION_PROMPT,
+    visionMarker: config.visionMarker ?? DEFAULT_VISION_MARKER,
+    visionProvider: config.visionProvider ?? '',
+    visionModel: config.visionModel ?? '',
+    visionBaseUrl: config.visionBaseUrl ?? '',
+    visionApiKey: config.visionApiKey ?? '',
+    visionApiKeyEnv: config.visionApiKeyEnv ?? 'VISION_API_KEY',
+    visionEndpointModel: config.visionEndpointModel ?? '',
+    visionAnonymous: config.visionAnonymous ?? false,
+    visionTimeoutMs: config.visionTimeoutMs ?? 120_000,
+    visionMaxTokens: config.visionMaxTokens ?? 4_096,
+    visionAutoLocalOllama: config.visionAutoLocalOllama ?? true,
+    visionLocalOllamaModel: config.visionLocalOllamaModel ?? '',
+    visionLocalOllamaUrl: config.visionLocalOllamaUrl ?? 'http://localhost:11434/v1',
+    visionFallbackModels: config.visionFallbackModels ?? [],
+    visionCacheLimit: config.visionCacheLimit ?? 200,
+    visionCooldownMs: config.visionCooldownMs ?? 60_000,
   }
 }
 
@@ -254,6 +337,38 @@ export class WebEnhancedGateway extends TypertRemoteService {
       return { provider: request.provider, model: request.model, pricing }
     } catch (error) {
       return { error: this.errorOf(error, 'pricing-error') }
+    }
+  }
+
+  /**
+   * Live state of the image-understanding integration: whether the admission
+   * patch is active, which vision models/endpoints the transcription engine
+   * can use, and its last failure. Read lazily so a deployment that mounts no
+   * integration reports that state instead of throwing.
+   */
+  @Remote('visionStatus')
+  async visionStatus(): Promise<VisionStatusResult> {
+    try {
+      const service = this.ctx.get('visionIntegration' as never, false) as unknown as VisionIntegrationFace | undefined
+      if (service === undefined) {
+        return {
+          mounted: false,
+          enabled: false,
+          patchAdmission: false,
+          admissionActive: false,
+          harnessModels: [],
+          endpointConfigured: false,
+          endpointModel: null,
+          apiKeySource: 'unset',
+          ollamaDetected: false,
+          ollamaModel: null,
+          cacheSize: 0,
+          lastError: 'the vision integration service is not mounted in this deployment',
+        }
+      }
+      return await service.status()
+    } catch (error) {
+      return { error: this.errorOf(error, 'vision-status') }
     }
   }
 

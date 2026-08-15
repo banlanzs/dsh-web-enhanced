@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.9.0] - 2026-08-15
+
+### 新增：识图功能集成（TODO #6）
+
+纯文本模型现在可以直接收图。设计是 `DSH-vision`（透明拦截）与 `dsh-vision-proxy`（健壮转写引擎）两个参考插件的合体：
+
+- **发送门禁与 `read_image` 门禁放行**：新增 `visionIntegration` Cordis 服务，可逆地包装共享 `llm.resolveModelInfo`，给纯文本模型补上 `image` 输入能力——一次同时绕过 api-proxy 的发送准入与 `read_image` 的工具门禁。包装带标记，卸载时**只有当前仍是自己的包装才还原**，修掉了 DSH-vision 无条件还原会误拆后来者包装的隐患。
+- **对话记录保图片、模型见文字**：`agent/pre-step` 为含图消息预计算描述；原文 append 图片照常进入历史（UI 与多模态模型一致），模型可见表面通过 `session` 表面替换（`surfaceOp: replace`）换成 `[图片内容描述]` 文字；包装后的 `session.deriveMessages` 覆盖替换微任务落盘前的那一步请求。`tools/post-execute` 对 `read_image` 结果做同样替换。
+- **多模态自动检测**：真实能力始终读补丁前捕获的原始 resolver，多模态模型原样放行、不产生识别费用。
+- **转写源依次回退**：DSH 已配置的多模态模型（`llm.stream`，自动探测、零额外密钥，支持 `visionProvider`/`visionModel` 钉选）→ 本地 Ollama（启动时探测、自动加进链首）→ `visionBaseUrl` OpenAI 兼容端点 + `visionFallbackModels` 回退链。引擎带图片字节 SHA-256 内容缓存、429/超时冷却、匿名端点 20s 硬超时、分类错误（rate_limit/quota/auth/region/model_not_found/context_too_large/http）与无密钥快速跳过。全部失败时模型收到占位描述，图片绝不裸奔进纯文本模型。
+- **设置页新增「识图」标签页**：只读展示实时状态（发送补丁是否生效、探测到的视觉模型、端点/Ollama/密钥来源、缓存条数、最近失败）与配置指引；配置本身仍是插件行静态 config（重启生效）。
+- 默认开启（`visionEnabled: true`）。与 `DSH-vision`（`dsh-image-vision`）不共存——两者都会重复识别同一张图；本插件是其超集。
+
+### 接口变化
+
+- 远程方法 27 → 28：新增 `visionStatus`。
+- 新增 config：`visionEnabled`、`visionPatchAdmission`、`visionProvider`、`visionModel`、`visionPrompt`、`visionMarker`、`visionBaseUrl`、`visionApiKey`、`visionApiKeyEnv`、`visionEndpointModel`、`visionAnonymous`、`visionTimeoutMs`、`visionMaxTokens`、`visionAutoLocalOllama`、`visionLocalOllamaModel`、`visionLocalOllamaUrl`、`visionFallbackModels`、`visionCacheLimit`、`visionCooldownMs`。
+- 测试 266 → 287。
+
 ## [0.8.0] - 2026-08-15
 
 ### 修复：输入框下方余额行不再被裁掉

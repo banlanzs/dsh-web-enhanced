@@ -9,7 +9,15 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionStatusResult } from './types.ts';
+/** One fallback vision endpoint entry, as declared in plugin config. */
+export interface VisionFallbackConfig {
+    model: string;
+    baseURL?: string;
+    apiKey?: string;
+    anonymous?: boolean;
+    timeoutMs?: number;
+}
 /** Plugin config; every bound defaults when unset. */
 export interface Config {
     cronIntervalMs?: number;
@@ -34,6 +42,25 @@ export interface Config {
     browseMaxEntries?: number;
     pluginOpTimeoutMs?: number;
     profileDir?: string;
+    visionEnabled?: boolean;
+    visionPatchAdmission?: boolean;
+    visionPrompt?: string;
+    visionMarker?: string;
+    visionProvider?: string;
+    visionModel?: string;
+    visionBaseUrl?: string;
+    visionApiKey?: string;
+    visionApiKeyEnv?: string;
+    visionEndpointModel?: string;
+    visionAnonymous?: boolean;
+    visionTimeoutMs?: number;
+    visionMaxTokens?: number;
+    visionAutoLocalOllama?: boolean;
+    visionLocalOllamaModel?: string;
+    visionLocalOllamaUrl?: string;
+    visionFallbackModels?: VisionFallbackConfig[];
+    visionCacheLimit?: number;
+    visionCooldownMs?: number;
 }
 export declare const Config: z<Config>;
 /** Field defaults applied when the gateway is constructed directly. */
@@ -72,6 +99,13 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     balanceGet(request: BalanceGetRequest): Promise<BalanceView>;
     /** models.dev pricing for one model route (cached, USD per 1M tokens). */
     pricingGet(request: PricingGetRequest): Promise<PricingGetResult>;
+    /**
+     * Live state of the image-understanding integration: whether the admission
+     * patch is active, which vision models/endpoints the transcription engine
+     * can use, and its last failure. Read lazily so a deployment that mounts no
+     * integration reports that state instead of throwing.
+     */
+    visionStatus(): Promise<VisionStatusResult>;
     /** Local branches; the current branch carries the flag. */
     gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>;
     /** Recent commits with branch markers; one branch when the graph filters. */

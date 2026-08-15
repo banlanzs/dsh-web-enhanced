@@ -22,7 +22,7 @@ import type {
   PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
   PricingView, TaskCreateRequest,
   TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest,
-  TaskRunResult, TaskUpdateRequest, TaskUpdateResult,
+  TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionStatusResult,
 } from '../types.ts'
 import type {
   BrowseActions, BrowseState, Observable, OverlayActions, OverlayState, PanelActions, PanelState,
@@ -48,6 +48,7 @@ export interface WebEnhancedRemote {
   taskRun(request: TaskRunRequest): Promise<TaskRunResult>
   balanceGet(request: BalanceGetRequest): Promise<BalanceView>
   pricingGet(request: PricingGetRequest): Promise<PricingGetResult>
+  visionStatus(): Promise<VisionStatusResult>
   gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>
   gitLog(request: GitLogRequest): Promise<GitLogResult>
   gitCommit(request: GitCommitRequest): Promise<GitCommitResult>
@@ -87,7 +88,8 @@ export type {
   ModelPricingView, PricingGetRequest, PricingGetResult, PricingView, TaskCreateRequest,
   TaskCreateResult,
   TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
-  TaskStatus, TaskUpdateRequest, TaskUpdateResult,
+  TaskStatus, TaskUpdateRequest, TaskUpdateResult, VisionHarnessModelView, VisionStatusResult,
+  VisionStatusView,
 } from '../types.ts'
 
 /** Right-panel tab selection. */

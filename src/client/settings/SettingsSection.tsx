@@ -19,43 +19,43 @@ import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { WebEnhancedProps } from '../contract.ts'
 import { PluginManager } from './PluginManager.tsx'
+import { VisionStatusPanel } from './VisionStatusPanel.tsx'
 import css from './SettingsSection.module.css'
 
 /** Full composed props of the settings section. */
 export type SettingsSectionProps = WebEnhancedProps<'settings.section'>
 
 /** Which page of the section is showing. */
-type Tab = 'plugins' | 'about'
+type Tab = 'plugins' | 'vision' | 'about'
 
 /** The web-enhanced settings page. */
 export function SettingsSection({ remote, t }: SettingsSectionProps) {
   const [tab, setTab] = useState<Tab>('plugins')
+  const tabs: ReadonlyArray<{ id: Tab; label: string }> = [
+    { id: 'plugins', label: t('settings.tab.plugins') },
+    { id: 'vision', label: t('settings.tab.vision') },
+    { id: 'about', label: t('settings.tab.about') },
+  ]
   return (
     <div className={css.root}>
       <div className={css.tabs} role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'plugins'}
-          className={tab === 'plugins' ? css.tabActive : css.tab}
-          onClick={() => { setTab('plugins') }}
-        >
-          {t('settings.tab.plugins')}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'about'}
-          className={tab === 'about' ? css.tabActive : css.tab}
-          onClick={() => { setTab('about') }}
-        >
-          {t('settings.tab.about')}
-        </button>
+        {tabs.map(entry => (
+          <button
+            key={entry.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === entry.id}
+            className={tab === entry.id ? css.tabActive : css.tab}
+            onClick={() => { setTab(entry.id) }}
+          >
+            {entry.label}
+          </button>
+        ))}
       </div>
       <div className={css.body}>
-        {tab === 'plugins'
-          ? <PluginManager remote={remote} t={t} />
-          : <p className={css.about}>{t('about.body')}</p>}
+        {tab === 'plugins' && <PluginManager remote={remote} t={t} />}
+        {tab === 'vision' && <VisionStatusPanel remote={remote} t={t} />}
+        {tab === 'about' && <p className={css.about}>{t('about.body')}</p>}
       </div>
     </div>
   )

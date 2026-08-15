@@ -227,6 +227,7 @@ describe('WebEnhancedGateway', () => {
     expect(gateway.typertRemote).toMatchObject({ serviceKey: 'webEnhanced', namespace: 'webEnhanced' })
     expect(remoteMethods(gateway).map(entry => entry.method)).toEqual([
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet', 'pricingGet',
+      'visionStatus',
       'gitBranches', 'gitLog', 'gitCommit', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',
@@ -639,6 +640,14 @@ describe('WebEnhancedGateway', () => {
         get: () => ({ baseURL: 'https://gateway.internal/v1' }),
       } as never)
       expect(await gateway.balanceGet({ provider: 'deepseek-official' })).toMatchObject({ applicable: false })
+    })
+  })
+
+  describe('vision remote', () => {
+    it('reports an unmounted integration as a state, never a throw', async () => {
+      const { gateway } = await harness()
+      const status = await gateway.visionStatus()
+      expect(status).toMatchObject({ mounted: false, enabled: false, admissionActive: false })
     })
   })
 

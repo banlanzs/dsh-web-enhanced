@@ -6,7 +6,7 @@
 
 </div>
 
-> DeepSeek Harness 的 Web 增强插件：任务看板（含 cron 定时执行）、Git 图谱、文件/预览/变更右侧面板、DeepSeek API 余额显示。
+> DeepSeek Harness 的 Web 增强插件：任务看板（含 cron 定时执行）、Git 图谱、文件/预览/变更右侧面板、DeepSeek API 余额显示，以及纯文本模型的识图（图片理解）。
 >
 > 🔌 生态：仓库已打 `#dsh` · `#dsh-plugin` topics —— 欢迎被 @dsh-plugin 收录。
 
@@ -21,6 +21,7 @@
 | **工作区视图** | 会话顶部视图栏中的「工作区」标签页，与「对话」「轨迹」并列，内含文件 / 预览 / 变更 / **任务看板** / **Git 图谱**五个面板。文件树支持整行展开、文件名搜索、点击打开预览；预览支持 markdown（含 GFM 表格、HTML 表格与行内 HTML）/ HTML（sandbox iframe）/ 代码 / **diff**（行级高亮 unified diff）/ CSV / 图片 / PDF / 文本 / **Office（docx/xlsx，宿主侧结构化转换）**，且支持**源码 / 分屏 / 预览**三态与保存；变更页基于真实 git status，支持 stage / unstage / discard 与逐文件 diff。当前面板与展开的目录按工作区持久化。 |
 | **文件 mention** | 输入框 `+` 菜单里的「引用文件」「引用文件夹」两项：项目内条目以**缩进目录视图**呈现（文件夹与文件都有，可本地过滤），文件选择器里点击文件夹行即**进入该文件夹**——打开插件自带的文件浏览器并定位到该目录；浏览器按文件资源管理器方式工作（面包屑 / 上一级 / 主目录 / 逐层列表 / 按名过滤，点文件夹进入、点文件选中）。第一行在项目根目录打开同一个浏览器，也可以走到**项目外**。选中文件后把 `@路径` 插入草稿，含空格的路径自动加引号。 |
 | **余额显示** | 输入框下方显示 DeepSeek API 余额（`GET /user/balance`），带刷新、弱化错误态，以及**当前会话已计费 token 的估算花费**（价格从 models.dev 拉取，USD / 百万 token）。**余额仅在当前会话的模型路由确实指向该余额所属账户时显示**——切到别家渠道（或把 deepseek-official 改指到自建网关）后余额部分隐藏，因为那时的数字说的是另一个账户；花费部分只在 models.dev 有对应 provider/model 的价格时显示。 |
+| **识图（图片理解）** | 内置、透明的纯文本模型识图能力（取代 `DSH-vision`）。纯文本模型直接发图：绕过「当前模型不支持图片」的发送门禁与 `read_image` 工具门禁；对话记录照常保留图片（UI 与多模态模型一致），模型实际看到的是 `[图片内容描述]` 文本转写；多模态模型用**打补丁前的真实 resolver** 判定、原样放行，不为它们浪费识别 token。转写源优先级：DSH 已配置的多模态模型（自动探测、零额外密钥）→ 本地 Ollama（自动探测）→ 配置的 OpenAI 兼容端点 + `visionFallbackModels` 有序回退链，带内容哈希缓存、分类错误、匿名端点硬超时与冷却。设置页新增「识图」标签页实时显示状态（发送补丁是否生效、探测到的模型、端点 / Ollama / 密钥来源、最近失败）。用插件行 `vision*` 配置，默认开启。 |
 | **设置页 + 插件管理** | 设置面板左侧多一行「Web 增强」（注册到 `settings.section`）。页内的**插件管理**列出当前 profile 装了哪些插件（名称、版本、依赖 spec、是否已启用为层），可**更新**或**移除**。列的是 profile `package.json` 的 `dependencies`——那才是 pnpm 能操作的集合；模板层（`@deepseek-ai/dsh-base` 等）单独列出且不给按钮，因为没有任何依赖提供它们。**只看得到启动时所用的那个 profile**（`dsh --profile web` 就只列 web 的依赖），profile 名与路径印在标题下。**所有操作都在下次启动才生效**（层栈在启动时组合），界面照直说明；移除本插件自己不被阻止，但确认框会说清代价。 |
 
 ## 截图
@@ -42,7 +43,7 @@
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # 推荐
 # 或：
-# dsh plugin --profile web add ./dsh-web-enhanced-0.8.0.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.9.0.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -111,7 +112,7 @@ host 能力失效）。改用打包重装来迭代：
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.8.0.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.9.0.tgz
 ```
 
 Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPackage` 步骤）。
@@ -144,11 +145,23 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 | `browseMaxEntries` | 500 | mention 浏览器单层目录的条目上限 |
 | `pluginOpTimeoutMs` | 300000 | 单次 pnpm 操作（update/remove）的超时 |
 | `profileDir` | 空 | profile 目录；留空则从本模块位置向上探测。仅用于 profile 不在插件模块祖先链上的部署 |
+| `visionEnabled` | true | 识图集成总开关 |
+| `visionPatchAdmission` | true | 包装 `llm.resolveModelInfo`，让纯文本模型通过发送门禁与 `read_image` 门禁（可逆、卸载顺序安全） |
+| `visionProvider` / `visionModel` | 空 | 指定用于转写的 DSH 模型渠道/模型；留空则从所有已配置渠道自动探测支持图片的模型 |
+| `visionPrompt` / `visionMarker` | 中文详尽描述提示词 / `[图片内容描述]` | 转写提示词，以及模型看到的图片替代标记 |
+| `visionBaseUrl` / `visionApiKey` / `visionEndpointModel` | 空 | OpenAI 兼容 VLM 端点（如 DashScope 兼容模式）；key 依次回退 `visionApiKeyEnv` → `VISION_API_KEY` → `DASHSCOPE_API_KEY`。base URL 或模型任一为空则不启用该来源 |
+| `visionApiKeyEnv` / `visionAnonymous` | `VISION_API_KEY` / false | 端点密钥环境变量；true 时不带 Authorization 头（匿名/免费端点强制 20s 硬超时） |
+| `visionTimeoutMs` / `visionMaxTokens` | 120000 / 4096 | VLM 请求超时与输出上限 |
+| `visionAutoLocalOllama` | true | 启动时探测 `visionLocalOllamaUrl`；检测到本地 Ollama 后把它的第一个视觉模型加进转写链最前（图片不出本机） |
+| `visionLocalOllamaModel` / `visionLocalOllamaUrl` | 空 / `http://localhost:11434/v1` | 优先使用的 Ollama 模型（空则选第一个 `*vl*`/`*vision*` 模型）与其 OpenAI 兼容基址 |
+| `visionFallbackModels` | `[]` | 有序回退链 `{model, baseURL?, apiKey?, anonymous?, timeoutMs?}`；每条可指向不同供应商，无密钥的非匿名条目自动跳过 |
+| `visionCacheLimit` / `visionCooldownMs` | 200 / 60000 | 进程内转写缓存条数（按图片字节 SHA-256）与刚失败（429/超时）端点的冷却时长 |
 
 ## 架构要点
 
 - **零仓库改动**：客户端 UI 只注册到既有槽位——`conversation.view`（工作区视图标签页，内含文件/预览/变更/**任务看板**/**Git 图谱** 五个 tab）、`shell.overlay`（mention 文件浏览器浮层）、`conversation.session.header.actions`（会话标题旁 `titleCluster` 行里的分支切换器）、`conversation.composer.dock`（余额 + 本轮花费行），外加通过 `ctx.commandUi.register` 注册的两个客户端命令（`+` 菜单里的文件 / 文件夹 mention）。未占用布局的 `details` 槽：那是已被 ui-conversation 的 `DetailsPanel` 占据的 `single` 槽，注册进去会顶掉工具详情列。
 - **可选服务一律非注入读取**：`agentPresets`、`llm`、`settings`、`credentials`、`modelDirectories`、`commandUi`、`conversation` 都用 `ctx.get()` 取，缺任何一个只让对应的那一小块降级，不会让插件入口卡住不启动。
+- **识图走宿主的「模型可见表面」而不是改适配器**：`visionIntegration` Cordis 服务可逆地包装共享 `llm.resolveModelInfo`（包装带标记，卸载时只有当前仍是自己的包装才还原，绝不误拆后来者的包装）。`agent/pre-step` 为含图消息计算描述并写入 `session` 表面替换（`surfaceOp: replace`）——模型推导历史读到文字，原文 append 的图片留在对话记录里；包装后的 `session.deriveMessages` 覆盖替换微任务落盘前的那一步请求，`tools/post-execute` 对 `read_image` 结果做同样替换。多模态判定始终读补丁前捕获的原始 resolver。转写引擎 `VisionTranscriber` 依次尝试 DSH 已配置的视觉模型（`llm.stream`）、本地 Ollama、OpenAI 兼容端点回退链（回退、内容哈希缓存、分类错误、冷却——这部分健壮性来自 `dsh-vision-proxy`）。
 - **任务执行**：`agentPresets.resolve()` 解析部署默认 preset → 写进 `meta.agentPreset` → 在 `setup` 里 `mount`（与宿主 `ensureSession` 同序），随后 `workspace.attachSession` 把会话记到项目上；之后 `followup` + `whenIdle` + `sessions.flush`，结果按 `turn/end` reason 回写。没有 preset 名册的部署照常运行，只是会话只带宿主根注册的工具。
 - **手写 remote contribution**：host 方法用 `@Remote` 装饰器（Typert SRC 模式，宿主网关自动发现 `ctx.webEnhanced` 服务）；客户端在 apply 里 `ctx.remote.$mount()` 手写的 src-json contribution，无需 typert 生成管线。
 - **持久化**：任务记录存 `ctx.storageDomain` 域 `web_enhanced`（JSON 后端），重启恢复 running → failed（host-restart）。
@@ -162,11 +175,11 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + 全部测试 + 构建（266 个测试）
+pnpm run check   # typecheck + 全部测试 + 构建（287 个测试）
 ```
 
 构建产物：
-- `lib/index.js` — node half：`web-enhanced` 函数插件（挂载 `WebEnhancedGateway` Typert 服务：task*/git*/fs*/balanceGet/pricingGet + cron 调度器 + 重启恢复）
+- `lib/index.js` — node half：`web-enhanced` 函数插件（挂载 `WebEnhancedGateway` Typert 服务：task*/git*/fs*/balanceGet/pricingGet/visionStatus + cron 调度器 + 重启恢复，以及 `VisionInterceptor` 识图服务）
 - `lib/client.js` — 浏览器 half：模块加载器闭包格式（`window.__ModuleLoader__.load`），由 `dsh.client` manifest 声明
 - `cordis.patch.yml` — bundle 补丁：插入 `web-enhanced` 行（一个行同时承载 node 与 browser 两个 half）
 
@@ -197,6 +210,10 @@ node scripts/e2e.mjs --capture   # 顺带刷新本 README 使用的 assets/*.png
 - 插件管理**不重载运行中的进程**：Cordis 在启动时组合层栈，所以 update/remove 描述的是下一次启动。同理它也不做 enable/disable——那要改的是 profile 的 `cordis.patch.yml`，与安装是两回事。
 - 插件管理**只看得到启动时所用的 profile**：`dsh --profile web` 列的是 `~/.dsh/profiles/web` 的依赖，装在别的 profile 里的插件不会出现。profile 目录就是 pnpm 的工作目录，跨 profile 操作会在一个此刻并未组合层栈的目录里跑 pnpm。要管别的 profile，用那个 profile 启动，或走 `dsh plugin --profile <name>`。
 - 插件管理需要 PATH 上有 `pnpm`，且 profile 目录在本插件模块的祖先链上（正常安装即满足；源码检出或测试环境会显示「没有可管理的插件」而不是报错）。同时只允许一个 pnpm 操作在跑，第二个请求会被告知而不是排队。
+- 识图至少需要一种转写源：DSH 里配置一个多模态模型、本地 Ollama、或 `visionBaseUrl` 端点。三者都没有时，发给纯文本模型的图片会被替换为占位描述而不是让整个回合报错，设置页的「识图」标签页会显示原因。转写质量取决于所选视觉模型的能力上限，不是插件的保证。
+- 端点转写会把图片字节（base64、HTTPS）发给配置的 VLM 端点——除非端点是本机服务（如 Ollama），图片会离开本机。除进程内内容哈希缓存外不保存任何东西。DSH 模型路径在同一轮内按图片去重，但不跨轮缓存；端点路径按图片内容跨轮缓存。
+- 不要再同时安装 `DSH-vision`（`dsh-image-vision`）：两个插件都会打发送补丁、都会对同一张图识别一次。本插件的补丁自身卸载顺序安全，但 DSH-vision 的卸载会还原它自己捕获的方法，仍可能覆盖后来挂上的包装。
+- 暂未内置大图缩放（`dsh-vision-proxy` 里可选的 `sharp` 步骤）；端点收到的是原始字节，`visionMaxTokens` 仍会限制转写输出长度。
 
 ## License
 

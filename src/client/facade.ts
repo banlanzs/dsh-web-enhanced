@@ -71,6 +71,7 @@ export function createRemoteFacade(
         : { applicable: true, isAvailable: false, infos: [], cachedAt: now(), error: apiErrorOf(settled.error) }
     },
     pricingGet: async request => open(await raw.pricingGet(request)),
+    visionStatus: async () => open(await raw.visionStatus()),
     gitBranches: async request => open(await raw.gitBranches(request)),
     gitLog: async request => open(await raw.gitLog(request)),
     gitCommit: async request => open(await raw.gitCommit(request)),

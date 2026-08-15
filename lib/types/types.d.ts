@@ -484,3 +484,34 @@ export interface PluginMutateRequest {
 export interface PluginListRequest {
     readonly refresh?: boolean;
 }
+/** One vision-capable provider/model route the harness can transcribe with. */
+export interface VisionHarnessModelView {
+    readonly provider: string;
+    readonly model: string;
+}
+/** Live state of the image-understanding integration, shown in Settings. */
+export interface VisionStatusView {
+    /** False when the integration service is absent from this deployment. */
+    readonly mounted: boolean;
+    readonly enabled: boolean;
+    readonly patchAdmission: boolean;
+    /** Whether the `resolveModelInfo` admission patch is on the live service. */
+    readonly admissionActive: boolean;
+    /** Vision models discovered from DSH-configured providers (auto path). */
+    readonly harnessModels: readonly VisionHarnessModelView[];
+    /** Whether `visionBaseUrl` + `visionEndpointModel` name a usable endpoint. */
+    readonly endpointConfigured: boolean;
+    /** The configured endpoint model, or null when not configured. */
+    readonly endpointModel: string | null;
+    /** Where the endpoint API key comes from (never the key itself). */
+    readonly apiKeySource: 'config' | 'env' | 'none-needed' | 'unset';
+    readonly ollamaDetected: boolean;
+    readonly ollamaModel: string | null;
+    /** In-process transcription cache entries (content-hash keyed). */
+    readonly cacheSize: number;
+    /** The most recent transcription failure, or null. */
+    readonly lastError: string | null;
+}
+export type VisionStatusResult = VisionStatusView | {
+    readonly error: ApiError;
+};

@@ -1,0 +1,124 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+}
+
+.refresh {
+  border: 1px solid rgb(128 128 128 / 28%);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+}
+
+.refresh:hover {
+  background: rgb(128 128 128 / 8%);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid rgb(128 128 128 / 18%);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(130px, 200px) 1fr;
+  gap: 12px;
+  align-items: start;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.label {
+  opacity: 0.65;
+  overflow-wrap: anywhere;
+}
+
+.value {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.code {
+  border: 1px solid rgb(128 128 128 / 22%);
+  border-radius: 4px;
+  background: rgb(128 128 128 / 8%);
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  padding: 1px 6px;
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.badgeOk {
+  border-radius: 10px;
+  background: rgb(64 160 96 / 16%);
+  color: rgb(64 200 110 / 95%);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 1px 9px;
+}
+
+.badgeMuted {
+  border-radius: 10px;
+  background: rgb(128 128 128 / 14%);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 1px 9px;
+}
+
+.muted {
+  opacity: 0.6;
+}
+
+.note,
+.error,
+.warn,
+.hint,
+.failure {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.error {
+  color: var(--dsw-alias-state-danger-primary, rgb(230 90 90));
+}
+
+.warn {
+  color: var(--dsw-alias-state-warning-primary, rgb(230 160 60));
+}
+
+.failure {
+  color: var(--dsw-alias-state-danger-primary, rgb(230 90 90));
+  white-space: pre-wrap;
+}
+
+.hint {
+  max-width: 68ch;
+  opacity: 0.6;
+  white-space: pre-wrap;
+}

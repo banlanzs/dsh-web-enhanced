@@ -31,7 +31,7 @@ const entry = { name: 'a', path: 'a', kind: 'file', size: 3 }
  * Methods invoked with no argument at all. Everything else takes exactly one
  * request object — see the arity guard below.
  */
-const nullaryMethods = new Set(['taskList'])
+const nullaryMethods = new Set(['taskList', 'visionStatus'])
 
 /** One representative payload per method, both the success and the error branch. */
 const payloads: Record<string, unknown[]> = {
@@ -48,6 +48,33 @@ const payloads: Record<string, unknown[]> = {
     provider: 'deepseek-official',
     model: 'deepseek-chat',
     pricing: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: null },
+  }, errorPayload],
+  visionStatus: [{
+    mounted: true,
+    enabled: true,
+    patchAdmission: true,
+    admissionActive: true,
+    harnessModels: [{ provider: 'glm', model: 'glm-4.6v' }],
+    endpointConfigured: true,
+    endpointModel: 'qwen3.7-flash',
+    apiKeySource: 'config',
+    ollamaDetected: true,
+    ollamaModel: 'qwen3-vl:4b',
+    cacheSize: 3,
+    lastError: null,
+  }, {
+    mounted: false,
+    enabled: false,
+    patchAdmission: false,
+    admissionActive: false,
+    harnessModels: [],
+    endpointConfigured: false,
+    endpointModel: null,
+    apiKeySource: 'unset',
+    ollamaDetected: false,
+    ollamaModel: null,
+    cacheSize: 0,
+    lastError: 'not mounted',
   }, errorPayload],
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
@@ -151,10 +178,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 27 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 28 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(27)
+    expect(methods).toHaveLength(28)
   })
 
   it('every result schema accepts its success and error payloads', () => {

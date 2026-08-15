@@ -7,6 +7,8 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { WebEnhancedGateway, Config } from './gateway.ts';
 export { WebEnhancedGateway, Config };
+export { VisionInterceptor, VisionTranscriber } from './vision.ts';
+export type { VisionConfigSource, VisionSettings } from './vision.ts';
 /** Cordis plugin name (the loader row references the package, this is the entry name). */
 export declare const name = "web-enhanced";
 /**
