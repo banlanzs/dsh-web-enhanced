@@ -21,6 +21,7 @@
 | **工作区视图** | 会话顶部视图栏中的「工作区」标签页，与「对话」「轨迹」并列，内含文件 / 预览 / 变更三个面板。文件树支持整行展开、文件名搜索、点击打开预览；预览支持 markdown（含 GFM 表格、HTML 表格与行内 HTML）/ HTML（sandbox iframe）/ 代码 / **diff**（行级高亮 unified diff）/ CSV / 图片 / PDF / 文本 / **Office（docx/xlsx，宿主侧结构化转换）**，且支持**源码 / 分屏 / 预览**三态与保存；变更页基于真实 git status，支持 stage / unstage / discard 与逐文件 diff。当前面板与展开的目录按工作区持久化。 |
 | **文件 mention** | 输入框 `+` 菜单里的「引用文件」「引用文件夹」两项：先给出项目内条目的扁平列表（可本地过滤），第一行「浏览其他位置…」打开插件自带的文件浏览器，可走到**项目外的任意目录**（面包屑 / 上一级 / 主目录 / 按名过滤）。选中后把 `@路径` 插入草稿，含空格的路径自动加引号。 |
 | **余额显示** | 输入框下方显示 DeepSeek API 余额（`GET /user/balance`），带刷新与弱化错误态。**仅在当前会话的模型路由确实指向该余额所属账户时显示**——切到别家渠道（或把 deepseek-official 改指到自建网关）后整行隐藏，因为那时的数字说的是另一个账户。 |
+| **设置页 + 插件管理** | 设置面板左侧多一行「Web 增强」（注册到 `settings.section`）。页内的**插件管理**列出当前 profile 装了哪些插件（名称、版本、依赖 spec、是否已启用为层），可**更新**或**移除**。列的是 profile `package.json` 的 `dependencies`——那才是 pnpm 能操作的集合；模板层（`@deepseek-ai/dsh-base` 等）单独列出且不给按钮，因为没有任何依赖提供它们。**所有操作都在下次启动才生效**（层栈在启动时组合），界面照直说明；移除本插件自己不被阻止，但确认框会说清代价。 |
 
 ## 截图
 
@@ -32,7 +33,7 @@
 
 | 浮动面板 | 余额行 |
 |---|---|
-| ![浮动面板](./assets/panel.png) | ![余额行](./assets/balance.png) |
+| ![工作区](./assets/panel.png) | ![余额行](./assets/balance.png) |
 
 ## 安装
 
@@ -41,7 +42,7 @@
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # 推荐
 # 或：
-# dsh plugin --profile web add ./dsh-web-enhanced-0.5.2.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.6.0.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -110,7 +111,7 @@ host 能力失效）。改用打包重装来迭代：
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.5.2.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.6.0.tgz
 ```
 
 Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPackage` 步骤）。
@@ -136,6 +137,8 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 | `searchMaxDepth` / `searchMaxEntries` | 8 / 200 | 文件搜索深度与条数上限 |
 | `officeMaxBytes` | 5 MiB | Office（docx/xlsx）预览文件大小上限 |
 | `browseMaxEntries` | 500 | mention 浏览器单层目录的条目上限 |
+| `pluginOpTimeoutMs` | 300000 | 单次 pnpm 操作（update/remove）的超时 |
+| `profileDir` | 空 | profile 目录；留空则从本模块位置向上探测。仅用于 profile 不在插件模块祖先链上的部署 |
 
 ## 架构要点
 
@@ -146,13 +149,14 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 - **持久化**：任务记录存 `ctx.storageDomain` 域 `web_enhanced`（JSON 后端），重启恢复 running → failed（host-restart）。
 - **路径安全**：所有 fs/git 路径经工作区根校验（拒绝绝对路径、`..`、反斜杠）；单 ref 参数拒绝 `-` 开头、`..` 范围与空白/通配（防止一个参数变成两个或变成选项）；git 输出有界收集；文件读有字节上限与二进制嗅探。Office 文件在宿主侧用 fflate 解包为有界结构化 blocks（标题/段落/列表/表格，≤ 2000 块、≤ 200×50 表格），绝不产出原始 HTML。
 - **唯一的例外：`fsBrowse`**。它列出任意绝对目录，不受工作区根约束——因为 mention 产出的只是一个**路径字符串**，而用户要的路径可能就在项目外。它只返回名称、类型与大小；读、写、预览仍然全部锁在工作区内。
+- **插件管理不改宿主任何文件**：设置页注册进既有的 `settings.section` 槽；配置与清单走本插件自己的 Typert 网关，因此不需要像 DSH-vision 那样去改 apiproxy 的 settings 暴露白名单（那是改 `node_modules` 里的宿主发布产物，每次升级会被覆盖）。remove/update 只在 profile 目录里跑 pnpm、重写该 profile 的 `dsh.profile.bundles`——与 `dsh plugin` 完全同一条路径。也没有把 `@deepseek-ai/dsh-app-boot`（CLI 里这些例程的归属）写成 peer：它是 dsh 安装的依赖而非 profile 的依赖，那样恰好会在这段代码唯一运行的部署里解析失败。
 - **预览安全**：markdown / CSV / diff / Office / 表格全部渲染为 React 元素，从不 `dangerouslySetInnerHTML`。markdown 里的 HTML 走白名单映射到对应元素，未知标签只丢标记保留文字，`script`/`style` 连内容一起丢；`javascript:`/`data:` 链接降级为字面文本（`data:image/*` 的图片除外），HTML 文件预览进 `sandbox=""` iframe。
 
 ## 开发
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + 全部测试 + 构建（175 个测试）
+pnpm run check   # typecheck + 全部测试 + 构建（212 个测试）
 ```
 
 构建产物：
@@ -182,6 +186,8 @@ node scripts/e2e.mjs --capture   # 顺带刷新本 README 使用的 assets/*.png
 - 定时任务为 best-effort：tick 粒度 30s，宿主关机期间错过的窗口在启动时补跑一次，不留积压。
 - 余额 key 与模型提供商同源（环境变量）；未配置时显示错误态而非报错。切到非 `balanceProviders` 的渠道时整行隐藏。
 - 图谱泳道为简化算法（首父连续性），非 git 完整拓扑着色；提交详情的文件清单按首父 diff 统计，合并提交因此只显示它带进来的改动。
+- 插件管理**不重载运行中的进程**：Cordis 在启动时组合层栈，所以 update/remove 描述的是下一次启动。同理它也不做 enable/disable——那要改的是 profile 的 `cordis.patch.yml`，与安装是两回事。
+- 插件管理需要 PATH 上有 `pnpm`，且 profile 目录在本插件模块的祖先链上（正常安装即满足；源码检出或测试环境会显示「没有可管理的插件」而不是报错）。同时只允许一个 pnpm 操作在跑，第二个请求会被告知而不是排队。
 
 ## License
 

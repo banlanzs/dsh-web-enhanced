@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.6.0] - 2026-08-15
+
+### 新增：插件自己的设置页
+
+注册到 `settings.section` —— 设置外壳把这个根级 list 槽的每条注册投影成一行导航（`id` / `order` / `label`），选中哪行就只渲染哪个 section。这就是全部契约：图标来自外壳按 id 写死的白名单（`models` / `agent-presets` / `plugins`），其余一律拿到通用齿轮，插件无从干预。`label` 用 thunk，所以切语言靠 ledger tick 重新取值，不需要重新注册。
+
+页内自带 tab，因为它承载两件不相干的事（管理已装插件、说明本插件是什么），谁都不值得单占一行导航。
+
+**没有走 apiproxy 的 settings 命名空间白名单**。同目录的 DSH-vision 为了让自己的配置出现在设置里，用 awk 改了 `node_modules/@deepseek-ai/dsh-host-apiproxy/lib/index.js` —— 那是改宿主发布产物，每次升级都会被覆盖。本插件已经有自己的 Typert 网关，配置读写走自己的远程方法即可，不碰宿主任何文件。
+
+### 新增：已安装插件管理（remove / update）
+
+宿主的 `pluginInventory` 服务列的是 **Loader 树**，并且它的 README 明说了 "cannot enable, disable, add, or remove plugins"。这里回答的是另一个问题——**profile 装了什么**，因为那才是 pnpm 能操作的集合。两者不重合：一个 npm 包可以贡献多行 Loader 条目，而 profile 模板的 bundles（`@deepseek-ai/dsh-base` 等）是**没有任何依赖提供**的 Loader 行。
+
+所以清单读的是 profile `package.json` 的 `dependencies`，模板层单独列出、不给按钮——`pnpm remove` 一个没人依赖的名字会「成功」且什么都没做。
+
+`dsh plugin` 本身是个 pnpm 转发器，所以这里做的是同样两步：在 profile 目录跑 pnpm，然后按**已安装状态**重写 `dsh.profile.bundles`。按已安装状态而不是依赖差异对齐是刻意的——某个包在新版本里才开始声明 `dsh.bundle` 时，`update` 也能把它激活。
+
+用 `update` 而不是 `install`：没写 ref 的 git spec 跟的是分支，但 pnpm 把解析到的 commit 钉进了锁文件，`install` 会尊重那个钉子。
+
+**没有复用 `@deepseek-ai/dsh-app-boot`**（CLI 里这些例程的归属）。那是 dsh 安装的依赖，不是 profile 的依赖——插件把它写成 peer，恰好会在这段代码唯一运行的部署里解析失败。manifest 的磁盘形状是稳定契约，所以直接读写。
+
+服务端进程比一次性命令多需要三样东西，都加了：单飞锁（这些操作要几秒到几分钟且重写同一个 `node_modules`，第二个调用被告知而不是悄悄排进一个它看不见的队列）、超时（默认 5 分钟，走 subprocess seam 的 `signal`）、有界输出。
+
+Windows 上 `pnpm` 是 `.cmd` shim，CreateProcess 执行不了，而 subprocess seam 明确不做 shell 解释，所以显式走 `cmd.exe /d /s /c`（`/d` 抑制注册表 AutoRun）。参数用空格拼接**仅仅**因为每一个都要么是本模块写的字面量、要么是过了 `assertPackageName` 的包名（拒绝 `-` 开头、大写、空格、`;&|"` 与路径分隔符），不含任何 cmd 元字符。
+
+**任何操作都不影响运行中的进程**：Cordis 在启动时组合层栈，改写 `node_modules` 描述的是下一次启动。所以成功结果恒带 `restartRequired: true`，UI 也照直说。
+
+移除本插件自己**不被拒绝**——那是正当的意图。`self` 标记的作用是让确认文案换一句：说清楚重启后设置页、任务看板、Git 图谱会一起消失，且只能用命令行装回来。
+
+### 接口变化
+
+- 远程方法 22 → 25：新增 `pluginList` / `pluginRemove` / `pluginUpdate`。
+- config 新增 `pluginOpTimeoutMs`（默认 300000）、`profileDir`（默认空，即从模块位置向上探测；显式给出用于 profile 不在模块祖先链上的部署）。
+- 客户端新增 peer/inject `@deepseek-ai/dsh-client-ui-settings`。
+- 测试 175 → 212。
+
 ## [0.5.2] - 2026-08-15
 
 ### 修复：文件选择器在 Windows 上出不了 C 盘

@@ -25,6 +25,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 // owning UI packages.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { webEnhancedRemote } from './remote.ts'
 import { en, zh } from './locales.ts'
@@ -44,6 +45,7 @@ import { BrowseOverlay } from './browse/BrowseOverlay.tsx'
 import { BranchStrip } from './git/BranchStrip.tsx'
 import { GraphOverlay } from './git/GraphOverlay.tsx'
 import { WorkspaceView } from './panel/WorkspaceView.tsx'
+import { SettingsSection } from './settings/SettingsSection.tsx'
 import { BalanceLine } from './balance/BalanceLine.tsx'
 
 /** Locale namespace owned by this plugin. */
@@ -286,6 +288,18 @@ export function apply(ctx: ClientContext): void {
             locale: NS,
             inject: face,
           }, BalanceLine)),
+          // The settings shell projects this registration's id/order/label into
+          // one nav row and renders only the selected section. `label` is
+          // thunked so a locale switch retitles the row through the ledger tick
+          // rather than needing a re-registration.
+          ctx.slots.inject('settings.section', () => ctx.slots.register({
+            name: 'settings.section',
+            id: 'web-enhanced',
+            order: 60,
+            locale: NS,
+            label: () => ctx.locale.bind(NS)('settings.nav'),
+            inject: face,
+          }, SettingsSection)),
           registerMentionCommands(ctx, remote, browse.actions.openBrowse),
         )
       },

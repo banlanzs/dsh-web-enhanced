@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
 /** Plugin config; every bound defaults when unset. */
 export interface Config {
     cronIntervalMs?: number;
@@ -27,6 +27,8 @@ export interface Config {
     searchMaxEntries?: number;
     officeMaxBytes?: number;
     browseMaxEntries?: number;
+    pluginOpTimeoutMs?: number;
+    profileDir?: string;
 }
 export declare const Config: z<Config>;
 /** Field defaults applied when the gateway is constructed directly. */
@@ -39,6 +41,10 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     private readonly resolved;
     private readonly balance;
     private readonly board;
+    /** Resolved lazily: the walk is filesystem work no other capability needs. */
+    private profileDirCache;
+    /** Built on first mutation, so a deployment outside a profile never makes one. */
+    private pnpm;
     /**
      * Register the gateway, mount the task board (recovering interrupted
      * runs), and start the scheduler.
@@ -98,6 +104,18 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
      */
     fsBrowse(request: FsBrowseRequest): Promise<FsBrowseResult>;
     /**
+     * The profile's installed plugins.
+     *
+     * Answers `no-profile` rather than an empty list when this deployment loads
+     * the plugin from outside any profile (a source checkout, a test): those are
+     * different facts, and an empty list would invite a removal that cannot work.
+     */
+    pluginList(_request: PluginListRequest): Promise<PluginListResult>;
+    /** Remove one plugin from the profile (takes effect on the next start). */
+    pluginRemove(request: PluginMutateRequest): Promise<PluginMutateResult>;
+    /** Update one plugin to its spec's head (takes effect on the next start). */
+    pluginUpdate(request: PluginMutateRequest): Promise<PluginMutateResult>;
+    /**
      * Whether the balance describes the account one model route bills.
      *
      * The provider's endpoint is read from the settings section its own adapter
@@ -118,5 +136,30 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     private resolveWorkspaceId;
     private workspaceRoot;
     private withGit;
+    /** The error returned when this deployment sits outside any profile. */
+    private noProfile;
+    /**
+     * The profile directory, resolved once and cached.
+     *
+     * A profile cannot move under a running host, so a repeated walk would only
+     * repeat the same filesystem reads. The promise itself is cached so
+     * concurrent first callers share one walk. A configured path wins outright:
+     * the walk is a heuristic over where the module happens to sit.
+     */
+    private profileDir;
+    /**
+     * Run one plugin mutation, guarding what pnpm itself would not.
+     *
+     * The refusal here is for a name pnpm cannot act on: a template bundle is in
+     * the layer list precisely because nothing depends on it, so `pnpm remove`
+     * would report success having done nothing. Removing the row that IS this
+     * plugin is NOT refused — that is a legitimate thing to want, and the
+     * `self` flag exists so the surface can confirm it rather than have the
+     * gateway decide on the user's behalf.
+     * @param name - package name from the request.
+     * @param operation - the runner call to perform.
+     * @returns the mutation result.
+     */
+    private pluginOperation;
     private errorOf;
 }

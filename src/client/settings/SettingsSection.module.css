@@ -1,0 +1,56 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+.tabs {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  border-bottom: 1px solid rgb(128 128 128 / 18%);
+}
+
+.tab,
+.tabActive {
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.tab {
+  opacity: 0.6;
+}
+
+.tab:hover {
+  opacity: 0.85;
+}
+
+.tabActive {
+  border-bottom-color: rgb(106 143 216 / 80%);
+  font-weight: 600;
+}
+
+/* The shell's content column owns the page height; this pane stretches into
+   it and scrolls on its own rather than growing the dialog. */
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+.about {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 13px;
+  line-height: 1.7;
+  opacity: 0.75;
+}

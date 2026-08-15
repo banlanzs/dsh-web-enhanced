@@ -73,6 +73,32 @@ const payloads: Record<string, unknown[]> = {
   }, {
     path: 'C:\\', parent: null, home: 'C:\\Users\\u', roots: ['C:\\', 'D:\\'], entries: [], truncated: true,
   }, errorPayload],
+  pluginList: [{
+    profileDir: '/home/u/.dsh/profiles/web',
+    profileName: 'web',
+    plugins: [{
+      name: 'dsh-web-enhanced',
+      spec: 'github:banlanzs/dsh-web-enhanced',
+      version: '0.6.0',
+      description: 'plugin',
+      bundle: true,
+      active: true,
+      self: true,
+    }, {
+      name: 'some-lib', spec: '^1.0.0', version: null, description: null, bundle: false, active: false, self: false,
+    }],
+    templateBundles: ['@deepseek-ai/dsh-base'],
+    busy: false,
+  }, errorPayload],
+  pluginRemove: [
+    { ok: true, added: [], removed: ['x'], restartRequired: true, output: '' },
+    { ok: false, added: [], removed: [], restartRequired: false, output: 'pnpm failed' },
+    errorPayload,
+  ],
+  pluginUpdate: [
+    { ok: true, added: ['x'], removed: [], restartRequired: true, output: 'up to date' },
+    errorPayload,
+  ],
 }
 
 describe('webEnhancedRemote contribution', () => {
@@ -103,10 +129,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 22 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 25 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(22)
+    expect(methods).toHaveLength(25)
   })
 
   it('every result schema accepts its success and error payloads', () => {

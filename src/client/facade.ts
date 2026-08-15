@@ -86,5 +86,8 @@ export function createRemoteFacade(
     fsDelete: async request => open(await raw.fsDelete(request)),
     fsOfficePreview: async request => open(await raw.fsOfficePreview(request)),
     fsBrowse: async request => open(await raw.fsBrowse(request)),
+    pluginList: async request => open(await raw.pluginList(request)),
+    pluginRemove: async request => open(await raw.pluginRemove(request)),
+    pluginUpdate: async request => open(await raw.pluginUpdate(request)),
   }
 }

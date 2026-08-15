@@ -17,7 +17,8 @@ import type {
   FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest,
   GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
   GitLogRequest, GitLogResult, GitMutateRequest,
-  GitMutateResult, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, TaskCreateRequest,
+  GitMutateResult, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, PluginListRequest,
+  PluginListResult, PluginMutateRequest, PluginMutateResult, TaskCreateRequest,
   TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest,
   TaskRunResult, TaskUpdateRequest, TaskUpdateResult,
 } from '../types.ts'
@@ -60,6 +61,9 @@ export interface WebEnhancedRemote {
   fsDelete(request: FsDeleteRequest): Promise<FsWriteResult>
   fsOfficePreview(request: FsOfficePreviewRequest): Promise<FsOfficePreviewResult>
   fsBrowse(request: FsBrowseRequest): Promise<FsBrowseResult>
+  pluginList(request: PluginListRequest): Promise<PluginListResult>
+  pluginRemove(request: PluginMutateRequest): Promise<PluginMutateResult>
+  pluginUpdate(request: PluginMutateRequest): Promise<PluginMutateResult>
 }
 
 /** Re-exported payload types (components, tests, and preview helpers). */
@@ -72,7 +76,9 @@ export type {
   GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitDetailView, GitCommitFileView,
   GitCommitRequest, GitCommitResult, GitCommitView, GitDiffRequest,
   GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry,
-  GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, TaskCreateRequest, TaskCreateResult,
+  GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, PluginListRequest, PluginListResult,
+  PluginListView, PluginMutateRequest, PluginMutateResult, PluginMutateView, PluginView,
+  TaskCreateRequest, TaskCreateResult,
   TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
   TaskStatus, TaskUpdateRequest, TaskUpdateResult,
 } from '../types.ts'

@@ -22,6 +22,8 @@ import { GitClient } from './git.ts'
 import type { GitLimits } from './git.ts'
 import { officePreviewView } from './office.ts'
 import type { OfficeLimits } from './office.ts'
+import { PnpmRunner, pnpmFailureCode } from './pnpm.ts'
+import { findProfileDir, readInventory } from './profile.ts'
 import type { PresetRoster, RunDeps } from './run-task.ts'
 import type {
   ApiError, BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest,
@@ -31,7 +33,8 @@ import type {
   FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest,
   GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
   GitLogRequest, GitLogResult, GitMutateRequest,
-  GitMutateResult, GitStatusRequest, GitStatusResult, TaskCreateRequest, TaskCreateResult,
+  GitMutateResult, GitStatusRequest, GitStatusResult, PluginListRequest, PluginListResult,
+  PluginMutateRequest, PluginMutateResult, TaskCreateRequest, TaskCreateResult,
   TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
   TaskUpdateRequest, TaskUpdateResult, WorkspaceId,
 } from './types.ts'
@@ -72,6 +75,8 @@ export interface Config {
   searchMaxEntries?: number
   officeMaxBytes?: number
   browseMaxEntries?: number
+  pluginOpTimeoutMs?: number
+  profileDir?: string
 }
 
 export const Config: z<Config> = z.object({
@@ -90,6 +95,10 @@ export const Config: z<Config> = z.object({
   searchMaxEntries: z.number().default(200),
   officeMaxBytes: z.number().default(5_242_880),
   browseMaxEntries: z.number().default(500),
+  pluginOpTimeoutMs: z.number().default(300_000),
+  // Located by walking up from this module by default; naming it explicitly is
+  // for a deployment whose profile is not an ancestor of the loaded plugin.
+  profileDir: z.string().default(''),
 })
 
 /** Field defaults applied when the gateway is constructed directly. */
@@ -110,6 +119,8 @@ export function resolveConfig(config: Config): Required<Config> {
     searchMaxEntries: config.searchMaxEntries ?? 200,
     officeMaxBytes: config.officeMaxBytes ?? 5_242_880,
     browseMaxEntries: config.browseMaxEntries ?? 500,
+    pluginOpTimeoutMs: config.pluginOpTimeoutMs ?? 300_000,
+    profileDir: config.profileDir ?? '',
   }
 }
 
@@ -121,6 +132,10 @@ export class WebEnhancedGateway extends TypertRemoteService {
   private readonly resolved: Required<Config>
   private readonly balance: BalanceClient
   private readonly board: TaskBoard
+  /** Resolved lazily: the walk is filesystem work no other capability needs. */
+  private profileDirCache: Promise<string | undefined> | undefined
+  /** Built on first mutation, so a deployment outside a profile never makes one. */
+  private pnpm: PnpmRunner | undefined
 
   /**
    * Register the gateway, mount the task board (recovering interrupted
@@ -357,8 +372,46 @@ export class WebEnhancedGateway extends TypertRemoteService {
     }
   }
 
-  // ── internals ────────────────────────────────────────────────────────────
+  // ── plugins ──────────────────────────────────────────────────────────────
 
+  /**
+   * The profile's installed plugins.
+   *
+   * Answers `no-profile` rather than an empty list when this deployment loads
+   * the plugin from outside any profile (a source checkout, a test): those are
+   * different facts, and an empty list would invite a removal that cannot work.
+   */
+  @Remote('pluginList')
+  async pluginList(_request: PluginListRequest): Promise<PluginListResult> {
+    try {
+      const dir = await this.profileDir()
+      if (dir === undefined) return { error: this.noProfile() }
+      const inventory = await readInventory(dir)
+      return {
+        profileDir: inventory.dir,
+        profileName: inventory.name,
+        plugins: inventory.plugins,
+        templateBundles: inventory.templateBundles,
+        busy: this.pnpm?.running ?? false,
+      }
+    } catch (error) {
+      return { error: this.errorOf(error, 'plugin-list') }
+    }
+  }
+
+  /** Remove one plugin from the profile (takes effect on the next start). */
+  @Remote('pluginRemove')
+  async pluginRemove(request: PluginMutateRequest): Promise<PluginMutateResult> {
+    return this.pluginOperation(request.name, runner => runner.remove(request.name))
+  }
+
+  /** Update one plugin to its spec's head (takes effect on the next start). */
+  @Remote('pluginUpdate')
+  async pluginUpdate(request: PluginMutateRequest): Promise<PluginMutateResult> {
+    return this.pluginOperation(request.name, runner => runner.update(request.name))
+  }
+
+  // ── internals ────────────────────────────────────────────────────────────
   /**
    * Whether the balance describes the account one model route bills.
    *
@@ -480,8 +533,84 @@ export class WebEnhancedGateway extends TypertRemoteService {
     }
   }
 
-  private errorOf(error: unknown, fallback: string): ApiError {
-    const message = error instanceof Error ? error.message : String(error)
+  /** The error returned when this deployment sits outside any profile. */
+  private noProfile(): ApiError {
+    return {
+      code: 'no-profile',
+      message: 'this deployment does not load the plugin from a dsh profile, so there is nothing to manage',
+    }
+  }
+
+  /**
+   * The profile directory, resolved once and cached.
+   *
+   * A profile cannot move under a running host, so a repeated walk would only
+   * repeat the same filesystem reads. The promise itself is cached so
+   * concurrent first callers share one walk. A configured path wins outright:
+   * the walk is a heuristic over where the module happens to sit.
+   */
+  private profileDir(): Promise<string | undefined> {
+    if (this.resolved.profileDir !== '') return Promise.resolve(this.resolved.profileDir)
+    this.profileDirCache ??= findProfileDir()
+    return this.profileDirCache
+  }
+
+  /**
+   * Run one plugin mutation, guarding what pnpm itself would not.
+   *
+   * The refusal here is for a name pnpm cannot act on: a template bundle is in
+   * the layer list precisely because nothing depends on it, so `pnpm remove`
+   * would report success having done nothing. Removing the row that IS this
+   * plugin is NOT refused — that is a legitimate thing to want, and the
+   * `self` flag exists so the surface can confirm it rather than have the
+   * gateway decide on the user's behalf.
+   * @param name - package name from the request.
+   * @param operation - the runner call to perform.
+   * @returns the mutation result.
+   */
+  private async pluginOperation(
+    name: string,
+    operation: (runner: PnpmRunner) => Promise<{
+      readonly run: { readonly exitCode: number | null; readonly stdout: string; readonly stderr: string; readonly timedOut: boolean }
+      readonly added: readonly string[]
+      readonly removed: readonly string[]
+    }>,
+  ): Promise<PluginMutateResult> {
+    try {
+      const dir = await this.profileDir()
+      if (dir === undefined) return { error: this.noProfile() }
+      const inventory = await readInventory(dir)
+      const row = inventory.plugins.find(plugin => plugin.name === name)
+      if (row === undefined) {
+        const template = inventory.templateBundles.includes(name)
+        return {
+          error: {
+            code: template ? 'plugin-not-removable' : 'plugin-not-found',
+            message: template
+              ? `'${name}' is a profile template layer, not a dependency — it cannot be removed or updated by pnpm`
+              : `'${name}' is not a dependency of profile '${inventory.name}'`,
+          },
+        }
+      }
+      this.pnpm ??= new PnpmRunner(this.ctx.subprocess, dir, {
+        timeoutMs: this.resolved.pluginOpTimeoutMs,
+        outputMaxBytes: this.resolved.gitOutputMaxBytes,
+      })
+      const { run, added, removed } = await operation(this.pnpm)
+      const output = `${run.stdout}\n${run.stderr}`.trim()
+      const failure = pnpmFailureCode(run)
+      if (failure !== undefined) {
+        return { ok: false, added, removed, restartRequired: false, output: output || failure }
+      }
+      // Always true on success: Cordis composed the layer stack at boot, so
+      // what changed on disk describes the next start, not this process.
+      return { ok: true, added, removed, restartRequired: true, output }
+    } catch (error) {
+      return { error: this.errorOf(error, 'plugin-operation') }
+    }
+  }
+
+  private errorOf(error: unknown, fallback: string): ApiError {    const message = error instanceof Error ? error.message : String(error)
     const code = error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT'
       ? 'not-found'
       : fallback

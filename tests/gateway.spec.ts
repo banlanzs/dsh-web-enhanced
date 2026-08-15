@@ -1,4 +1,5 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -63,6 +64,8 @@ interface HarnessOptions {
   presets?: { resolve: (id?: string) => Promise<{ id: string }>; mount: (agentCtx: unknown, id?: string) => Promise<unknown> }
   /** Membership refusal, so the run-survives-a-refused-attach path is reachable. */
   attachFails?: string
+  /** Profile directory the plugin-management methods act on. */
+  profileDir?: string
 }
 
 async function harness(options: HarnessOptions = {}): Promise<{
@@ -116,7 +119,10 @@ async function harness(options: HarnessOptions = {}): Promise<{
   ctx.provide('agents', { create } as never)
   ctx.provide('sessions', { flush: vi.fn(async () => options.flush === undefined ? true : options.flush()) } as never)
   ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-chat' }) } as never)
-  await ctx.plugin(WebEnhancedGateway, { balanceApiKeyEnv: 'WEB_ENHANCED_TEST_KEY' })
+  await ctx.plugin(WebEnhancedGateway, {
+    balanceApiKeyEnv: 'WEB_ENHANCED_TEST_KEY',
+    ...options.profileDir === undefined ? {} : { profileDir: options.profileDir },
+  })
   const gateway = ctx.get('webEnhanced') as WebEnhancedGateway
   return {
     ctx, gateway, pool, subprocess, create, attached, warnings,
@@ -224,6 +230,7 @@ describe('WebEnhancedGateway', () => {
       'gitBranches', 'gitLog', 'gitCommit', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',
+      'pluginList', 'pluginRemove', 'pluginUpdate',
     ])
   })
 
@@ -604,6 +611,117 @@ describe('WebEnhancedGateway', () => {
         get: () => ({ baseURL: 'https://gateway.internal/v1' }),
       } as never)
       expect(await gateway.balanceGet({ provider: 'deepseek-official' })).toMatchObject({ applicable: false })
+    })
+  })
+
+  describe('plugins', () => {
+    /** A profile fixture with one bundle dependency and one template layer. */
+    async function profileFixture(): Promise<string> {
+      const dir = await tempRoot()
+      await writeFile(join(dir, 'package.json'), JSON.stringify({
+        name: 'dsh-profile-test',
+        dependencies: { 'plugin-a': 'github:o/a' },
+        dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', 'plugin-a'] } },
+      }, null, 2))
+      const packageDir = join(dir, 'node_modules', 'plugin-a')
+      await mkdir(packageDir, { recursive: true })
+      await writeFile(join(packageDir, 'package.json'), JSON.stringify({
+        name: 'plugin-a',
+        version: '1.4.0',
+        description: 'a plugin',
+        dsh: { bundle: { patch: './cordis.patch.yml' } },
+      }))
+      return dir
+    }
+
+    it('lists the profile dependencies with their layer state', async () => {
+      const dir = await profileFixture()
+      const { gateway } = await harness({ profileDir: dir })
+      const result = await gateway.pluginList({})
+      if ('error' in result) throw new Error(result.error.message)
+      expect(result.profileName).toBe(dir.split(/[/\\]/u).pop())
+      expect(result.plugins).toEqual([{
+        name: 'plugin-a',
+        spec: 'github:o/a',
+        version: '1.4.0',
+        description: 'a plugin',
+        bundle: true,
+        active: true,
+        self: false,
+      }])
+      // Not a dependency, so pnpm cannot act on it — reported apart from the
+      // rows the surface offers buttons for.
+      expect(result.templateBundles).toEqual(['@deepseek-ai/dsh-base'])
+      expect(result.busy).toBe(false)
+    })
+
+    it('answers no-profile when the deployment sits outside one', async () => {
+      // The default: this repository's own checkout is not a profile, so the
+      // upward walk finds none. A state, not a failure.
+      const { gateway } = await harness({})
+      const result = await gateway.pluginList({})
+      expect(result).toMatchObject({ error: { code: 'no-profile' } })
+    })
+
+    it('refuses to act on a template layer', async () => {
+      const dir = await profileFixture()
+      const { gateway } = await harness({ profileDir: dir })
+      const result = await gateway.pluginRemove({ name: '@deepseek-ai/dsh-base' })
+      // Forwarding this to pnpm would report success having removed nothing.
+      expect(result).toMatchObject({ error: { code: 'plugin-not-removable' } })
+    })
+
+    it('refuses a name that is not a dependency', async () => {
+      const dir = await profileFixture()
+      const { gateway } = await harness({ profileDir: dir })
+      expect(await gateway.pluginUpdate({ name: 'never-installed' }))
+        .toMatchObject({ error: { code: 'plugin-not-found' } })
+    })
+
+    it('reports a pnpm failure as a result, keeping the layer list intact', async () => {
+      const dir = await profileFixture()
+      const { gateway, subprocess } = await harness({ profileDir: dir })
+      subprocess.enqueue({ exitCode: 1, stderr: 'ERR_PNPM_FETCH_404' })
+      const result = await gateway.pluginRemove({ name: 'plugin-a' })
+      if ('error' in result) throw new Error(result.error.message)
+      expect(result.ok).toBe(false)
+      expect(result.restartRequired).toBe(false)
+      expect(result.output).toContain('ERR_PNPM_FETCH_404')
+      const manifest = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8')) as {
+        dsh: { profile: { bundles: string[] } }
+      }
+      expect(manifest.dsh.profile.bundles).toEqual(['@deepseek-ai/dsh-base', 'plugin-a'])
+    })
+
+    it('reconciles the layer list and demands a restart after a successful removal', async () => {
+      const dir = await profileFixture()
+      const { gateway, subprocess } = await harness({ profileDir: dir })
+      // The seam is scripted, so the removal pnpm would perform is applied
+      // here at spawn time. Without it the manifest still lists `plugin-a` as
+      // a dependency and reconciliation would correctly change nothing —
+      // the post-pnpm state is what this path is about.
+      const spawn = subprocess.spawn.bind(subprocess)
+      subprocess.spawn = (spec) => {
+        writeFileSync(join(dir, 'package.json'), JSON.stringify({
+          name: 'dsh-profile-test',
+          dependencies: {},
+          dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', 'plugin-a'] } },
+        }, null, 2))
+        rmSync(join(dir, 'node_modules', 'plugin-a'), { recursive: true, force: true })
+        return spawn(spec)
+      }
+      subprocess.enqueue({ exitCode: 0, stdout: 'Packages: -1' })
+      const result = await gateway.pluginRemove({ name: 'plugin-a' })
+      if ('error' in result) throw new Error(result.error.message)
+      expect(result.ok).toBe(true)
+      expect(result.removed).toEqual(['plugin-a'])
+      // Always: the layer stack was composed at boot, so nothing here reaches
+      // the running tree.
+      expect(result.restartRequired).toBe(true)
+      const manifest = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8')) as {
+        dsh: { profile: { bundles: string[] } }
+      }
+      expect(manifest.dsh.profile.bundles).toEqual(['@deepseek-ai/dsh-base'])
     })
   })
 })

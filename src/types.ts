@@ -257,3 +257,64 @@ export interface BalanceGetRequest {
 
 /** The balance itself, before the channel decision is folded in. */
 export type BalanceReading = Omit<BalanceView, 'applicable'>
+
+/** One installed profile plugin. */
+export interface PluginView {
+  readonly name: string
+  /** Dependency spec as written in the profile manifest. */
+  readonly spec: string
+  /** Installed version, or null when the package is not materialized. */
+  readonly version: string | null
+  readonly description: string | null
+  /** Whether the installed package declares `dsh.bundle` (i.e. is a layer). */
+  readonly bundle: boolean
+  /** Whether the profile's layer list currently carries it. */
+  readonly active: boolean
+  /** True for this very plugin — removing it takes this UI with it. */
+  readonly self: boolean
+}
+
+/** The profile's plugin inventory, or why there is none to show. */
+export interface PluginListView {
+  /** Absolute profile directory. */
+  readonly profileDir: string
+  /** Profile name (`dsh --profile <name>`). */
+  readonly profileName: string
+  readonly plugins: readonly PluginView[]
+  /**
+   * Layers that are not dependencies — the profile template's own bundles.
+   * Listed for orientation; pnpm cannot remove what nothing depends on.
+   */
+  readonly templateBundles: readonly string[]
+  /** True while an operation holds the single-flight lock. */
+  readonly busy: boolean
+}
+
+export type PluginListResult = PluginListView | { readonly error: ApiError }
+
+/**
+ * Outcome of one plugin mutation.
+ *
+ * `restartRequired` is always true on success: Cordis composes the layer stack
+ * at boot, so a rewritten `node_modules` describes the NEXT start, never the
+ * running tree.
+ */
+export interface PluginMutateView {
+  readonly ok: boolean
+  /** Layer names added to `dsh.profile.bundles` by the reconciliation. */
+  readonly added: readonly string[]
+  /** Layer names removed from it. */
+  readonly removed: readonly string[]
+  /** Whether the deployment must restart before the change takes effect. */
+  readonly restartRequired: boolean
+  /** pnpm's own output, trimmed and bounded — shown verbatim on failure. */
+  readonly output: string
+}
+
+export type PluginMutateResult = PluginMutateView | { readonly error: ApiError }
+
+/** Address one installed plugin by package name. */
+export interface PluginMutateRequest { readonly name: string }
+
+/** List the profile's plugins; takes no arguments beyond the envelope. */
+export interface PluginListRequest { readonly refresh?: boolean }
