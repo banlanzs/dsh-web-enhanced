@@ -21,11 +21,40 @@ export interface BrowseLimits {
 }
 
 /**
+ * The filesystem roots a browser may jump to.
+ *
+ * POSIX has exactly one and walking up reaches it, so the list is empty
+ * there — an affordance that only ever offers `/` is noise. Windows has one
+ * root PER DRIVE with no common ancestor above them, so walking up from
+ * `C:\Users\me` dead-ends at `C:\` and no other drive is reachable by
+ * navigation at all. These jump targets are the only way across.
+ *
+ * The drives are probed rather than enumerated: Node exposes no drive list
+ * without a native binding. The 26 probes run concurrently, so the cost is
+ * the slowest one — which for a disconnected network letter can still be a
+ * second or two.
+ * @returns the roots, or an empty list on POSIX.
+ */
+export async function filesystemRoots(): Promise<string[]> {
+  if (process.platform !== 'win32') return []
+  const letters = Array.from({ length: 26 }, (_unused, index) => String.fromCharCode(65 + index))
+  const probed = await Promise.all(letters.map(async (letter) => {
+    const root = `${letter}:\\`
+    try {
+      return (await stat(root)).isDirectory() ? root : undefined
+    } catch {
+      return undefined
+    }
+  }))
+  return probed.filter((root): root is string => root !== undefined)
+}
+
+/**
  * List one absolute directory: subdirectories first, then files, each
  * name-sorted.
  * @param path - absolute directory; omitted or blank lists the host home.
  * @param limits - entry cap.
- * @returns the level, its parent, and the host home for rooting.
+ * @returns the level, its parent, the host home, and the filesystem roots.
  * @throws when the path does not exist or is not a directory.
  */
 export async function browseDirectory(
@@ -37,7 +66,10 @@ export async function browseDirectory(
   if (!(await stat(target)).isDirectory()) {
     throw new Error(`'${target}' is not a directory`)
   }
-  const dirents = await readdir(target, { withFileTypes: true })
+  const [dirents, roots] = await Promise.all([
+    readdir(target, { withFileTypes: true }),
+    filesystemRoots(),
+  ])
   const dirs: FsBrowseEntry[] = []
   const files: FsBrowseEntry[] = []
   let truncated = false
@@ -78,6 +110,7 @@ export async function browseDirectory(
     // render an "up" affordance that goes nowhere.
     parent: parent === target ? null : parent,
     home,
+    roots,
     entries: [...dirs, ...files],
     truncated,
   }

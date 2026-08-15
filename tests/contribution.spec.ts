@@ -67,9 +67,12 @@ const payloads: Record<string, unknown[]> = {
     path: '/home/u',
     parent: '/home',
     home: '/home/u',
+    roots: [],
     entries: [{ name: 'a', path: '/home/u/a', kind: 'dir' }, { name: 'b.txt', path: '/home/u/b.txt', kind: 'file', size: 2 }],
     truncated: false,
-  }, { path: '/', parent: null, home: '/home/u', entries: [], truncated: true }, errorPayload],
+  }, {
+    path: 'C:\\', parent: null, home: 'C:\\Users\\u', roots: ['C:\\', 'D:\\'], entries: [], truncated: true,
+  }, errorPayload],
 }
 
 describe('webEnhancedRemote contribution', () => {

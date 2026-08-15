@@ -41,7 +41,7 @@ The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # recommended
 # or:
-# dsh plugin --profile web add ./dsh-web-enhanced-0.5.1.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.5.2.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -111,7 +111,7 @@ reinstalling from a packed tarball instead:
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.5.1.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.5.2.tgz
 ```
 
 On Windows, tarball installs need real symlink permission (pnpm's
@@ -163,7 +163,7 @@ Plugin-row `config` fields (all have defaults):
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + full tests + build (173 tests)
+pnpm run check   # typecheck + full tests + build (175 tests)
 ```
 
 Build outputs:
@@ -188,7 +188,7 @@ Prereqs: `dsh`/`pnpm` on PATH, and the main repo's web build output (playwright 
 - The workspace surface is a view tab, not a side-by-side column: it replaces the transcript while active rather than sitting next to it, and it owns no width or collapse of its own.
 - HTML inside Markdown renders through an allow list: `<table>` is read structurally and inline tags map to real elements, everything else keeps only its text. `<details>`, inline `style`, and custom elements are not reproduced.
 - The mention pickers' in-project list is one bounded pass of the host search (`searchMaxEntries`, 200 by default); the popup's own search filters that batch locally rather than re-querying per keystroke. Past that cap, and past the project boundary, is the first row's「Browse elsewhere…」.
-- The mention browser is an in-app file manager, not an operating-system dialog: the host's `host.pickDirectory` picks directories only and only under the `native` capability, and a browser's `<input type="file">` withholds absolute paths by design.
+- The mention browser is an in-app file manager, not an operating-system dialog: the host's `host.pickDirectory` picks directories only and only under the `native` capability, and a browser's `<input type="file">` withholds absolute paths by design. On Windows the drive list comes from 26 concurrent `stat` probes (Node exposes no drive table without a native binding), so a disconnected network letter can cost a second or two; a UNC share not mapped to a letter (`\\server\share`) is not reachable yet.
 - Office preview is structural: docx headings/paragraphs/lists/tables and the first xlsx worksheet are rendered; inline styles (bold, colors), images, and multi-sheet workbooks are not. Legacy `.doc`/`.xls` binaries are not previewable.
 - Scheduled tasks are best-effort: 30s tick granularity; windows missed while the host is down are caught up once at startup, no backlog is kept.
 - The balance key shares its source with the model provider (env var); when unconfigured it shows an error state rather than failing. On a route outside `balanceProviders` the line is hidden entirely.

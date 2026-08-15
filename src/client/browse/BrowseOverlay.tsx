@@ -133,18 +133,38 @@ export function BrowseOverlay({ useBrowse, remote, closeBrowse, appendMention, t
       }
     >
       {current !== undefined && (
-        <nav className={css.crumbs} aria-label={t('browse.crumbs')}>
-          {crumbsOf(current.path).map(crumb => (
-            <button
-              type="button"
-              className={css.crumb}
-              key={crumb.path}
-              onClick={() => { setPath(crumb.path) }}
-            >
-              {crumb.name}
-            </button>
-          ))}
-        </nav>
+        <div className={css.nav}>
+          {/* Drive jumps: on Windows the drives have no common ancestor, so
+              walking up dead-ends at `C:\` and no other drive is reachable by
+              navigation at all. Empty on POSIX, where `/` is reachable. */}
+          {current.roots.length > 0 && (
+            <div className={css.roots} data-testid="browse-roots">
+              {current.roots.map(root => (
+                <button
+                  type="button"
+                  className={css.root}
+                  key={root}
+                  data-active={root === current.path || undefined}
+                  onClick={() => { setPath(root) }}
+                >
+                  {root.replace(/[\\/]+$/u, '')}
+                </button>
+              ))}
+            </div>
+          )}
+          <nav className={css.crumbs} aria-label={t('browse.crumbs')}>
+            {crumbsOf(current.path).map(crumb => (
+              <button
+                type="button"
+                className={css.crumb}
+                key={crumb.path}
+                onClick={() => { setPath(crumb.path) }}
+              >
+                {crumb.name}
+              </button>
+            ))}
+          </nav>
+        </div>
       )}
 
       {level.phase === 'loading' && <p className={css.empty}>{t('browse.loading')}</p>}

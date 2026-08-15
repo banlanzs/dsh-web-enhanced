@@ -230,6 +230,7 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
     path: z.string(),
     parent: z.string().nullable(),
     home: z.string(),
+    roots: z.array(z.string()),
     entries: z.array(z.object({
       name: z.string(),
       path: z.string(),

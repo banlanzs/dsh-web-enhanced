@@ -24,14 +24,48 @@
   width: 160px;
 }
 
-.crumbs {
+.nav {
   display: flex;
   flex: none;
+  align-items: baseline;
+  gap: 10px;
+  border-bottom: 1px solid rgb(128 128 128 / 18%);
+  padding-bottom: 6px;
+}
+
+.roots {
+  display: flex;
+  flex: none;
+  gap: 3px;
+}
+
+.root {
+  border: 1px solid rgb(128 128 128 / 30%);
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  padding: 1px 6px;
+}
+
+.root:hover {
+  background: rgb(128 128 160 / 18%);
+}
+
+.root[data-active] {
+  border-color: rgb(106 143 216 / 65%);
+  background: rgb(106 143 216 / 22%);
+}
+
+.crumbs {
+  display: flex;
+  flex: 1;
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
-  border-bottom: 1px solid rgb(128 128 128 / 18%);
-  padding-bottom: 6px;
+  min-width: 0;
 }
 
 .crumb {

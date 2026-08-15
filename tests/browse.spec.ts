@@ -10,7 +10,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { browseDirectory } from '../src/browse.ts'
+import { browseDirectory, filesystemRoots } from '../src/browse.ts'
 
 const roots: string[] = []
 
@@ -63,5 +63,30 @@ describe('browseDirectory', () => {
     await expect(browseDirectory(join(root, 'a.txt'), { maxEntries: 5 }))
       .rejects.toThrow('is not a directory')
     await expect(browseDirectory(join(root, 'nope'), { maxEntries: 5 })).rejects.toThrow()
+  })
+
+  it('carries the filesystem roots on every level', async () => {
+    const root = await fixture()
+    const view = await browseDirectory(root, { maxEntries: 5 })
+    expect(view.roots).toEqual(await filesystemRoots())
+  })
+})
+
+describe('filesystemRoots', () => {
+  const windows = process.platform === 'win32'
+
+  it.runIf(windows)('lists one root per drive, because drives have no common ancestor', async () => {
+    // Walking up from C:\Users\me dead-ends at C:\ — `dirname` of a drive
+    // root is itself — so without these jump targets no other drive is
+    // reachable by navigation at all.
+    const roots = await filesystemRoots()
+    expect(roots.length).toBeGreaterThan(0)
+    expect(roots).toContain(`${homedir()[0]!.toUpperCase()}:\\`)
+    for (const root of roots) expect(root).toMatch(/^[A-Z]:\\$/u)
+    expect(new Set(roots).size).toBe(roots.length)
+  })
+
+  it.runIf(!windows)('offers nothing on POSIX, where walking up reaches the single root', async () => {
+    await expect(filesystemRoots()).resolves.toEqual([])
   })
 })

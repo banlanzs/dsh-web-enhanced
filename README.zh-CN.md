@@ -41,7 +41,7 @@
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # 推荐
 # 或：
-# dsh plugin --profile web add ./dsh-web-enhanced-0.5.1.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.5.2.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -110,7 +110,7 @@ host 能力失效）。改用打包重装来迭代：
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.5.1.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.5.2.tgz
 ```
 
 Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPackage` 步骤）。
@@ -152,7 +152,7 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + 全部测试 + 构建（173 个测试）
+pnpm run check   # typecheck + 全部测试 + 构建（175 个测试）
 ```
 
 构建产物：
@@ -177,7 +177,7 @@ node scripts/e2e.mjs --capture   # 顺带刷新本 README 使用的 assets/*.png
 - 工作区为视图标签页而非并排列：激活时取代对话记录显示，而不是与其并排；它自身不拥有宽度与折叠状态。
 - markdown 中的 HTML 只做白名单渲染：`<table>` 按结构解析，行内标签映射到对应元素，其余标签只保留文字。`<details>`、内联 `style`、自定义元素不还原。
 - mention 的项目内列表一次性列出宿主搜索上限（`searchMaxEntries`，默认 200）内的条目，弹层内的搜索是对这批结果的本地过滤，不是逐键重新查询；要越过这个上限或走到项目外，用第一行的「浏览其他位置…」。
-- mention 浏览器是应用内的文件管理器，不调系统对话框：宿主的 `host.pickDirectory` 只选目录且只在 `native` 能力下可用，浏览器的 `<input type="file">` 出于安全也不给绝对路径。
+- mention 浏览器是应用内的文件管理器，不调系统对话框：宿主的 `host.pickDirectory` 只选目录且只在 `native` 能力下可用，浏览器的 `<input type="file">` 出于安全也不给绝对路径。Windows 上的盘符列表靠 26 次并发 `stat` 探测得到（Node 无原生绑定就拿不到盘符表），断连的网络盘符可能让这一步慢上一两秒；未映射为盘符的 UNC 共享（`\\server\share`）目前走不到。
 - Office 预览为结构化视图：docx 的标题/段落/列表/表格与 xlsx 首个工作表可预览；内联样式（加粗/颜色）、图片与多工作表不保留。旧版 `.doc`/`.xls` 二进制格式不支持预览。
 - 定时任务为 best-effort：tick 粒度 30s，宿主关机期间错过的窗口在启动时补跑一次，不留积压。
 - 余额 key 与模型提供商同源（环境变量）；未配置时显示错误态而非报错。切到非 `balanceProviders` 的渠道时整行隐藏。

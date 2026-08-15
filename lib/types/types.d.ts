@@ -308,6 +308,14 @@ export interface FsBrowseView {
     readonly parent: string | null;
     /** Host account home, so the browser can offer a stable starting point. */
     readonly home: string;
+    /**
+     * Filesystem roots reachable only by jumping.
+     *
+     * Empty on POSIX, where walking up reaches the single root. On Windows this
+     * is one entry per drive (`C:\`, `D:\`, …): the drives have no common
+     * ancestor, so no amount of walking up leads from one to another.
+     */
+    readonly roots: readonly string[];
     readonly entries: readonly FsBrowseEntry[];
     /** True when the level was cut at the entry cap. */
     readonly truncated: boolean;
