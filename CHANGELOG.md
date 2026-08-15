@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.12.0] - 2026-08-15
+
+### 调整：识图改为两级模型池按序回退
+
+按用户需求，识图不再「单个优先模型 + 单 API 模型」，而是**两段模型池**：
+
+- **DSH 模型池**（新 settings/config 字段 `harnessModels`）：设置页把 DSH 已声明支持图片的模型按渠道分组多选保存；转写按池顺序逐个尝试，全部失败后进入独立 API。池为空时保持原来的自动探测（上限 4 个）；静态钉选的 `visionProvider`/`visionModel` 仍排最前。
+- **独立 API 模型池**（沿用 `endpointModels`）：转写先试可选的优先模型 `endpointModel`，再按保存顺序逐个尝试池内其余模型，最后才是静态 `visionFallbackModels`。
+- 全部失败时行为不变：模型收到带已尝试来源的失败占位描述，图片绝不裸奔进纯文本模型。
+- UI：DSH 区块从单渠道/单模型下拉改为分组多选模型池；独立 API 的「模型」改为「优先模型（可选）」，留空即按池顺序。
+
+### 接口变化
+
+- 无新增远程；`visionConfigGet`/`visionConfigSet` 增加 `harnessModels` 字段（settings 命名空间同步新增）。
+- 新增 config：`visionHarnessModels`。
+- 测试 295 → 297。
+
 ## [0.11.1] - 2026-08-15
 
 ### 改进：「关于」标签页不再只有一段文字

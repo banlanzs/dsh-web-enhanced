@@ -48,6 +48,11 @@ export interface Config {
     visionMarker?: string;
     visionProvider?: string;
     visionModel?: string;
+    /** User-selected DSH model pool; non-empty replaces auto-detection. */
+    visionHarnessModels?: Array<{
+        provider: string;
+        model: string;
+    }>;
     visionBaseUrl?: string;
     visionApiKey?: string;
     visionApiKeyEnv?: string;

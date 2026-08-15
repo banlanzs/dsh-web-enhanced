@@ -542,6 +542,11 @@ export interface VisionConfigView {
     /** Empty = auto-detect DSH vision models. */
     readonly provider: string;
     readonly model: string;
+    /**
+     * The user-selected DSH model pool, tried in order. Non-empty replaces
+     * auto-detection (the pinned pair above still goes first).
+     */
+    readonly harnessModels: readonly VisionHarnessModelView[];
     readonly prompt: string;
     readonly marker: string;
     /** Dedicated transcription endpoint (never touches DSH channels). */
@@ -576,6 +581,8 @@ export interface VisionConfigPatch {
     patchAdmission?: boolean;
     provider?: string;
     model?: string;
+    /** DSH model pool; an empty array restores auto-detection. */
+    harnessModels?: VisionHarnessModelView[];
     prompt?: string;
     marker?: string;
     baseUrl?: string;

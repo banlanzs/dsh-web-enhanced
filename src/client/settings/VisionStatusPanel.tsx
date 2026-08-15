@@ -14,8 +14,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
-  VisionConfigPatch, VisionConfigView, VisionEndpointModelView, VisionStatusView,
-  WebEnhancedRemote,
+  VisionConfigPatch, VisionConfigView, VisionEndpointModelView, VisionHarnessModelView,
+  VisionStatusView, WebEnhancedRemote,
 } from '../contract.ts'
 import type { Translate } from '../locale-keys.ts'
 import css from './VisionStatusPanel.module.css'
@@ -26,6 +26,8 @@ interface Draft {
   patchAdmission: boolean
   provider: string
   model: string
+  /** DSH model pool checked across the provider lists. */
+  harnessModels: VisionHarnessModelView[]
   prompt: string
   marker: string
   baseUrl: string
@@ -48,6 +50,7 @@ function draftOf(value: VisionConfigView): Draft {
     patchAdmission: value.patchAdmission,
     provider: value.provider,
     model: value.model,
+    harnessModels: value.harnessModels.map(entry => ({ provider: entry.provider, model: entry.model })),
     prompt: value.prompt,
     marker: value.marker,
     baseUrl: value.baseUrl,
@@ -183,6 +186,18 @@ export function VisionStatusPanel({ remote, t }: VisionStatusPanelProps) {
     })
   }
 
+  /** Check/uncheck one DSH provider/model pair in the harness pool. */
+  const toggleHarnessModel = (provider: string, model: string): void => {
+    setDraft(current => {
+      if (current === null) return current
+      const exists = current.harnessModels.some(entry => entry.provider === provider && entry.model === model)
+      const pool = exists
+        ? current.harnessModels.filter(entry => entry.provider !== provider || entry.model !== model)
+        : [...current.harnessModels, { provider, model }]
+      return { ...current, harnessModels: pool }
+    })
+  }
+
   /** Providers that offer at least one image-capable model (picker source). */
   const visionProviders = (view?.providers ?? [])
     .filter(provider => provider.models.some(model => model.supportsImage))
@@ -225,6 +240,7 @@ export function VisionStatusPanel({ remote, t }: VisionStatusPanelProps) {
       patchAdmission: draft.patchAdmission,
       provider: draft.provider,
       model: draft.provider === '' ? '' : draft.model,
+      harnessModels: draft.harnessModels.map(entry => ({ provider: entry.provider, model: entry.model })),
       prompt: draft.prompt,
       marker: draft.marker,
       baseUrl: draft.baseUrl.trim(),
@@ -264,43 +280,29 @@ export function VisionStatusPanel({ remote, t }: VisionStatusPanelProps) {
           <section className={css.section}>
             <h3 className={css.sectionTitle}>{t('vision.form.harnessTitle')}</h3>
             <p className={css.sectionHint}>{t('vision.form.harnessHint')}</p>
-            <Field label={t('vision.form.provider')}>
-              <select
-                className={css.input}
-                value={draft.provider}
-                onChange={event => {
-                  const provider = event.target.value
-                  setDraft(current => current === null ? current : { ...current, provider, model: '' })
-                }}
-              >
-                <option value="">{t('vision.form.providerAuto')}</option>
-                {visionProviders.map(provider => (
-                  <option key={provider.provider} value={provider.provider}>{provider.name}</option>
-                ))}
-                {draft.provider !== '' && !visionProviders.some(provider => provider.provider === draft.provider) && (
-                  <option value={draft.provider}>{view?.providers.find(provider => provider.provider === draft.provider)?.name ?? draft.provider}</option>
-                )}
-              </select>
-            </Field>
             {visionProviders.length === 0 && <p className={css.sectionHint}>{t('vision.form.noImageModels')}</p>}
-            {draft.provider !== '' && (
-              <Field label={t('vision.form.model')} hint={t('vision.form.modelHint')}>
-                <select
-                  className={css.input}
-                  value={draft.model}
-                  onChange={event => { setDraft({ ...draft, model: event.target.value }) }}
-                >
-                  {visionProviders
-                    .find(provider => provider.provider === draft.provider)
-                    ?.models.filter(model => model.supportsImage)
-                    .map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
-                  {draft.model !== '' && !visionProviders.some(provider => provider.provider === draft.provider
-                    && provider.models.some(model => model.id === draft.model && model.supportsImage)) && (
-                    <option value={draft.model}>{draft.model}</option>
-                  )}
-                </select>
-              </Field>
+            {visionProviders.length > 0 && (
+              <div className={css.poolList}>
+                {visionProviders.flatMap(provider => provider.models
+                  .filter(model => model.supportsImage)
+                  .map(model => {
+                    const checked = draft.harnessModels.some(entry =>
+                      entry.provider === provider.provider && entry.model === model.id)
+                    return (
+                      <label key={`${provider.provider}/${model.id}`} className={css.poolRow}>
+                        <input type="checkbox" checked={checked}
+                          onChange={() => { toggleHarnessModel(provider.provider, model.id) }} />
+                        <span className={css.poolName}>{provider.name} · {model.name === model.id ? model.id : `${model.name}（${model.id}）`}</span>
+                      </label>
+                    )
+                  }))}
+              </div>
             )}
+            <p className={css.sectionHint}>
+              {draft.harnessModels.length > 0
+                ? t('vision.form.harnessPoolHint', { count: String(draft.harnessModels.length) })
+                : t('vision.form.harnessAutoHint')}
+            </p>
           </section>
 
           <section className={css.section}>
@@ -316,6 +318,7 @@ export function VisionStatusPanel({ remote, t }: VisionStatusPanelProps) {
                   ? (
                       <select className={css.input} value={draft.endpointModel}
                         onChange={event => { setDraft({ ...draft, endpointModel: event.target.value }) }}>
+                        <option value="">{t('vision.form.endpointModelAuto')}</option>
                         {draft.endpointModels.map(id => <option key={id} value={id}>{id}</option>)}
                         {draft.endpointModel !== '' && !draft.endpointModels.includes(draft.endpointModel) && (
                           <option value={draft.endpointModel}>{draft.endpointModel}</option>

@@ -278,6 +278,7 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
     patchAdmission: z.boolean(),
     provider: z.string(),
     model: z.string(),
+    harnessModels: z.array(z.object({ provider: z.string(), model: z.string() })),
     prompt: z.string(),
     marker: z.string(),
     baseUrl: z.string(),

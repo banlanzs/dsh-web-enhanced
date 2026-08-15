@@ -164,17 +164,20 @@ describe('vision helpers', () => {
     const base = staticVisionSettingsBase({
       visionEnabled: false,
       visionBaseUrl: 'https://vlm.example/v1',
+      visionHarnessModels: [{ provider: 'glm', model: 'glm-4.6v' }],
       visionEndpointModels: ['qwen-vl', 'backup-vl'],
       visionFallbackModels: [{ model: 'backup', anonymous: true }],
     })
     expect(base).toEqual({
       enabled: false,
       baseUrl: 'https://vlm.example/v1',
+      harnessModels: [{ provider: 'glm', model: 'glm-4.6v' }],
       endpointModels: ['qwen-vl', 'backup-vl'],
       fallbackModels: [{ model: 'backup', anonymous: true }],
     })
     const value = {
       enabled: true, patchAdmission: true, provider: 'glm', model: 'glm-4.6v',
+      harnessModels: [{ provider: 'glm', model: 'glm-4.6v' }],
       prompt: 'p', marker: 'm', baseUrl: '', apiKey: 'sk', apiKeyEnv: 'VISION_API_KEY',
       endpointModel: '', endpointModels: ['qwen-vl'], anonymous: false,
       timeoutMs: 120000, maxTokens: 4096,
@@ -183,6 +186,7 @@ describe('vision helpers', () => {
     } satisfies VisionSettingsValue
     expect(visionConfigSourceOf(value)).toMatchObject({
       visionEnabled: true, visionProvider: 'glm', visionModel: 'glm-4.6v',
+      visionHarnessModels: [{ provider: 'glm', model: 'glm-4.6v' }],
       visionApiKey: 'sk', visionAutoLocalOllama: false, visionEndpointModels: ['qwen-vl'],
     })
     expect(visionConfigSourceOf(value).visionBaseUrl).toBe('')
@@ -220,6 +224,64 @@ describe('VisionTranscriber', () => {
     const memo = new Map<string, string>()
     expect(await transcriber.describe(ref(), memo)).toContain('图片内容识别不可用')
     expect(stream).not.toHaveBeenCalled()
+  })
+
+  it('tries the user-selected DSH pool in order and skips auto-detection', async () => {
+    const order: string[] = []
+    const listModels = vi.fn(async () => [{ id: 'unexpected', inputModalities: ['text', 'image'] }])
+    const stream = vi.fn(async function* (options?: unknown) {
+      const model = (options as { model: string }).model
+      order.push(model)
+      if (model === 'b') yield { type: 'text-delta', text: 'B 成功' }
+      // Model 'a' yields no text: a failed transcription, not a success.
+    })
+    const transcriber = new VisionTranscriber(resolveVisionSettings({
+      visionAutoLocalOllama: false,
+      visionHarnessModels: [
+        { provider: 'p', model: 'a' },
+        { provider: 'q', model: 'b' },
+      ],
+    }), {
+      llm: {
+        listProviders: () => [{ id: 'p' }],
+        listModels,
+        stream: stream as never,
+      },
+      logger: silentLogger,
+    })
+    expect(await transcriber.describe(ref(), new Map())).toBe('B 成功')
+    expect(order).toEqual(['a', 'b'])
+    expect(listModels).not.toHaveBeenCalled()
+  })
+
+  it('tries the preferred endpoint model, then the rest of the saved pool', async () => {
+    const urls: string[] = []
+    let calls = 0
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      urls.push(String(input))
+      calls += 1
+      if (calls === 1) {
+        return { ok: false, status: 500, headers: { get: () => null }, text: async () => 'first failed' } as unknown as Response
+      }
+      if (calls === 2) return chatResponse('second-ok')
+      throw new Error('no later attempt may run')
+    })
+    const transcriber = new VisionTranscriber(resolveVisionSettings({
+      visionAutoLocalOllama: false,
+      visionBaseUrl: 'https://vlm.example/v1',
+      visionApiKey: 'sk-pool',
+      visionEndpointModel: 'first',
+      visionEndpointModels: ['first', 'second', 'third'],
+    }), {
+      llm: { listProviders: () => [], listModels: async () => [], stream: async function* () {} },
+      attachments: attachments(),
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      logger: silentLogger,
+    })
+    expect(await transcriber.describe(ref(), new Map())).toBe('second-ok')
+    expect(urls).toHaveLength(2)
+    const bodies = fetchImpl.mock.calls.map(call => JSON.parse(String((call[1] as RequestInit).body)) as { model: string })
+    expect(bodies.map(body => body.model)).toEqual(['first', 'second'])
   })
 
   it('falls back to the configured endpoint and caches by content hash', async () => {
@@ -570,6 +632,7 @@ describe('VisionInterceptor', () => {
   it('registers the settings namespace with static config as base and reconfigures live', async () => {
     const scopeValue: VisionSettingsValue = {
       enabled: true, patchAdmission: true, provider: '', model: '',
+      harnessModels: [],
       prompt: 'p', marker: 'm', baseUrl: '', apiKey: '', apiKeyEnv: 'VISION_API_KEY',
       endpointModel: '', endpointModels: [], anonymous: false, timeoutMs: 120000,
       maxTokens: 4096, autoLocalOllama: false, localOllamaModel: '', localOllamaUrl: '',

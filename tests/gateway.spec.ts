@@ -661,10 +661,12 @@ describe('WebEnhancedGateway', () => {
     it('reads the namespace without exposing the key and saves a filtered patch with CAS', async () => {
       const { ctx, gateway } = await harness()
       const section = {
-        enabled: true, patchAdmission: true, provider: '', model: '', prompt: 'p', marker: 'm',
-        baseUrl: '', apiKey: 'sk-secret', apiKeyEnv: 'VISION_API_KEY', endpointModel: '',
-        endpointModels: ['qwen-vl'], anonymous: false, timeoutMs: 120000, maxTokens: 4096,
-        autoLocalOllama: true, localOllamaModel: '', localOllamaUrl: 'http://localhost:11434/v1',
+        enabled: true, patchAdmission: true, provider: '', model: '',
+        harnessModels: [{ provider: 'glm', model: 'glm-4.6v' }],
+        prompt: 'p', marker: 'm', baseUrl: '', apiKey: 'sk-secret', apiKeyEnv: 'VISION_API_KEY',
+        endpointModel: '', endpointModels: ['qwen-vl'], anonymous: false,
+        timeoutMs: 120000, maxTokens: 4096, autoLocalOllama: true,
+        localOllamaModel: '', localOllamaUrl: 'http://localhost:11434/v1',
         fallbackModels: [], cacheLimit: 200, cooldownMs: 60000,
       }
       const sections: Record<string, Record<string, unknown>> = { 'dsh-web-enhanced-vision': { ...section } }
@@ -690,6 +692,7 @@ describe('WebEnhancedGateway', () => {
       expect(view).toMatchObject({
         managed: true, writable: true, revision: 7, enabled: true,
         apiKeySet: true, fallbackCount: 0, endpointModel: '',
+        harnessModels: [{ provider: 'glm', model: 'glm-4.6v' }],
         endpointModels: ['qwen-vl'],
         providers: [{
           provider: 'deepseek-official', name: 'DeepSeek',
@@ -708,6 +711,7 @@ describe('WebEnhancedGateway', () => {
           baseUrl: 'https://vlm.example/v1',
           endpointModel: 'qwen-vl',
           endpointModels: ['qwen-vl', 'backup-vl'],
+          harnessModels: [{ provider: 'glm', model: 'glm-4.6v' }, { provider: 'octopus', model: 'claude-sonnet-5' }],
           unknownField: true,
         } as unknown as VisionConfigPatch,
         expectedRevision: 7,
@@ -717,6 +721,7 @@ describe('WebEnhancedGateway', () => {
         baseUrl: 'https://vlm.example/v1',
         endpointModel: 'qwen-vl',
         endpointModels: ['qwen-vl', 'backup-vl'],
+        harnessModels: [{ provider: 'glm', model: 'glm-4.6v' }, { provider: 'octopus', model: 'claude-sonnet-5' }],
       }, 7)
       expect(sections['dsh-web-enhanced-vision']).toMatchObject({
         baseUrl: 'https://vlm.example/v1', apiKey: 'sk-secret',

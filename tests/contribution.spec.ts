@@ -86,6 +86,7 @@ const payloads: Record<string, unknown[]> = {
     patchAdmission: true,
     provider: 'glm',
     model: 'glm-4.6v',
+    harnessModels: [{ provider: 'glm', model: 'glm-4.6v' }, { provider: 'octopus', model: 'claude-sonnet-5' }],
     prompt: 'describe',
     marker: '[图片内容描述]',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',

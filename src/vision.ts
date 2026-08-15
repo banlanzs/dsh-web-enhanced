@@ -59,8 +59,10 @@ export const VISION_SETTINGS_NS = 'dsh-web-enhanced-vision'
 const OLLAMA_PROBE_TIMEOUT_MS = 1_500
 /** Hard cap on the effective timeout for anonymous endpoints (they can hang). */
 const ANONYMOUS_TIMEOUT_CAP_MS = 20_000
-/** How many harness vision models are tried for one image. */
+/** How many harness vision models are tried for one image (auto path). */
 const HARNESS_CANDIDATE_CAP = 4
+/** How many USER-SELECTED pool models may run before the pool is cut. */
+const HARNESS_POOL_CAP = 20
 /** Pause between failed vision-model attempts. */
 const RETRY_DELAY_MS = 600
 /** Upper bound for honoring a Retry-After header (seconds), paid endpoints only. */
@@ -146,6 +148,12 @@ export interface VisionFallbackSettings {
   readonly timeoutMs: number
 }
 
+/** One user-selected DSH provider/model pair in the harness transcription pool. */
+export interface VisionHarnessModelSettings {
+  readonly provider: string
+  readonly model: string
+}
+
 /** Resolved vision settings (every field has a default). */
 export interface VisionSettings {
   readonly enabled: boolean
@@ -154,11 +162,19 @@ export interface VisionSettings {
   readonly marker: string
   readonly provider: string
   readonly model: string
+  /**
+   * The user-selected DSH model pool (tried in saved order). When non-empty it
+   * REPLACES auto-detection; the pinned pair above still goes first.
+   */
+  readonly harnessModels: readonly VisionHarnessModelSettings[]
   readonly baseUrl: string
   readonly apiKey: string
   readonly apiKeyEnv: string
   readonly endpointModel: string
-  /** Saved candidate pool; `endpointModel` is chosen from it in the UI. */
+  /**
+   * The user-selected dedicated-endpoint model pool. Transcription tries
+   * `endpointModel` first (when set), then every pool member in saved order.
+   */
   readonly endpointModels: readonly string[]
   readonly anonymous: boolean
   readonly timeoutMs: number
@@ -179,6 +195,7 @@ export interface VisionConfigSource {
   readonly visionMarker?: string
   readonly visionProvider?: string
   readonly visionModel?: string
+  readonly visionHarnessModels?: readonly VisionHarnessModelSettings[]
   readonly visionBaseUrl?: string
   readonly visionApiKey?: string
   readonly visionApiKeyEnv?: string
@@ -204,6 +221,10 @@ export function resolveVisionSettings(config: VisionConfigSource): VisionSetting
     marker: config.visionMarker ?? DEFAULT_VISION_MARKER,
     provider: config.visionProvider ?? '',
     model: config.visionModel ?? '',
+    harnessModels: (config.visionHarnessModels ?? []).map(entry => ({
+      provider: entry.provider,
+      model: entry.model,
+    })),
     baseUrl: config.visionBaseUrl ?? '',
     apiKey: config.visionApiKey ?? '',
     apiKeyEnv: config.visionApiKeyEnv ?? 'VISION_API_KEY',
@@ -233,6 +254,7 @@ export interface VisionSettingsValue {
   readonly patchAdmission: boolean
   readonly provider: string
   readonly model: string
+  readonly harnessModels: VisionHarnessModelSettings[]
   readonly prompt: string
   readonly marker: string
   readonly baseUrl: string
@@ -257,6 +279,10 @@ export const VisionSettingsSchema: z<VisionSettingsValue> = z.object({
   patchAdmission: z.boolean().default(true),
   provider: z.string().default(''),
   model: z.string().default(''),
+  harnessModels: z.array(z.object({
+    provider: z.string(),
+    model: z.string(),
+  })).default([]),
   prompt: z.string().default(DEFAULT_VISION_PROMPT),
   marker: z.string().default(DEFAULT_VISION_MARKER),
   baseUrl: z.string().default(''),
@@ -291,6 +317,7 @@ export function staticVisionSettingsBase(config: VisionConfigSource): Partial<Vi
   if (config.visionPatchAdmission !== undefined) base['patchAdmission'] = config.visionPatchAdmission
   if (config.visionProvider !== undefined) base['provider'] = config.visionProvider
   if (config.visionModel !== undefined) base['model'] = config.visionModel
+  if (config.visionHarnessModels !== undefined) base['harnessModels'] = config.visionHarnessModels
   if (config.visionPrompt !== undefined) base['prompt'] = config.visionPrompt
   if (config.visionMarker !== undefined) base['marker'] = config.visionMarker
   if (config.visionBaseUrl !== undefined) base['baseUrl'] = config.visionBaseUrl
@@ -317,6 +344,7 @@ export function visionConfigSourceOf(value: VisionSettingsValue): VisionConfigSo
     visionPatchAdmission: value.patchAdmission,
     visionProvider: value.provider,
     visionModel: value.model,
+    visionHarnessModels: value.harnessModels,
     visionPrompt: value.prompt,
     visionMarker: value.marker,
     visionBaseUrl: value.baseUrl,
@@ -619,20 +647,28 @@ export class VisionTranscriber {
   }
 
   /**
-   * Vision models from DSH-configured providers: the pinned `visionProvider` /
-   * `visionModel` first, then every listed model that declares image input.
+   * Vision models from DSH-configured providers, in transcription order:
+   * the pinned `visionProvider`/`visionModel` first, then the user-selected
+   * `harnessModels` pool (which, when non-empty, REPLACES auto-detection), and
+   * only with no pool the automatic scan of image-capable models.
    */
   async harnessCandidates(): Promise<Array<{ provider: string; model: string }>> {
     const list: Array<{ provider: string; model: string }> = []
     const seen = new Set<string>()
-    const push = (provider: string, model: string): void => {
-      if (list.length >= HARNESS_CANDIDATE_CAP) return
+    const push = (provider: string, model: string, cap: number): void => {
+      if (provider.trim() === '' || model.trim() === '' || list.length >= cap) return
       const key = `${provider}/${model}`
       if (seen.has(key)) return
       seen.add(key)
       list.push({ provider, model })
     }
-    if (this.settings.provider !== '' && this.settings.model !== '') push(this.settings.provider, this.settings.model)
+    if (this.settings.provider !== '' && this.settings.model !== '') {
+      push(this.settings.provider, this.settings.model, HARNESS_POOL_CAP)
+    }
+    if (this.settings.harnessModels.length > 0) {
+      for (const entry of this.settings.harnessModels) push(entry.provider, entry.model, HARNESS_POOL_CAP)
+      return list
+    }
     const llm = this.deps.llm
     if (llm === undefined) return list
     try {
@@ -641,7 +677,7 @@ export class VisionTranscriber {
         try {
           const models = await llm.listModels(provider.id)
           for (const model of models) {
-            if ((model.inputModalities ?? []).includes('image')) push(provider.id, model.id)
+            if ((model.inputModalities ?? []).includes('image')) push(provider.id, model.id, HARNESS_CANDIDATE_CAP)
           }
         } catch {
           // One failing provider must not veto the others.
@@ -751,27 +787,40 @@ export class VisionTranscriber {
     return trimmed === '' ? null : trimmed
   }
 
-  /** Ordered endpoint attempts: local Ollama, main endpoint, fallbacks. */
+  /**
+   * Ordered endpoint attempts: local Ollama, then the dedicated endpoint's
+   * user-selected model POOL (`endpointModel` first when set, then every saved
+   * `endpointModels` member), then the static fallback chain.
+   */
   private async endpointAttempts(): Promise<EndpointAttempt[]> {
     const attempts: EndpointAttempt[] = []
     const local = await this.ollamaProbe
     if (local !== null) attempts.push(local)
-    if (this.settings.baseUrl.trim() !== '' && this.settings.endpointModel.trim() !== '') {
-      attempts.push({
-        model: this.settings.endpointModel,
-        baseURL: this.settings.baseUrl.replace(/\/+$/u, ''),
-        apiKey: this.settings.apiKey,
-        anonymous: this.settings.anonymous,
-        timeoutMs: this.settings.timeoutMs,
-        maxTokens: this.settings.maxTokens,
-      })
+    const baseURL = this.settings.baseUrl.replace(/\/+$/u, '')
+    if (baseURL !== '') {
+      const ordered: string[] = []
+      if (this.settings.endpointModel.trim() !== '') ordered.push(this.settings.endpointModel.trim())
+      for (const model of this.settings.endpointModels) {
+        const trimmed = model.trim()
+        if (trimmed !== '' && !ordered.includes(trimmed)) ordered.push(trimmed)
+      }
+      for (const model of ordered) {
+        attempts.push({
+          model,
+          baseURL,
+          apiKey: this.settings.apiKey,
+          anonymous: this.settings.anonymous,
+          timeoutMs: this.settings.timeoutMs,
+          maxTokens: this.settings.maxTokens,
+        })
+      }
     }
     for (const fallback of this.settings.fallbacks) {
-      const baseURL = fallback.baseURL === '' ? this.settings.baseUrl : fallback.baseURL
-      if (fallback.model.trim() === '' || baseURL.trim() === '') continue
+      const fallbackURL = fallback.baseURL === '' ? this.settings.baseUrl : fallback.baseURL
+      if (fallback.model.trim() === '' || fallbackURL.trim() === '') continue
       attempts.push({
         model: fallback.model,
-        baseURL: baseURL.replace(/\/+$/u, ''),
+        baseURL: fallbackURL.replace(/\/+$/u, ''),
         apiKey: fallback.apiKey === '' ? this.settings.apiKey : fallback.apiKey,
         anonymous: fallback.anonymous,
         timeoutMs: fallback.timeoutMs > 0 ? fallback.timeoutMs : this.settings.timeoutMs,
@@ -1126,7 +1175,8 @@ export class VisionInterceptor extends Service {
       this.transcriber.harnessCandidates(),
       this.transcriber.ollamaState(),
     ])
-    const endpointConfigured = this.settings.baseUrl.trim() !== '' && this.settings.endpointModel.trim() !== ''
+    const endpointConfigured = this.settings.baseUrl.trim() !== ''
+      && (this.settings.endpointModel.trim() !== '' || this.settings.endpointModels.length > 0)
     return {
       mounted: true,
       enabled: this.settings.enabled,

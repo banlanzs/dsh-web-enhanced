@@ -91,7 +91,7 @@ interface VisionIntegrationFace {
 
 /** Settings keys the Vision tab may edit (everything else is read-only). */
 const VISION_CONFIG_EDITABLE_KEYS: ReadonlySet<string> = new Set([
-  'enabled', 'patchAdmission', 'provider', 'model', 'prompt', 'marker',
+  'enabled', 'patchAdmission', 'provider', 'model', 'harnessModels', 'prompt', 'marker',
   'baseUrl', 'apiKey', 'endpointModel', 'endpointModels', 'anonymous', 'timeoutMs',
   'maxTokens', 'autoLocalOllama', 'localOllamaModel', 'localOllamaUrl',
   'cacheLimit', 'cooldownMs',
@@ -137,6 +137,8 @@ export interface Config {
   visionMarker?: string
   visionProvider?: string
   visionModel?: string
+  /** User-selected DSH model pool; non-empty replaces auto-detection. */
+  visionHarnessModels?: Array<{ provider: string; model: string }>
   visionBaseUrl?: string
   visionApiKey?: string
   visionApiKeyEnv?: string
@@ -193,6 +195,10 @@ export const Config: z<Config> = z.object({
   visionMarker: z.string().default(DEFAULT_VISION_MARKER),
   visionProvider: z.string().default(''),
   visionModel: z.string().default(''),
+  visionHarnessModels: z.array(z.object({
+    provider: z.string(),
+    model: z.string(),
+  })).default([]),
   visionBaseUrl: z.string().default(''),
   visionApiKey: z.string().role('secret').default(''),
   visionApiKeyEnv: z.string().default('VISION_API_KEY'),
@@ -246,6 +252,7 @@ export function resolveConfig(config: Config): Required<Config> {
     visionMarker: config.visionMarker ?? DEFAULT_VISION_MARKER,
     visionProvider: config.visionProvider ?? '',
     visionModel: config.visionModel ?? '',
+    visionHarnessModels: config.visionHarnessModels ?? [],
     visionBaseUrl: config.visionBaseUrl ?? '',
     visionApiKey: config.visionApiKey ?? '',
     visionApiKeyEnv: config.visionApiKeyEnv ?? 'VISION_API_KEY',
@@ -413,6 +420,7 @@ export class WebEnhancedGateway extends TypertRemoteService {
         patchAdmission: raw.patchAdmission,
         provider: raw.provider,
         model: raw.model,
+        harnessModels: raw.harnessModels,
         prompt: raw.prompt,
         marker: raw.marker,
         baseUrl: raw.baseUrl,

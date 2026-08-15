@@ -114,6 +114,11 @@ export interface VisionFallbackSettings {
     readonly anonymous: boolean;
     readonly timeoutMs: number;
 }
+/** One user-selected DSH provider/model pair in the harness transcription pool. */
+export interface VisionHarnessModelSettings {
+    readonly provider: string;
+    readonly model: string;
+}
 /** Resolved vision settings (every field has a default). */
 export interface VisionSettings {
     readonly enabled: boolean;
@@ -122,11 +127,19 @@ export interface VisionSettings {
     readonly marker: string;
     readonly provider: string;
     readonly model: string;
+    /**
+     * The user-selected DSH model pool (tried in saved order). When non-empty it
+     * REPLACES auto-detection; the pinned pair above still goes first.
+     */
+    readonly harnessModels: readonly VisionHarnessModelSettings[];
     readonly baseUrl: string;
     readonly apiKey: string;
     readonly apiKeyEnv: string;
     readonly endpointModel: string;
-    /** Saved candidate pool; `endpointModel` is chosen from it in the UI. */
+    /**
+     * The user-selected dedicated-endpoint model pool. Transcription tries
+     * `endpointModel` first (when set), then every pool member in saved order.
+     */
     readonly endpointModels: readonly string[];
     readonly anonymous: boolean;
     readonly timeoutMs: number;
@@ -146,6 +159,7 @@ export interface VisionConfigSource {
     readonly visionMarker?: string;
     readonly visionProvider?: string;
     readonly visionModel?: string;
+    readonly visionHarnessModels?: readonly VisionHarnessModelSettings[];
     readonly visionBaseUrl?: string;
     readonly visionApiKey?: string;
     readonly visionApiKeyEnv?: string;
@@ -169,6 +183,7 @@ export interface VisionSettingsValue {
     readonly patchAdmission: boolean;
     readonly provider: string;
     readonly model: string;
+    readonly harnessModels: VisionHarnessModelSettings[];
     readonly prompt: string;
     readonly marker: string;
     readonly baseUrl: string;
@@ -296,8 +311,10 @@ export declare class VisionTranscriber {
         changed: boolean;
     }>;
     /**
-     * Vision models from DSH-configured providers: the pinned `visionProvider` /
-     * `visionModel` first, then every listed model that declares image input.
+     * Vision models from DSH-configured providers, in transcription order:
+     * the pinned `visionProvider`/`visionModel` first, then the user-selected
+     * `harnessModels` pool (which, when non-empty, REPLACES auto-detection), and
+     * only with no pool the automatic scan of image-capable models.
      */
     harnessCandidates(): Promise<Array<{
         provider: string;
@@ -313,7 +330,11 @@ export declare class VisionTranscriber {
     private describeFresh;
     /** One `llm.stream` description through a DSH-configured vision model. */
     private streamHarness;
-    /** Ordered endpoint attempts: local Ollama, main endpoint, fallbacks. */
+    /**
+     * Ordered endpoint attempts: local Ollama, then the dedicated endpoint's
+     * user-selected model POOL (`endpointModel` first when set, then every saved
+     * `endpointModels` member), then the static fallback chain.
+     */
     private endpointAttempts;
     /** Read the image bytes once, then hit the content-hash cache. */
     private transcribeEndpoint;
