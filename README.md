@@ -42,7 +42,7 @@ The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # recommended
 # or:
-# dsh plugin --profile web add ./dsh-web-enhanced-0.7.0.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.7.1.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -112,7 +112,7 @@ reinstalling from a packed tarball instead:
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.7.0.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.7.1.tgz
 ```
 
 On Windows, tarball installs need real symlink permission (pnpm's
@@ -130,7 +130,7 @@ Plugin-row `config` fields (all have defaults):
 | `balanceCacheTtlMs` | 60000 | Balance view cache duration |
 | `balanceBaseUrl` | `https://api.deepseek.com` | Balance endpoint base URL |
 | `balanceProviders` | `[deepseek-official]` | Model routes the balance line is shown for; a route with its own configured `baseURL` must also share the endpoint's host |
-| `skipDirs` | `[node_modules]` | Directories skipped by the file tree/search (`.git` is always skipped) |
+| `skipDirs` | `[node_modules]` | Directories skipped by the file tree/search and by the mention pickers (`.git` is always skipped; the browse overlay does not apply the filter) |
 | `readMaxBytes` | 1 MiB | Text read cap (truncated with a marker beyond it) |
 | `writeMaxBytes` | 2 MiB | File write cap |
 | `binaryMaxBytes` | 5 MiB | Binary preview (base64) cap |
@@ -169,7 +169,7 @@ Plugin-row `config` fields (all have defaults):
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + full tests + build (252 tests)
+pnpm run check   # typecheck + full tests + build (253 tests)
 ```
 
 Build outputs:
@@ -193,7 +193,7 @@ Prereqs: `dsh`/`pnpm` on PATH, and the main repo's web build output (playwright 
 
 - The workspace surface is a view tab, not a side-by-side column: it replaces the transcript while active rather than sitting next to it, and it owns no width or collapse of its own.
 - HTML inside Markdown renders through an allow list: `<table>` is read structurally and inline tags map to real elements, everything else keeps only its text. `<details>`, inline `style`, and custom elements are not reproduced.
-- The mention pickers' in-project list is one bounded pass of the host search (`searchMaxEntries`, 200 by default); the popup's own search filters that batch locally rather than re-querying per keystroke. Past that cap, and past the project boundary, is the first row's「Browse elsewhere…」.
+- The mention pickers' in-project list is one bounded pass of the host search (`searchMaxEntries`, 200 by default) and keeps the `skipDirs` filter (`node_modules` by default, `.git` always): dependency trees are the paths nobody references, and listing them would crowd the real project files out of the batch. The popup's own search filters that batch locally rather than re-querying per keystroke. Past that cap, past the project boundary, and into a skipped directory, the first row's「Browse elsewhere…」is the way — its walker applies no `skipDirs` filter.
 - The mention browser is an in-app file manager, not an operating-system dialog: the host's `host.pickDirectory` picks directories only and only under the `native` capability, and a browser's `<input type="file">` withholds absolute paths by design. On Windows the drive list comes from 26 concurrent `stat` probes (Node exposes no drive table without a native binding), so a disconnected network letter can cost a second or two; a UNC share not mapped to a letter (`\\server\share`) is not reachable yet.
 - Office preview is structural: docx headings/paragraphs/lists/tables and the first xlsx worksheet are rendered; inline styles (bold, colors), images, and multi-sheet workbooks are not. Legacy `.doc`/`.xls` binaries are not previewable.
 - Scheduled tasks are best-effort: 30s tick granularity; windows missed while the host is down are caught up once at startup, no backlog is kept.

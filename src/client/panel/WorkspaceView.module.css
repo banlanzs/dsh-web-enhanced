@@ -22,7 +22,7 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   padding: 4px 10px;
   opacity: 0.7;
 }
@@ -44,7 +44,7 @@
 
 .empty {
   margin: 24px auto;
-  font-size: 12px;
+  font-size: 13px;
   opacity: 0.7;
   text-align: center;
 }

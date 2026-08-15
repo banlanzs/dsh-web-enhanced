@@ -1,14 +1,18 @@
 .entry {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
   border: none;
   border-radius: 5px;
   background: transparent;
   color: inherit;
   cursor: pointer;
-  font-size: 12px;
+  font: inherit;
+  font-size: 13px;
   padding: 5px 8px;
   text-align: start;
 }
@@ -24,12 +28,35 @@
 .glyph {
   flex: none;
   width: 14px;
+  font-size: 14px;
   opacity: 0.8;
   text-align: center;
 }
 
 .label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Collapsed rail: the shell's settled rail has a 36px-wide content box and
+   renders our two footer actions side by side, so each entry takes exactly
+   half of it. The label is already unmounted by the component; this only owns
+   geometry — icon centered, no padding, no text room. The explicit 18px basis
+   (rather than flex-basis 0) is what keeps the shell's auto-width footer row
+   from collapsing to content width and clipping the glyphs. */
+.entry[data-wide='false'] {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 36px;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.entry[data-wide='false'] .glyph {
+  width: auto;
+  opacity: 0.9;
 }

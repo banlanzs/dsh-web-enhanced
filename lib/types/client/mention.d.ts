@@ -70,6 +70,12 @@ export declare function mentionOf(path: string): string;
  * keystroke. A workspace larger than that cap is visible only up to it — and
  * the browse row is the way past both that cap and the project boundary.
  *
+ * The listing deliberately keeps the search's default `skipDirs` filter
+ * (default `node_modules`): dependency trees are exactly the files nobody
+ * references from the composer, and letting them flood the bounded list would
+ * crowd out real project files. Files inside a skipped directory are still
+ * reachable through the browse row, whose walker applies no such filter.
+ *
  * A session with no project still gets the browse row: it has no listing to
  * offer, but nothing about it forbids naming a path.
  * @param deps - remote and workspace resolution.

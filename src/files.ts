@@ -88,7 +88,15 @@ export async function listDirectory(root: string, rel: string, limits: FsLimits)
   return out
 }
 
-/** Recursive basename search with bounded depth and result count. */
+/**
+ * Recursive basename search with bounded depth and result count.
+ *
+ * Skips `.git` and every configured `skipDirs` (default `node_modules`) in
+ * BOTH consumers — the file tree and the mention pickers. Dependency trees
+ * are the files a composer mention is least likely to name, and letting them
+ * flood a bounded list would crowd out the actual project files; the host-wide
+ * browse walker is the escape hatch for anything inside a skipped directory.
+ */
 export async function searchFiles(root: string, rel: string, query: string, limits: FsLimits): Promise<FsEntryView[]> {
   const needle = query.trim().toLowerCase()
   const out: FsEntryView[] = []

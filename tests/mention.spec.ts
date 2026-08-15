@@ -43,6 +43,15 @@ describe('mentionOptions', () => {
     ])
   })
 
+  it('uses the default skipDirs-aware search so vendor trees do not flood the window', async () => {
+    // node_modules & co are exactly the paths nobody mentions; including them
+    // would fill the bounded list and crowd out real project files. The browse
+    // row remains the escape hatch for anything inside a skipped directory.
+    const fsSearch = vi.fn(async () => ({ entries: [] }) as const)
+    await mentionOptions(deps({ remote: { fsSearch } as unknown as WebEnhancedRemote }), 'file', 's1')
+    expect(fsSearch).toHaveBeenCalledWith({ workspaceId: 'w1' })
+  })
+
   it('offers the browse row alone to a session that belongs to no project', async () => {
     // There is no project to list, but nothing about an ungrouped session
     // forbids naming a path.

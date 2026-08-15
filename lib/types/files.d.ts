@@ -32,7 +32,15 @@ export declare function resolveWithin(root: string, rel: string): string;
 export declare function compareFsEntries(left: FsEntryView, right: FsEntryView): number;
 /** One directory listing, skipping `.git` and the configured skip dirs. */
 export declare function listDirectory(root: string, rel: string, limits: FsLimits): Promise<FsEntryView[]>;
-/** Recursive basename search with bounded depth and result count. */
+/**
+ * Recursive basename search with bounded depth and result count.
+ *
+ * Skips `.git` and every configured `skipDirs` (default `node_modules`) in
+ * BOTH consumers — the file tree and the mention pickers. Dependency trees
+ * are the files a composer mention is least likely to name, and letting them
+ * flood a bounded list would crowd out the actual project files; the host-wide
+ * browse walker is the escape hatch for anything inside a skipped directory.
+ */
 export declare function searchFiles(root: string, rel: string, query: string, limits: FsLimits): Promise<FsEntryView[]>;
 /**
  * Read one file: text (capped, truncated flag) or binary (base64 when small

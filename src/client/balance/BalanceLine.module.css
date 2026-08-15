@@ -3,7 +3,7 @@
   align-items: center;
   gap: 8px;
   padding: 2px 12px;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.85;
 }
 
@@ -24,7 +24,7 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.8;
   padding: 0;
 }

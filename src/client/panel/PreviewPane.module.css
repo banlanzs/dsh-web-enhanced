@@ -33,7 +33,7 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   padding: 3px 6px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -49,7 +49,7 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 12px;
   opacity: 0.6;
   padding: 2px 4px;
 }
@@ -74,7 +74,7 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   padding: 2px 8px;
 }
 
@@ -92,14 +92,14 @@
 }
 
 .notice {
-  font-size: 10px;
+  font-size: 12px;
   opacity: 0.65;
 }
 
 .error {
   margin: 6px 8px;
   color: #d9534f;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .body {
@@ -125,7 +125,7 @@
   background: transparent;
   color: inherit;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   padding: 8px;
 }
@@ -141,7 +141,7 @@
   margin: 0;
   overflow: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   padding: 8px;
   white-space: pre-wrap;
@@ -157,7 +157,7 @@
 
 .empty {
   margin: 12px;
-  font-size: 12px;
+  font-size: 13px;
   opacity: 0.7;
 }
 
@@ -175,13 +175,13 @@
 }
 
 .markdown {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.65;
 }
 
-.markdown h1 { font-size: 20px; }
-.markdown h2 { font-size: 17px; }
-.markdown h3 { font-size: 15px; }
+.markdown h1 { font-size: 22px; }
+.markdown h2 { font-size: 19px; }
+.markdown h3 { font-size: 17px; }
 
 .markdown blockquote {
   margin: 8px 0;
@@ -193,7 +193,7 @@
 .inlineCode,
 .codeBlock {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .inlineCode {
@@ -211,7 +211,7 @@
 
 .table {
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
   width: 100%;
 }
 

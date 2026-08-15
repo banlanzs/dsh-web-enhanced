@@ -18,20 +18,20 @@
 }
 
 .title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .subtitle {
   margin-top: 3px;
-  font-size: 12px;
+  font-size: 13px;
   opacity: 0.55;
   overflow-wrap: anywhere;
 }
 
 .muted {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.7;
   opacity: 0.6;
 }
@@ -45,7 +45,7 @@
   color: inherit;
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   padding: 3px 10px;
   white-space: nowrap;
 }
@@ -108,26 +108,26 @@
 }
 
 .name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .version {
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.55;
 }
 
 .selfTag {
   border: 1px solid rgb(106 143 216 / 55%);
   border-radius: 3px;
-  font-size: 10px;
+  font-size: 12px;
   padding: 0 5px;
   opacity: 0.85;
 }
 
 .desc {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   opacity: 0.65;
   overflow-wrap: anywhere;
@@ -145,7 +145,7 @@
 .tagOn {
   border: 1px solid rgb(128 128 128 / 30%);
   border-radius: 3px;
-  font-size: 10px;
+  font-size: 12px;
   padding: 0 5px;
   opacity: 0.7;
 }
@@ -158,7 +158,7 @@
 
 .spec {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.6;
   overflow-wrap: anywhere;
 }
@@ -173,7 +173,7 @@
 .noteBad {
   border: 1px solid rgb(106 190 130 / 45%);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   padding: 8px 10px;
 }
@@ -184,7 +184,7 @@
 
 .output {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .output summary {
@@ -208,14 +208,14 @@
 }
 
 .templateTitle {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   opacity: 0.75;
 }
 
 .templateHint {
   margin-top: 3px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
   opacity: 0.5;
 }
@@ -236,7 +236,7 @@
 
 .confirmText {
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.7;
 }
 

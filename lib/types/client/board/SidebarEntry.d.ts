@@ -10,6 +10,6 @@ import type { WebEnhancedProps } from '../contract.ts';
 /** Full composed props of a sidebar footer entry. */
 export type SidebarEntryProps = WebEnhancedProps<'sidebar.footer.action'>;
 /** Task-board entry: toggles the board overlay. */
-export declare function BoardSidebarEntry({ useOverlay, openOverlay, closeOverlay, t }: SidebarEntryProps): import("react").JSX.Element;
+export declare function BoardSidebarEntry({ wide, useOverlay, openOverlay, closeOverlay, t }: SidebarEntryProps): import("react").JSX.Element;
 /** Git-graph entry: toggles the graph overlay. */
-export declare function GraphSidebarEntry({ useOverlay, openOverlay, closeOverlay, t }: SidebarEntryProps): import("react").JSX.Element;
+export declare function GraphSidebarEntry({ wide, useOverlay, openOverlay, closeOverlay, t }: SidebarEntryProps): import("react").JSX.Element;

@@ -17,7 +17,7 @@
   flex-direction: column;
   gap: 4px;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--dsw-alias-label-secondary, inherit);
 }
 
@@ -39,7 +39,7 @@
   border-radius: 4px;
   background: transparent;
   color: inherit;
-  font-size: 11px;
+  font-size: 12px;
   max-width: 220px;
   padding: 1px 5px;
 }
@@ -68,7 +68,7 @@
   color: inherit;
   cursor: pointer;
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   padding: 1px 8px;
 }
 
@@ -85,7 +85,7 @@
   max-height: 120px;
   overflow: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

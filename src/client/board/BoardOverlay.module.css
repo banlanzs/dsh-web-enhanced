@@ -5,7 +5,7 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   padding: 3px 10px;
 }
 
@@ -25,7 +25,7 @@
   border-radius: 5px;
   background: rgb(217 83 79 / 16%);
   color: #d9534f;
-  font-size: 12px;
+  font-size: 13px;
   padding: 6px 9px;
 }
 
@@ -45,7 +45,7 @@
 }
 
 .fieldLabel {
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.72;
 }
 
@@ -56,7 +56,7 @@
   background: transparent;
   color: inherit;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   padding: 4px 7px;
 }
 
@@ -65,7 +65,7 @@
 }
 
 .hint {
-  font-size: 10px;
+  font-size: 12px;
   opacity: 0.6;
 }
 
@@ -116,7 +116,7 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   opacity: 0.78;
   text-transform: uppercase;
@@ -125,7 +125,7 @@
 .count {
   border-radius: 8px;
   background: rgb(128 128 160 / 24%);
-  font-size: 10px;
+  font-size: 12px;
   padding: 0 6px;
 }
 
@@ -147,6 +147,6 @@
 .empty {
   flex: none;
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.55;
 }
