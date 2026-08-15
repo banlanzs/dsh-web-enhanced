@@ -19,7 +19,7 @@
 | **任务看板** | 侧边栏入口打开看板；任务按五列组织（待规划 / 待办 / 进行中 / 已完成 / 已失败）；卡片「执行」在宿主上开一个真实 DSH 智能体会话运行任务提示词，会话按部署的 agent preset 组合（因此拿得到 bash / read_file / write_file 等工具）并附着到任务绑定的项目上，完成后状态与结果自动回写；「查看会话」跳转到执行会话；**每张卡片带内联编辑表单**（title / prompt / cron / 状态列——done/failed 改回 planned/todo 即重开）；**「已完成」列的卡片默认折叠为一行标题**（点击展开），「已失败」不折叠，因为那一列的错误信息正是要看的东西；支持 5 字段 cron 定时（如 `0 23 * * *`），到期自动运行，宿主重启后补跑并恢复中断任务。 |
 | **Git 图谱** | 侧边栏入口打开图谱覆盖层；分支泳道 + 提交历史以 SVG 渲染（首父连续泳道 + 合并横向连线）；标题栏的分支下拉只筛选图谱显示的提交（全部分支 / 单分支），不切换仓库；点击任一提交展开详情：完整 hash、父提交、作者与邮箱、时间、提交正文，以及逐文件增删行数。**顶部另有「未提交的改动」一行**：空心虚线圆点画在 HEAD 所在泳道上并虚线连到 HEAD，展开后逐文件列出暂存 / 未暂存 / 未跟踪的增删行数（未跟踪文件的行数由宿主读文件数出，二进制或超限报 `—`）。输入框上方另有分支选择条——那是真正的 checkout，与图谱筛选是两回事；切换前若工作区不干净会先问一句，并分开报「已跟踪 / 未跟踪」的条数。 |
 | **工作区视图** | 会话顶部视图栏中的「工作区」标签页，与「对话」「轨迹」并列，内含文件 / 预览 / 变更三个面板。文件树支持整行展开、文件名搜索、点击打开预览；预览支持 markdown（含 GFM 表格、HTML 表格与行内 HTML）/ HTML（sandbox iframe）/ 代码 / **diff**（行级高亮 unified diff）/ CSV / 图片 / PDF / 文本 / **Office（docx/xlsx，宿主侧结构化转换）**，且支持**源码 / 分屏 / 预览**三态与保存；变更页基于真实 git status，支持 stage / unstage / discard 与逐文件 diff。当前面板与展开的目录按工作区持久化。 |
-| **文件 mention** | 输入框 `+` 菜单里的「引用文件」「引用文件夹」两项：先给出项目内条目的扁平列表（可本地过滤），第一行「浏览其他位置…」打开插件自带的文件浏览器，可走到**项目外的任意目录**（面包屑 / 上一级 / 主目录 / 按名过滤）。选中后把 `@路径` 插入草稿，含空格的路径自动加引号。 |
+| **文件 mention** | 输入框 `+` 菜单里的「引用文件」「引用文件夹」两项：项目内条目以**缩进目录视图**呈现（文件夹与文件都有，可本地过滤），文件选择器里点击文件夹行即**进入该文件夹**——打开插件自带的文件浏览器并定位到该目录；浏览器按文件资源管理器方式工作（面包屑 / 上一级 / 主目录 / 逐层列表 / 按名过滤，点文件夹进入、点文件选中）。第一行在项目根目录打开同一个浏览器，也可以走到**项目外**。选中文件后把 `@路径` 插入草稿，含空格的路径自动加引号。 |
 | **余额显示** | 输入框下方显示 DeepSeek API 余额（`GET /user/balance`），带刷新与弱化错误态。**仅在当前会话的模型路由确实指向该余额所属账户时显示**——切到别家渠道（或把 deepseek-official 改指到自建网关）后整行隐藏，因为那时的数字说的是另一个账户。 |
 | **设置页 + 插件管理** | 设置面板左侧多一行「Web 增强」（注册到 `settings.section`）。页内的**插件管理**列出当前 profile 装了哪些插件（名称、版本、依赖 spec、是否已启用为层），可**更新**或**移除**。列的是 profile `package.json` 的 `dependencies`——那才是 pnpm 能操作的集合；模板层（`@deepseek-ai/dsh-base` 等）单独列出且不给按钮，因为没有任何依赖提供它们。**只看得到启动时所用的那个 profile**（`dsh --profile web` 就只列 web 的依赖），profile 名与路径印在标题下。**所有操作都在下次启动才生效**（层栈在启动时组合），界面照直说明；移除本插件自己不被阻止，但确认框会说清代价。 |
 
@@ -42,7 +42,7 @@
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # 推荐
 # 或：
-# dsh plugin --profile web add ./dsh-web-enhanced-0.7.1.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.7.2.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -111,7 +111,7 @@ host 能力失效）。改用打包重装来迭代：
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.7.1.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.7.2.tgz
 ```
 
 Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPackage` 步骤）。
@@ -158,7 +158,7 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + 全部测试 + 构建（254 个测试）
+pnpm run check   # typecheck + 全部测试 + 构建（256 个测试）
 ```
 
 构建产物：

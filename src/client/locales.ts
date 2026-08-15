@@ -70,10 +70,10 @@ export const zh = {
   'graph.working.unknown': '行数未知（二进制或超过读取上限）',
 
   'mention.file': '引用文件',
-  'mention.fileDescription': '选择文件，把路径插入输入框',
+  'mention.fileDescription': '选择文件，或进入文件夹浏览；选中的文件路径插入输入框',
   'mention.folder': '引用文件夹',
   'mention.folderDescription': '选择文件夹，把路径插入输入框',
-  'mention.browse': '📁 浏览其他位置…（项目外）',
+  'mention.browse': '📁 打开文件浏览器…（点击文件夹进入）',
   'mention.empty': '没有匹配的条目',
   'mention.error': '读取工作区失败：{message}',
 
@@ -238,10 +238,10 @@ export const en: Record<keyof typeof zh, string> = {
   'graph.working.unknown': 'Line count unknown (binary, or over the read cap)',
 
   'mention.file': 'Mention file',
-  'mention.fileDescription': 'Pick a file and insert its path into the composer',
+  'mention.fileDescription': 'Pick a file, or enter a folder to browse; the picked path goes into the composer',
   'mention.folder': 'Mention folder',
   'mention.folderDescription': 'Pick a folder and insert its path into the composer',
-  'mention.browse': '📁 Browse elsewhere… (outside the project)',
+  'mention.browse': '📁 Open file browser… (click folders to enter)',
   'mention.empty': 'No matching entries',
   'mention.error': 'Could not read the workspace: {message}',
 

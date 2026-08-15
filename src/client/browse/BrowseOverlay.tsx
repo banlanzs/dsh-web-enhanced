@@ -54,6 +54,7 @@ export function BrowseOverlay({ useBrowse, remote, closeBrowse, appendMention, t
   const open = useBrowse(state => state.open)
   const kind = useBrowse(state => state.kind)
   const sessionId = useBrowse(state => state.sessionId)
+  const startPath = useBrowse(state => state.startPath)
 
   const [path, setPath] = useState<string | undefined>(undefined)
   const [level, setLevel] = useState<Level>({ phase: 'loading' })
@@ -72,14 +73,14 @@ export function BrowseOverlay({ useBrowse, remote, closeBrowse, appendMention, t
     setLevel({ phase: 'ready', value: result })
   }, [remote])
 
-  // Each opening starts at the host home again: the browser is a one-shot
-  // gesture, and resuming somewhere the user has forgotten is worse than a
-  // known starting point.
+  // Each opening is a one-shot gesture: the mention picker names where to
+  // start (workspace root, or a folder entered from the picker), and without
+  // one the browser falls back to the host home.
   useEffect(() => {
     if (!open) return
-    setPath(undefined)
+    setPath(startPath)
     setQuery('')
-  }, [open])
+  }, [open, startPath])
 
   useEffect(() => {
     if (open) void load(path)

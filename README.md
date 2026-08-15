@@ -19,7 +19,7 @@ Developed and built independently of the deepseek-harness repo — the plugin on
 | **Task board** | Sidebar entry opens a board with five columns (Planned / To do / Running / Done / Failed). 「Run」opens a real DSH agent session that executes the task prompt — composed from the deployment's agent preset (so it has bash / read_file / write_file) and attached to the task's project — and the status and result write back automatically when it finishes. 「View session」jumps to the execution session. **Each card has an inline edit form** (title / prompt / cron / column — done or failed tasks reopen via planned/todo). **A card in the Done column starts collapsed to a single title line** (click to expand); Failed does not collapse, because that column's message is the thing you came to read. Supports 5-field cron scheduling (e.g. `0 23 * * *`): runs automatically at the due time, catches up after a host restart, and recovers interrupted runs. |
 | **Git graph** | Sidebar entry opens a graph overlay; branch lanes + commit history rendered as SVG (first-parent continuous lanes + horizontal merge links). The header's branch dropdown filters which commits the graph DRAWS (all branches, or one) and changes nothing in the repository; clicking a commit expands its full hash, parents, author and email, date, message body, and per-file added/removed line counts. **An「Uncommitted changes」row sits on HEAD**: a hollow dashed dot on HEAD's own lane, joined to it by a dashed stub, expanding to the staged / unstaged / untracked files with their added and removed line counts (an untracked file's count comes from reading it on the host; binary or over-cap files report `—`). The branch strip above the composer is the other operation — it checks a branch out, and asks first when the work tree is dirty, counting tracked and untracked entries apart. |
 | **Workspace view** | A **Workspace** tab in the conversation's view ring, beside Chat and Trajectory, with three panes (Files / Preview / Changes). The file tree expands, searches by name, and opens files in preview; preview supports markdown (GFM tables, HTML tables, and inline HTML) / HTML (sandboxed iframe) / code / **diff** (line-highlighted unified diff) / CSV / images / PDF / text / **Office docx & xlsx** (host-side structural conversion) with source / **split** (editor + preview side by side) / view modes and save. The Changes pane is backed by real `git status` with stage / unstage / discard and per-file diffs. The active pane and the open directories persist per workspace. |
-| **File mentions** | 「Mention file」and「Mention folder」in the composer's `+` menu: a flat, locally filterable list of the project's entries, with a first row「Browse elsewhere…」that opens the plugin's own file browser and walks **any directory outside the project** (breadcrumbs / parent / home / filter by name). Picking one inserts its `@path` into the draft (paths with spaces are quoted). |
+| **File mentions** | 「Mention file」and「Mention folder」in the composer's `+` menu: an indented project directory view (folders and files, locally filterable) whose folder rows **enter that folder** — they open the plugin's own file browser at it, which works like a file manager (breadcrumbs / parent / home / per-level listing / filter by name; a file click picks, a folder click enters). The first row opens the same browser at the project root, and it can also walk **outside the project**. Picking a file inserts its `@path` into the draft (paths with spaces are quoted). |
 | **Balance line** | Shows the DeepSeek API balance (`GET /user/balance`) below the composer, with a refresh button and a muted error state. **Only while the session's model route actually bills that account** — switching to another channel (or repointing `deepseek-official` at a private gateway) hides the whole line, because the number would then be about somebody else's account. |
 | **Settings page + plugin management** | One more row in the Settings nav, "Web Enhanced" (registered into `settings.section`). Its **Plugins** tab lists what the current profile has installed — name, version, dependency spec, whether it is an active layer — and offers **Update** and **Remove**. What it lists is the profile `package.json`'s `dependencies`, because that is the set pnpm can act on; template layers (`@deepseek-ai/dsh-base` and friends) are shown apart with no buttons, since no dependency provides them. **Only the profile this host started with is visible** (`dsh --profile web` lists web's dependencies and nothing else); the profile name and path are printed under the title. **Every operation takes effect on the next start** (the layer stack is composed at boot) and the UI says so. Removing this plugin itself is not blocked — the confirmation just spells out what it costs. |
 
@@ -42,7 +42,7 @@ The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # recommended
 # or:
-# dsh plugin --profile web add ./dsh-web-enhanced-0.7.1.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.7.2.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -112,7 +112,7 @@ reinstalling from a packed tarball instead:
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.7.1.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.7.2.tgz
 ```
 
 On Windows, tarball installs need real symlink permission (pnpm's
@@ -169,7 +169,7 @@ Plugin-row `config` fields (all have defaults):
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + full tests + build (254 tests)
+pnpm run check   # typecheck + full tests + build (256 tests)
 ```
 
 Build outputs:

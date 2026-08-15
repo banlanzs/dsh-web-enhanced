@@ -67,10 +67,10 @@ export declare const zh: {
     readonly 'graph.working.truncated': "文件过多，仅显示前 {count} 个";
     readonly 'graph.working.unknown': "行数未知（二进制或超过读取上限）";
     readonly 'mention.file': "引用文件";
-    readonly 'mention.fileDescription': "选择文件，把路径插入输入框";
+    readonly 'mention.fileDescription': "选择文件，或进入文件夹浏览；选中的文件路径插入输入框";
     readonly 'mention.folder': "引用文件夹";
     readonly 'mention.folderDescription': "选择文件夹，把路径插入输入框";
-    readonly 'mention.browse': "📁 浏览其他位置…（项目外）";
+    readonly 'mention.browse': "📁 打开文件浏览器…（点击文件夹进入）";
     readonly 'mention.empty': "没有匹配的条目";
     readonly 'mention.error': "读取工作区失败：{message}";
     readonly 'browse.titleFile': "选择文件";

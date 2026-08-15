@@ -84,6 +84,12 @@ export interface BrowseState {
     readonly kind: 'file' | 'dir';
     /** Session whose composer receives the mention. */
     readonly sessionId: string;
+    /**
+     * Directory the browser opens at; undefined starts at the host home.
+     * The mention pickers set this to the workspace root (or a folder the user
+     * entered from the picker) so the explorer opens in-project.
+     */
+    readonly startPath?: string;
 }
 /** Browser actions handed to components through their inject face. */
 export interface BrowseActions {
@@ -91,8 +97,9 @@ export interface BrowseActions {
      * Open the browser for one session's composer.
      * @param kind - whether files or folders may be chosen.
      * @param sessionId - the session whose draft receives the mention.
+     * @param startPath - directory to start at; omitted starts at the host home.
      */
-    readonly openBrowse: (kind: 'file' | 'dir', sessionId: string) => void;
+    readonly openBrowse: (kind: 'file' | 'dir', sessionId: string, startPath?: string) => void;
     /** Close the browser; a no-op when it is already closed. */
     readonly closeBrowse: () => void;
 }

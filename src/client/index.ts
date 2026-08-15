@@ -115,20 +115,26 @@ function appendMentionTo(ctx: ClientContext, sessionId: string, text: string): v
  * this plugin does not depend on one.
  * @param ctx - client root context.
  * @param remote - the envelope-free host facade.
- * @param openBrowse - opener of the host-wide browser (the out-of-project path).
+ * @param openBrowse - opener of the file-browser overlay (project root, a
+ *   folder entered from the picker, or the host home for ungrouped sessions).
  * @returns the disposer.
  */
 function registerMentionCommands(
   ctx: ClientContext,
   remote: WebEnhancedRemote,
-  openBrowse: (kind: MentionKind, sessionId: string) => void,
+  openBrowse: (kind: MentionKind, sessionId: string, startPath?: string) => void,
 ): () => void {
   const commandUi = ctx.get('commandUi' as never) as unknown as CommandUiFace | undefined
   if (commandUi === undefined) return () => {}
   const t = ctx.locale.bind(NS)
   const deps: MentionDeps = {
     remote,
-    workspaceOf: sessionId => workspaceOfSessionId(sessionId, ctx.workspaces.list.getSnapshot())?.workspaceId,
+    workspaceOf: (sessionId) => {
+      const workspace = workspaceOfSessionId(sessionId, ctx.workspaces.list.getSnapshot())
+      return workspace === undefined
+        ? undefined
+        : { workspaceId: String(workspace.workspaceId), path: workspace.path }
+    },
     appendDraft: (sessionId, text) => { appendMentionTo(ctx, sessionId, text) },
     openBrowse,
     browseLabel: () => t('mention.browse'),
@@ -143,7 +149,7 @@ function registerMentionCommands(
       ui: {
         kind: 'popupSelect',
         options: session => mentionOptions(deps, kind, String(session.sessionId)),
-        onSelect: (option, session) => { applyMention(deps, kind, String(session.sessionId), option.id) },
+        onSelect: (option, session) => { applyMention(deps, kind, String(session.sessionId), option) },
       },
     })
   const disposers = [

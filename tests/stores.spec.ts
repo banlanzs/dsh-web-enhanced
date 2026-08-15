@@ -82,13 +82,15 @@ describe('overlay', () => {
 })
 
 describe('mention browser', () => {
-  it('remembers which session and kind opened it, and closes idempotently', () => {
+  it('remembers which session, kind, and starting directory opened it, and closes idempotently', () => {
     // The browser is root-scoped but writes into ONE session's composer, so
     // the opening session has to ride the state.
     const { cell, actions } = createBrowse()
     expect(cell.getSnapshot().open).toBe(false)
     actions.openBrowse('dir', 's1')
     expect(cell.getSnapshot()).toEqual({ open: true, kind: 'dir', sessionId: 's1' })
+    actions.openBrowse('file', 's2', '/proj/src')
+    expect(cell.getSnapshot()).toEqual({ open: true, kind: 'file', sessionId: 's2', startPath: '/proj/src' })
     actions.openBrowse('file', 's2')
     expect(cell.getSnapshot()).toEqual({ open: true, kind: 'file', sessionId: 's2' })
     actions.closeBrowse()
