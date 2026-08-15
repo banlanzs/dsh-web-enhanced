@@ -21,7 +21,7 @@ Developed and built independently of the deepseek-harness repo — the plugin on
 | **Workspace view** | A **Workspace** tab in the conversation's view ring, beside Chat and Trajectory, with five panes (Files / Preview / Changes / **Task Board** / **Git Graph**). The file tree expands, searches by name, and opens files in preview; preview supports markdown (GFM tables, HTML tables, and inline HTML) / HTML (sandboxed iframe) / code / **diff** (line-highlighted unified diff) / CSV / images / PDF / text / **Office docx & xlsx** (host-side structural conversion) with source / **split** (editor + preview side by side) / view modes and save. The Changes pane is backed by real `git status` with stage / unstage / discard and per-file diffs. The active pane and the open directories persist per workspace. |
 | **File mentions** | 「Mention file」and「Mention folder」in the composer's `+` menu: an indented project directory view (folders and files, locally filterable) whose folder rows **enter that folder** — they open the plugin's own file browser at it, which works like a file manager (breadcrumbs / parent / home / per-level listing / filter by name; a file click picks, a folder click enters). The first row opens the same browser at the project root, and it can also walk **outside the project**. Picking a file inserts its `@path` into the draft (paths with spaces are quoted). |
 | **Balance line** | Shows the DeepSeek API balance (`GET /user/balance`) below the composer, with a refresh button, a muted error state, and **an estimated cost of the current session's billed tokens** (prices fetched from models.dev, USD per million tokens). **Only while the session's model route actually bills that account** — switching to another channel (or repointing `deepseek-official` at a private gateway) hides the balance part, because the number would then be about somebody else's account; the cost part appears only when models.dev has a price for the exact provider/model selection. |
-| **Image understanding** | Transparent image support for text-only models, built in (supersedes `DSH-vision`). Sending an image to a text-only model passes the「model does not support images」gate and the `read_image` tool gate; the transcript keeps the image (the UI shows it exactly like on a multimodal route) while the model sees a `[图片内容描述]` text transcription; multimodal models are detected through the REAL pre-patch resolver and pass through untouched, so no token is spent describing images they can see. The transcription source order is: DSH-configured multimodal models (auto-detected, zero extra keys) → local Ollama (auto-detected) → a configured OpenAI-compatible endpoint with an ordered `visionFallbackModels` chain, content-hash cache, classified errors, anonymous-endpoint timeout caps, and cooldowns. A **Vision** tab on the Settings page shows the live state (admission patch, discovered models, endpoint/Ollama/key source, last failure). Configure it on the plugin row (`vision*` keys); it is on by default. |
+| **Image understanding** | Transparent image support for text-only models, built in (supersedes `DSH-vision`). Sending an image to a text-only model passes the「model does not support images」gate and the `read_image` tool gate; the transcript keeps the image (the UI shows it exactly like on a multimodal route) while the model sees a `[图片内容描述]` text transcription; multimodal models are detected through the REAL pre-patch resolver and pass through untouched, so no token is spent describing images they can see. The transcription source order is: DSH-configured multimodal models (auto-detect, or pick one in Settings) → local Ollama (auto-detected) → a **dedicated transcription API** configured in Settings (OpenAI-compatible, never registered into DSH channels) with an ordered `visionFallbackModels` chain, content-hash cache, classified errors, anonymous-endpoint timeout caps, and cooldowns. **The Vision tab in Settings → Web Enhanced is a full configuration form** (switches, a DSH provider/model picker filtered to image-capable models, dedicated endpoint + key, Ollama, prompt/marker) whose saves apply immediately through a settings namespace — the static `vision*` keys in `cordis.patch.yml` remain as the base layer. |
 | **Settings page + plugin management** | One more row in the Settings nav, "Web Enhanced" (registered into `settings.section`). Its **Plugins** tab lists what the current profile has installed — name, version, dependency spec, whether it is an active layer — and offers **Update** and **Remove**. What it lists is the profile `package.json`'s `dependencies`, because that is the set pnpm can act on; template layers (`@deepseek-ai/dsh-base` and friends) are shown apart with no buttons, since no dependency provides them. **Only the profile this host started with is visible** (`dsh --profile web` lists web's dependencies and nothing else); the profile name and path are printed under the title. **Every operation takes effect on the next start** (the layer stack is composed at boot) and the UI says so. Removing this plugin itself is not blocked — the confirmation just spells out what it costs. |
 
 ## Screenshots
@@ -43,7 +43,7 @@ The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # recommended
 # or:
-# dsh plugin --profile web add ./dsh-web-enhanced-0.9.0.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.10.0.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -113,7 +113,7 @@ reinstalling from a packed tarball instead:
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.9.0.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.10.0.tgz
 ```
 
 On Windows, tarball installs need real symlink permission (pnpm's
@@ -122,7 +122,7 @@ Developer Mode or install from the git URL, which does not take that path.
 
 ## Configuration
 
-Plugin-row `config` fields (all have defaults):
+Plugin-row `config` fields (all have defaults; the `vision*` ones can also be edited live in Settings → Web Enhanced → Vision, whose saves override these base values):
 
 | key | default | meaning |
 |---|---|---|
@@ -185,11 +185,11 @@ Plugin-row `config` fields (all have defaults):
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + full tests + build (287 tests)
+pnpm run check   # typecheck + full tests + build (293 tests)
 ```
 
 Build outputs:
-- `lib/index.js` — node half: the `web-enhanced` function plugin (mounts the `WebEnhancedGateway` Typert service: task*/git*/fs*/balanceGet/pricingGet/visionStatus + cron scheduler + restart recovery, and the `VisionInterceptor` image-understanding service)
+- `lib/index.js` — node half: the `web-enhanced` function plugin (mounts the `WebEnhancedGateway` Typert service: task*/git*/fs*/balanceGet/pricingGet/visionStatus/visionConfigGet/visionConfigSet + cron scheduler + restart recovery, and the `VisionInterceptor` image-understanding service with its settings namespace)
 - `lib/client.js` — browser half: module-loader closure format (`window.__ModuleLoader__.load`), declared by the `dsh.client` manifest
 - `cordis.patch.yml` — bundle patch: inserts the `web-enhanced` row (one row carries both the node and browser halves)
 
@@ -220,7 +220,7 @@ Prereqs: `dsh`/`pnpm` on PATH, and the main repo's web build output (playwright 
 - Plugin management does **not** reload the running process: Cordis composes the layer stack at boot, so an update or removal describes the next start. For the same reason it offers no enable/disable — that edits the profile's `cordis.patch.yml`, a different thing from installing.
 - Plugin management sees **only the profile this host started with**: `dsh --profile web` lists `~/.dsh/profiles/web`'s dependencies, and a plugin installed into another profile does not appear. The profile directory is pnpm's working directory, and acting across profiles would run pnpm in a directory whose layer stack is not the one composed right now. To manage another profile, start with it — or use `dsh plugin --profile <name>`.
 - Plugin management needs `pnpm` on PATH and the profile directory on this module's ancestor chain (true of any normal install; a source checkout or a test reports "nothing to manage" rather than an error). One pnpm operation runs at a time — a second request is told so rather than queued.
-- Image understanding needs at least one transcription source — a DSH-configured multimodal model, a local Ollama, or a `visionBaseUrl` endpoint. With none, images to text-only models are replaced by a placeholder description instead of crashing the turn, and the Vision tab shows why. Transcription quality is the chosen vision model's ceiling, not a plugin guarantee.
+- Image understanding needs at least one transcription source — a DSH-configured multimodal model, a local Ollama, or the dedicated endpoint. With none, images to text-only models are replaced by a placeholder description instead of crashing the turn, and the Vision tab shows why. The same tab configures all three sources, and saves apply immediately (the static `vision*` keys stay as the base layer). Transcription quality is the chosen vision model's ceiling, not a plugin guarantee.
 - Endpoint transcription sends image bytes (base64, HTTPS) to the configured VLM endpoint; they leave the machine unless the endpoint is local (Ollama). Only the in-process content-hash cache is kept — nothing else is stored. The harness-model path re-identifies an image within one step but does not cache across turns; the endpoint path does cache across turns by image content.
 - Do not install `DSH-vision` (`dsh-image-vision`) alongside this plugin: both would patch admission and both would transcribe the same image. This plugin's admission wrapper is unload-order safe itself, but `DSH-vision`'s teardown restores whatever IT captured and can still clobber a wrapper installed after it.
 - Large-image downscaling (the optional `sharp` step `dsh-vision-proxy` has) is not bundled; endpoints receive the original bytes. `visionMaxTokens` caps the transcription output either way.

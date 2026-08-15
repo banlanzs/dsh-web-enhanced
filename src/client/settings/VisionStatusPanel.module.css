@@ -6,25 +6,124 @@
   min-height: 0;
 }
 
-.toolbar {
+.form {
   display: flex;
-  flex: none;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.refresh {
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid rgb(128 128 128 / 18%);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sectionHint,
+.fieldHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.6;
+}
+
+.checks,
+.grid {
+  display: grid;
+  gap: 10px 16px;
+}
+
+.grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.input,
+.textarea {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid rgb(128 128 128 / 28%);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 9px;
+}
+
+.textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.keyRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.minorButton {
+  flex: none;
   border: 1px solid rgb(128 128 128 / 28%);
   border-radius: 6px;
   background: transparent;
   color: inherit;
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
-  padding: 5px 12px;
+  font-size: 12px;
+  padding: 5px 10px;
 }
 
-.refresh:hover {
+.minorButton:hover {
   background: rgb(128 128 128 / 8%);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.save {
+  border: none;
+  border-radius: 6px;
+  background: var(--dsw-alias-button-primary-fill, rgb(84 122 198));
+  color: var(--dsw-alias-label-primary-foreground, #fff);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 18px;
+}
+
+.save:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.saved {
+  font-size: 13px;
+  color: var(--dsw-alias-state-success-primary, rgb(90 200 120));
 }
 
 .card {
@@ -95,17 +194,12 @@
 }
 
 .note,
-.error,
 .warn,
 .hint,
 .failure {
   margin: 0;
   font-size: 13px;
   line-height: 1.7;
-}
-
-.error {
-  color: var(--dsw-alias-state-danger-primary, rgb(230 90 90));
 }
 
 .warn {

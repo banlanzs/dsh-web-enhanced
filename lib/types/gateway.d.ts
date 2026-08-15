@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionStatusResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionStatusResult } from './types.ts';
 /** One fallback vision endpoint entry, as declared in plugin config. */
 export interface VisionFallbackConfig {
     model: string;
@@ -106,6 +106,17 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
      * integration reports that state instead of throwing.
      */
     visionStatus(): Promise<VisionStatusResult>;
+    /**
+     * The editable vision configuration plus the picker options and the live
+     * status, all in one read. The API key is never returned.
+     */
+    visionConfigGet(): Promise<VisionConfigGetResult>;
+    /**
+     * Save one vision-config patch into the settings namespace. The namespace
+     * owner (`VisionInterceptor`) watches the commit and reconfigures live, so
+     * no restart is needed; `expectedRevision` gives the save CAS semantics.
+     */
+    visionConfigSet(request: VisionConfigSaveRequest): Promise<VisionConfigSetResult>;
     /** Local branches; the current branch carries the flag. */
     gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>;
     /** Recent commits with branch markers; one branch when the graph filters. */
@@ -162,6 +173,12 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     pluginRemove(request: PluginMutateRequest): Promise<PluginMutateResult>;
     /** Update one plugin to its spec's head (takes effect on the next start). */
     pluginUpdate(request: PluginMutateRequest): Promise<PluginMutateResult>;
+    /** The settings provider the vision config remotes read and write. */
+    private visionSettings;
+    /** The live integration status, or the explicit unmounted state. */
+    private visionStatusView;
+    /** Providers and models for the Vision tab, from the model picker's source. */
+    private visionProviderOptions;
     /**
      * Whether the balance describes the account one model route bills.
      *

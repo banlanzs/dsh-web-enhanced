@@ -515,3 +515,89 @@ export interface VisionStatusView {
 export type VisionStatusResult = VisionStatusView | {
     readonly error: ApiError;
 };
+/** One model a DSH provider offers, with its advertised image capability. */
+export interface VisionModelOptionView {
+    readonly id: string;
+    readonly name: string;
+    readonly supportsImage: boolean;
+}
+/** One DSH provider route and its model list (the model-picker data source). */
+export interface VisionProviderOptionView {
+    readonly provider: string;
+    readonly name: string;
+    readonly models: readonly VisionModelOptionView[];
+}
+/**
+ * The user-editable vision configuration, as the Settings tab renders it.
+ * `apiKey` is never returned — only whether one is set.
+ */
+export interface VisionConfigView {
+    /** Whether the settings namespace is registered in this deployment. */
+    readonly managed: boolean;
+    readonly writable: boolean;
+    /** CAS revision; send it back with the next save. */
+    readonly revision: number | null;
+    readonly enabled: boolean;
+    readonly patchAdmission: boolean;
+    /** Empty = auto-detect DSH vision models. */
+    readonly provider: string;
+    readonly model: string;
+    readonly prompt: string;
+    readonly marker: string;
+    /** Dedicated transcription endpoint (never touches DSH channels). */
+    readonly baseUrl: string;
+    readonly apiKeySet: boolean;
+    readonly apiKeyEnv: string;
+    readonly endpointModel: string;
+    readonly anonymous: boolean;
+    readonly timeoutMs: number;
+    readonly maxTokens: number;
+    readonly autoLocalOllama: boolean;
+    readonly localOllamaModel: string;
+    readonly localOllamaUrl: string;
+    /** Advanced fallback entries; configured statically / in settings.yaml. */
+    readonly fallbackCount: number;
+    readonly cacheLimit: number;
+    readonly cooldownMs: number;
+    /** DSH providers and models, the same directory the model picker uses. */
+    readonly providers: readonly VisionProviderOptionView[];
+    /** Live integration state, in the same shape `visionStatus` returns. */
+    readonly status: VisionStatusView;
+}
+export type VisionConfigGetResult = VisionConfigView | {
+    readonly error: ApiError;
+};
+/** Fields the Settings tab may edit; everything else is read-only there. */
+export interface VisionConfigPatch {
+    enabled?: boolean;
+    patchAdmission?: boolean;
+    provider?: string;
+    model?: string;
+    prompt?: string;
+    marker?: string;
+    baseUrl?: string;
+    /** Present only when the user typed a new key; omitted keeps the old one. */
+    apiKey?: string;
+    endpointModel?: string;
+    anonymous?: boolean;
+    timeoutMs?: number;
+    maxTokens?: number;
+    autoLocalOllama?: boolean;
+    localOllamaModel?: string;
+    localOllamaUrl?: string;
+    cacheLimit?: number;
+    cooldownMs?: number;
+}
+/** One settings save, carrying the revision the form loaded. */
+export interface VisionConfigSaveRequest {
+    readonly patch: VisionConfigPatch;
+    readonly expectedRevision?: number;
+}
+/** Successful save; `revision` is the new CAS value. */
+export interface VisionConfigSaveView {
+    readonly ok: true;
+    readonly revision: number;
+}
+export type VisionConfigSetResult = VisionConfigSaveView | {
+    readonly error: ApiError;
+};

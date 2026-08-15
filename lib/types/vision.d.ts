@@ -30,12 +30,22 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import { Service } from '@deepseek-ai/cordis';
+import z from '@deepseek-ai/schemastery';
 import type { VisionFallbackConfig } from './gateway.ts';
 import type { VisionStatusView } from './types.ts';
 /** Default description prompt: thorough Chinese transcription + scene detail. */
 export declare const DEFAULT_VISION_PROMPT = "\u8BF7\u4ED4\u7EC6\u89C2\u5BDF\u8FD9\u5F20\u56FE\u7247\u5E76\u8BE6\u7EC6\u63CF\u8FF0\u5176\u5185\u5BB9\uFF0C\u5305\u62EC\uFF1A\u6240\u6709\u53EF\u89C1\u7684\u6587\u5B57\uFF08\u8BF7\u9010\u5B57\u8F6C\u5F55\uFF09\u3001\u7269\u4F53\u3001\u4EBA\u7269\u3001\u573A\u666F\u3001\u5E03\u5C40\u3001\u989C\u8272\u4EE5\u53CA\u4EFB\u4F55\u503C\u5F97\u6CE8\u610F\u7684\u7EC6\u8282\u3002\u8BF7\u7528\u4E2D\u6587\u56DE\u7B54\u3002";
 /** Marker the model sees instead of the image block. */
 export declare const DEFAULT_VISION_MARKER = "[\u56FE\u7247\u5185\u5BB9\u63CF\u8FF0]";
+/**
+ * Settings namespace carrying the user-editable vision configuration.
+ *
+ * The static `vision*` plugin config is the composition `base` layer; what the
+ * Settings → Web Enhanced → Vision tab saves becomes the user layer and wins.
+ * The namespace is owned by this plugin's own gateway/UI (not the host settings
+ * whitelist), so no api-proxy patch is needed.
+ */
+export declare const VISION_SETTINGS_NS = "dsh-web-enhanced-vision";
 /** Durable image reference face (see `@deepseek-ai/dsh-attachment`). */
 export interface ImageRefFace {
     readonly attachmentId?: string;
@@ -150,6 +160,49 @@ export interface VisionConfigSource {
 }
 /** Field-wise defaults for the vision subset of the plugin config. */
 export declare function resolveVisionSettings(config: VisionConfigSource): VisionSettings;
+/** The settings-namespace shape (camelCase; the static config is its base). */
+export interface VisionSettingsValue {
+    readonly enabled: boolean;
+    readonly patchAdmission: boolean;
+    readonly provider: string;
+    readonly model: string;
+    readonly prompt: string;
+    readonly marker: string;
+    readonly baseUrl: string;
+    readonly apiKey: string;
+    readonly apiKeyEnv: string;
+    readonly endpointModel: string;
+    readonly anonymous: boolean;
+    readonly timeoutMs: number;
+    readonly maxTokens: number;
+    readonly autoLocalOllama: boolean;
+    readonly localOllamaModel: string;
+    readonly localOllamaUrl: string;
+    readonly fallbackModels: VisionFallbackConfig[];
+    readonly cacheLimit: number;
+    readonly cooldownMs: number;
+}
+/** Schema of the `dsh-web-enhanced-vision` settings namespace. */
+export declare const VisionSettingsSchema: z<VisionSettingsValue>;
+/**
+ * The composition `base` layer: only fields the STATIC plugin config actually
+ * set, so unset keys keep the schema defaults until the UI writes them.
+ */
+export declare function staticVisionSettingsBase(config: VisionConfigSource): Partial<VisionSettingsValue>;
+/** Map a resolved settings-namespace value back onto the plugin-config face. */
+export declare function visionConfigSourceOf(value: VisionSettingsValue): VisionConfigSource;
+/** The settings-service face the interceptor registers its namespace on. */
+export interface VisionSettingsScopeFace {
+    get(): unknown;
+    watch(callback: (next: unknown, prev: unknown) => void | Promise<void>): () => void;
+}
+/** Settings provider face, structurally (see `@deepseek-ai/dsh-settings`). */
+export interface VisionSettingsServiceFace {
+    register(ns: unknown, schema: unknown, options?: {
+        readonly base?: unknown;
+        readonly applies?: string;
+    }): VisionSettingsScopeFace;
+}
 /** Recursively detect image blocks, walking tool-result content. */
 export declare function hasImageBlocks(blocks: readonly unknown[] | undefined): boolean;
 /** Whether an endpoint is a localhost service (no key required). */
@@ -200,13 +253,21 @@ export interface VisionTranscriberDeps {
  * adapter raw.
  */
 export declare class VisionTranscriber {
-    readonly settings: VisionSettings;
+    private settings;
     private readonly deps;
     private readonly cache;
     private readonly cooldowns;
-    private readonly ollamaProbe;
+    private ollamaProbe;
     private failure;
     constructor(settings: VisionSettings, deps: VisionTranscriberDeps);
+    /** One Ollama probe built from the given settings (restarted on reconfig). */
+    private probeFor;
+    /**
+     * Adopt a freshly saved settings value (the settings-namespace watch path).
+     * The caches and cooldowns survive; only the configuration and the Ollama
+     * probe are replaced.
+     */
+    reconfigure(next: VisionSettings): void;
     private get fetchImpl();
     /** Entries currently held in the content-hash cache. */
     get cacheSize(): number;
@@ -263,10 +324,11 @@ export declare class VisionTranscriber {
  * model-visible replacements, and rewrites `read_image` results.
  */
 export declare class VisionInterceptor extends Service {
-    private readonly settings;
+    private settings;
     private readonly transcriber;
     private readonly llm;
     private readonly defaultModel;
+    private readonly settingsScope;
     private readonly modelByAgent;
     private readonly pending;
     private readonly lastTurns;
@@ -276,6 +338,14 @@ export declare class VisionInterceptor extends Service {
     constructor(ctx: Context, config?: VisionConfigSource);
     /** Live status for the Settings tab and the `visionStatus` remote. */
     status(): Promise<VisionStatusView>;
+    /**
+     * Register the user-editable settings namespace, with the static plugin
+     * config as its base layer. Returns null (and the static config stays in
+     * force) in a deployment without the settings service.
+     */
+    private registerSettings;
+    /** Adopt a freshly committed settings value: reconfigure and patch/unpatch. */
+    private applySettings;
     /** Add `image` to the model metadata the two admission gates read. */
     private patchAdmission;
     /**

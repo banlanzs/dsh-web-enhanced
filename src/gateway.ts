@@ -26,7 +26,8 @@ import { PnpmRunner, pnpmFailureCode } from './pnpm.ts'
 import { ModelsDevPricing } from './pricing.ts'
 import { findProfileDir, readInventory } from './profile.ts'
 import type { PresetRoster, RunDeps } from './run-task.ts'
-import { DEFAULT_VISION_MARKER, DEFAULT_VISION_PROMPT } from './vision.ts'
+import { DEFAULT_VISION_MARKER, DEFAULT_VISION_PROMPT, VISION_SETTINGS_NS } from './vision.ts'
+import type { VisionSettingsValue } from './vision.ts'
 import type {
   ApiError, BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest,
   FsListRequest, FsListResult,
@@ -40,7 +41,9 @@ import type {
   PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
   TaskCreateRequest, TaskCreateResult,
   TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
-  TaskUpdateRequest, TaskUpdateResult, VisionStatusResult, VisionStatusView, WorkspaceId,
+  TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigPatch,
+  VisionConfigSaveRequest, VisionConfigSetResult, VisionModelOptionView, VisionProviderOptionView,
+  VisionStatusResult, VisionStatusView, WorkspaceId,
 } from './types.ts'
 
 /**
@@ -62,10 +65,35 @@ interface SettingsReadFace {
   get(ns: never): unknown
 }
 
+/** The settings write face the vision config remotes use, structurally. */
+interface SettingsVisionFace {
+  get(ns: unknown): unknown
+  describe(options?: { readonly redactSecrets?: boolean }): ReadonlyArray<{ readonly ns: string; readonly revision: number }>
+  update(ns: unknown, patch: object, expectedRevision?: number): Promise<void>
+  readonly writable: boolean
+}
+
+/** The provider/model directory face the vision config picker reads. */
+interface LlmVisionDirectoryFace {
+  listProviders(): ReadonlyArray<{ readonly id: string; readonly name?: string }>
+  listModels(provider: string): Promise<ReadonlyArray<{
+    readonly id: string
+    readonly name?: string
+    readonly inputModalities?: readonly string[]
+  }>>
+}
+
 /** The vision integration service face the status remote reads, structurally. */
 interface VisionIntegrationFace {
   status(): Promise<VisionStatusView>
 }
+
+/** Settings keys the Vision tab may edit (everything else is read-only). */
+const VISION_CONFIG_EDITABLE_KEYS: ReadonlySet<string> = new Set([
+  'enabled', 'patchAdmission', 'provider', 'model', 'prompt', 'marker',
+  'baseUrl', 'apiKey', 'endpointModel', 'anonymous', 'timeoutMs', 'maxTokens',
+  'autoLocalOllama', 'localOllamaModel', 'localOllamaUrl', 'cacheLimit', 'cooldownMs',
+])
 
 /** One fallback vision endpoint entry, as declared in plugin config. */
 export interface VisionFallbackConfig {
@@ -349,26 +377,91 @@ export class WebEnhancedGateway extends TypertRemoteService {
   @Remote('visionStatus')
   async visionStatus(): Promise<VisionStatusResult> {
     try {
-      const service = this.ctx.get('visionIntegration' as never, false) as unknown as VisionIntegrationFace | undefined
-      if (service === undefined) {
-        return {
-          mounted: false,
-          enabled: false,
-          patchAdmission: false,
-          admissionActive: false,
-          harnessModels: [],
-          endpointConfigured: false,
-          endpointModel: null,
-          apiKeySource: 'unset',
-          ollamaDetected: false,
-          ollamaModel: null,
-          cacheSize: 0,
-          lastError: 'the vision integration service is not mounted in this deployment',
-        }
-      }
-      return await service.status()
+      return await this.visionStatusView()
     } catch (error) {
       return { error: this.errorOf(error, 'vision-status') }
+    }
+  }
+
+  /**
+   * The editable vision configuration plus the picker options and the live
+   * status, all in one read. The API key is never returned.
+   */
+  @Remote('visionConfigGet')
+  async visionConfigGet(): Promise<VisionConfigGetResult> {
+    try {
+      const settings = this.visionSettings()
+      if (settings === undefined) {
+        return { error: { code: 'vision-settings-unavailable', message: 'the settings service is not mounted in this deployment' } }
+      }
+      const raw = settings.get(VISION_SETTINGS_NS as never) as VisionSettingsValue | undefined
+      if (raw === undefined || typeof raw !== 'object') {
+        return { error: { code: 'vision-settings-unmanaged', message: `settings namespace '${VISION_SETTINGS_NS}' is not registered` } }
+      }
+      const descriptor = settings.describe().find(entry => entry.ns === VISION_SETTINGS_NS)
+      return {
+        managed: true,
+        writable: settings.writable,
+        revision: descriptor?.revision ?? null,
+        enabled: raw.enabled,
+        patchAdmission: raw.patchAdmission,
+        provider: raw.provider,
+        model: raw.model,
+        prompt: raw.prompt,
+        marker: raw.marker,
+        baseUrl: raw.baseUrl,
+        apiKeySet: raw.apiKey !== '',
+        apiKeyEnv: raw.apiKeyEnv,
+        endpointModel: raw.endpointModel,
+        anonymous: raw.anonymous,
+        timeoutMs: raw.timeoutMs,
+        maxTokens: raw.maxTokens,
+        autoLocalOllama: raw.autoLocalOllama,
+        localOllamaModel: raw.localOllamaModel,
+        localOllamaUrl: raw.localOllamaUrl,
+        fallbackCount: raw.fallbackModels.length,
+        cacheLimit: raw.cacheLimit,
+        cooldownMs: raw.cooldownMs,
+        providers: await this.visionProviderOptions(),
+        status: await this.visionStatusView(),
+      }
+    } catch (error) {
+      return { error: this.errorOf(error, 'vision-config') }
+    }
+  }
+
+  /**
+   * Save one vision-config patch into the settings namespace. The namespace
+   * owner (`VisionInterceptor`) watches the commit and reconfigures live, so
+   * no restart is needed; `expectedRevision` gives the save CAS semantics.
+   */
+  @Remote('visionConfigSet')
+  async visionConfigSet(request: VisionConfigSaveRequest): Promise<VisionConfigSetResult> {
+    try {
+      const settings = this.visionSettings()
+      if (settings === undefined) {
+        return { error: { code: 'vision-settings-unavailable', message: 'the settings service is not mounted in this deployment' } }
+      }
+      if (!settings.writable) {
+        return { error: { code: 'vision-settings-readonly', message: 'the settings provider is read-only' } }
+      }
+      const raw = settings.get(VISION_SETTINGS_NS as never)
+      if (raw === undefined) {
+        return { error: { code: 'vision-settings-unmanaged', message: `settings namespace '${VISION_SETTINGS_NS}' is not registered` } }
+      }
+      const patch: Record<string, unknown> = {}
+      const source = request.patch as VisionConfigPatch | undefined
+      if (source !== undefined) {
+        for (const [key, value] of Object.entries(source)) {
+          if (VISION_CONFIG_EDITABLE_KEYS.has(key)) patch[key] = value
+        }
+      }
+      await settings.update(VISION_SETTINGS_NS as never, patch, request.expectedRevision)
+      const revision = settings.describe().find(entry => entry.ns === VISION_SETTINGS_NS)?.revision ?? 0
+      return { ok: true, revision }
+    } catch (error) {
+      const conflict = (error as { code?: unknown }).code === 'SETTINGS_CONFLICT'
+      return { error: this.errorOf(error, conflict ? 'vision-config-conflict' : 'vision-config-save') }
     }
   }
 
@@ -589,6 +682,57 @@ export class WebEnhancedGateway extends TypertRemoteService {
   }
 
   // ── internals ────────────────────────────────────────────────────────────
+  /** The settings provider the vision config remotes read and write. */
+  private visionSettings(): SettingsVisionFace | undefined {
+    return this.ctx.get('settings' as never, false) as unknown as SettingsVisionFace | undefined
+  }
+
+  /** The live integration status, or the explicit unmounted state. */
+  private async visionStatusView(): Promise<VisionStatusView> {
+    const service = this.ctx.get('visionIntegration' as never, false) as unknown as VisionIntegrationFace | undefined
+    if (service === undefined) {
+      return {
+        mounted: false,
+        enabled: false,
+        patchAdmission: false,
+        admissionActive: false,
+        harnessModels: [],
+        endpointConfigured: false,
+        endpointModel: null,
+        apiKeySource: 'unset',
+        ollamaDetected: false,
+        ollamaModel: null,
+        cacheSize: 0,
+        lastError: 'the vision integration service is not mounted in this deployment',
+      }
+    }
+    return await service.status()
+  }
+
+  /** Providers and models for the Vision tab, from the model picker's source. */
+  private async visionProviderOptions(): Promise<VisionProviderOptionView[]> {
+    const llm = this.ctx.get('llm' as never, false) as unknown as LlmVisionDirectoryFace | undefined
+    if (llm === undefined || typeof llm.listProviders !== 'function') return []
+    const options: VisionProviderOptionView[] = []
+    for (const provider of llm.listProviders()) {
+      try {
+        const models = await llm.listModels(provider.id)
+        options.push({
+          provider: provider.id,
+          name: provider.name ?? provider.id,
+          models: models.map((model): VisionModelOptionView => ({
+            id: model.id,
+            name: model.name ?? model.id,
+            supportsImage: (model.inputModalities ?? []).includes('image'),
+          })),
+        })
+      } catch {
+        // A provider that cannot answer its model list offers no options.
+      }
+    }
+    return options
+  }
+
   /**
    * Whether the balance describes the account one model route bills.
    *

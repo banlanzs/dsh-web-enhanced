@@ -31,7 +31,22 @@ const entry = { name: 'a', path: 'a', kind: 'file', size: 3 }
  * Methods invoked with no argument at all. Everything else takes exactly one
  * request object — see the arity guard below.
  */
-const nullaryMethods = new Set(['taskList', 'visionStatus'])
+const nullaryMethods = new Set(['taskList', 'visionStatus', 'visionConfigGet'])
+
+const visionStatusSample = {
+  mounted: true,
+  enabled: true,
+  patchAdmission: true,
+  admissionActive: true,
+  harnessModels: [{ provider: 'glm', model: 'glm-4.6v' }],
+  endpointConfigured: true,
+  endpointModel: 'qwen3.7-flash',
+  apiKeySource: 'config',
+  ollamaDetected: true,
+  ollamaModel: 'qwen3-vl:4b',
+  cacheSize: 3,
+  lastError: null,
+}
 
 /** One representative payload per method, both the success and the error branch. */
 const payloads: Record<string, unknown[]> = {
@@ -49,20 +64,7 @@ const payloads: Record<string, unknown[]> = {
     model: 'deepseek-chat',
     pricing: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: null },
   }, errorPayload],
-  visionStatus: [{
-    mounted: true,
-    enabled: true,
-    patchAdmission: true,
-    admissionActive: true,
-    harnessModels: [{ provider: 'glm', model: 'glm-4.6v' }],
-    endpointConfigured: true,
-    endpointModel: 'qwen3.7-flash',
-    apiKeySource: 'config',
-    ollamaDetected: true,
-    ollamaModel: 'qwen3-vl:4b',
-    cacheSize: 3,
-    lastError: null,
-  }, {
+  visionStatus: [visionStatusSample, {
     mounted: false,
     enabled: false,
     patchAdmission: false,
@@ -76,6 +78,40 @@ const payloads: Record<string, unknown[]> = {
     cacheSize: 0,
     lastError: 'not mounted',
   }, errorPayload],
+  visionConfigGet: [{
+    managed: true,
+    writable: true,
+    revision: 3,
+    enabled: true,
+    patchAdmission: true,
+    provider: 'glm',
+    model: 'glm-4.6v',
+    prompt: 'describe',
+    marker: '[图片内容描述]',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    apiKeySet: true,
+    apiKeyEnv: 'VISION_API_KEY',
+    endpointModel: 'qwen3.7-flash',
+    anonymous: false,
+    timeoutMs: 120000,
+    maxTokens: 4096,
+    autoLocalOllama: true,
+    localOllamaModel: '',
+    localOllamaUrl: 'http://localhost:11434/v1',
+    fallbackCount: 1,
+    cacheLimit: 200,
+    cooldownMs: 60000,
+    providers: [{
+      provider: 'glm',
+      name: 'GLM',
+      models: [
+        { id: 'glm-4.6v', name: 'GLM-4.6V', supportsImage: true },
+        { id: 'glm-chat', name: 'GLM Chat', supportsImage: false },
+      ],
+    }],
+    status: visionStatusSample,
+  }, errorPayload],
+  visionConfigSet: [{ ok: true, revision: 4 }, errorPayload],
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
   gitCommit: [{ commit: commitDetail }, errorPayload],
@@ -178,10 +214,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 28 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 30 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(28)
+    expect(methods).toHaveLength(30)
   })
 
   it('every result schema accepts its success and error payloads', () => {

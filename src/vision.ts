@@ -34,6 +34,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { Service } from '@deepseek-ai/cordis'
 import type { Message } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
+import z from '@deepseek-ai/schemastery'
 import type { VisionFallbackConfig } from './gateway.ts'
 import type { VisionStatusView } from './types.ts'
 
@@ -43,6 +44,16 @@ export const DEFAULT_VISION_PROMPT =
 
 /** Marker the model sees instead of the image block. */
 export const DEFAULT_VISION_MARKER = '[图片内容描述]'
+
+/**
+ * Settings namespace carrying the user-editable vision configuration.
+ *
+ * The static `vision*` plugin config is the composition `base` layer; what the
+ * Settings → Web Enhanced → Vision tab saves becomes the user layer and wins.
+ * The namespace is owned by this plugin's own gateway/UI (not the host settings
+ * whitelist), so no api-proxy patch is needed.
+ */
+export const VISION_SETTINGS_NS = 'dsh-web-enhanced-vision'
 
 /** Local Ollama health-check budget; it is a probe, not a transcription. */
 const OLLAMA_PROBE_TIMEOUT_MS = 1_500
@@ -212,6 +223,122 @@ export function resolveVisionSettings(config: VisionConfigSource): VisionSetting
   }
 }
 
+/** The settings-namespace shape (camelCase; the static config is its base). */
+export interface VisionSettingsValue {
+  readonly enabled: boolean
+  readonly patchAdmission: boolean
+  readonly provider: string
+  readonly model: string
+  readonly prompt: string
+  readonly marker: string
+  readonly baseUrl: string
+  readonly apiKey: string
+  readonly apiKeyEnv: string
+  readonly endpointModel: string
+  readonly anonymous: boolean
+  readonly timeoutMs: number
+  readonly maxTokens: number
+  readonly autoLocalOllama: boolean
+  readonly localOllamaModel: string
+  readonly localOllamaUrl: string
+  readonly fallbackModels: VisionFallbackConfig[]
+  readonly cacheLimit: number
+  readonly cooldownMs: number
+}
+
+/** Schema of the `dsh-web-enhanced-vision` settings namespace. */
+export const VisionSettingsSchema: z<VisionSettingsValue> = z.object({
+  enabled: z.boolean().default(true),
+  patchAdmission: z.boolean().default(true),
+  provider: z.string().default(''),
+  model: z.string().default(''),
+  prompt: z.string().default(DEFAULT_VISION_PROMPT),
+  marker: z.string().default(DEFAULT_VISION_MARKER),
+  baseUrl: z.string().default(''),
+  apiKey: z.string().role('secret').default(''),
+  apiKeyEnv: z.string().default('VISION_API_KEY'),
+  endpointModel: z.string().default(''),
+  anonymous: z.boolean().default(false),
+  timeoutMs: z.number().default(120_000),
+  maxTokens: z.number().default(4_096),
+  autoLocalOllama: z.boolean().default(true),
+  localOllamaModel: z.string().default(''),
+  localOllamaUrl: z.string().default('http://localhost:11434/v1'),
+  fallbackModels: z.array(z.object({
+    model: z.string(),
+    baseURL: z.string().default(''),
+    apiKey: z.string().role('secret').default(''),
+    anonymous: z.boolean().default(false),
+    timeoutMs: z.number().default(0),
+  })).default([]),
+  cacheLimit: z.number().default(200),
+  cooldownMs: z.number().default(60_000),
+})
+
+/**
+ * The composition `base` layer: only fields the STATIC plugin config actually
+ * set, so unset keys keep the schema defaults until the UI writes them.
+ */
+export function staticVisionSettingsBase(config: VisionConfigSource): Partial<VisionSettingsValue> {
+  const base: Record<string, unknown> = {}
+  if (config.visionEnabled !== undefined) base['enabled'] = config.visionEnabled
+  if (config.visionPatchAdmission !== undefined) base['patchAdmission'] = config.visionPatchAdmission
+  if (config.visionProvider !== undefined) base['provider'] = config.visionProvider
+  if (config.visionModel !== undefined) base['model'] = config.visionModel
+  if (config.visionPrompt !== undefined) base['prompt'] = config.visionPrompt
+  if (config.visionMarker !== undefined) base['marker'] = config.visionMarker
+  if (config.visionBaseUrl !== undefined) base['baseUrl'] = config.visionBaseUrl
+  if (config.visionApiKey !== undefined) base['apiKey'] = config.visionApiKey
+  if (config.visionApiKeyEnv !== undefined) base['apiKeyEnv'] = config.visionApiKeyEnv
+  if (config.visionEndpointModel !== undefined) base['endpointModel'] = config.visionEndpointModel
+  if (config.visionAnonymous !== undefined) base['anonymous'] = config.visionAnonymous
+  if (config.visionTimeoutMs !== undefined) base['timeoutMs'] = config.visionTimeoutMs
+  if (config.visionMaxTokens !== undefined) base['maxTokens'] = config.visionMaxTokens
+  if (config.visionAutoLocalOllama !== undefined) base['autoLocalOllama'] = config.visionAutoLocalOllama
+  if (config.visionLocalOllamaModel !== undefined) base['localOllamaModel'] = config.visionLocalOllamaModel
+  if (config.visionLocalOllamaUrl !== undefined) base['localOllamaUrl'] = config.visionLocalOllamaUrl
+  if (config.visionFallbackModels !== undefined) base['fallbackModels'] = config.visionFallbackModels
+  if (config.visionCacheLimit !== undefined) base['cacheLimit'] = config.visionCacheLimit
+  if (config.visionCooldownMs !== undefined) base['cooldownMs'] = config.visionCooldownMs
+  return base as Partial<VisionSettingsValue>
+}
+
+/** Map a resolved settings-namespace value back onto the plugin-config face. */
+export function visionConfigSourceOf(value: VisionSettingsValue): VisionConfigSource {
+  return {
+    visionEnabled: value.enabled,
+    visionPatchAdmission: value.patchAdmission,
+    visionProvider: value.provider,
+    visionModel: value.model,
+    visionPrompt: value.prompt,
+    visionMarker: value.marker,
+    visionBaseUrl: value.baseUrl,
+    visionApiKey: value.apiKey,
+    visionApiKeyEnv: value.apiKeyEnv,
+    visionEndpointModel: value.endpointModel,
+    visionAnonymous: value.anonymous,
+    visionTimeoutMs: value.timeoutMs,
+    visionMaxTokens: value.maxTokens,
+    visionAutoLocalOllama: value.autoLocalOllama,
+    visionLocalOllamaModel: value.localOllamaModel,
+    visionLocalOllamaUrl: value.localOllamaUrl,
+    visionFallbackModels: value.fallbackModels,
+    visionCacheLimit: value.cacheLimit,
+    visionCooldownMs: value.cooldownMs,
+  }
+}
+
+/** The settings-service face the interceptor registers its namespace on. */
+export interface VisionSettingsScopeFace {
+  get(): unknown
+  watch(callback: (next: unknown, prev: unknown) => void | Promise<void>): () => void
+}
+
+/** Settings provider face, structurally (see `@deepseek-ai/dsh-settings`). */
+export interface VisionSettingsServiceFace {
+  register(ns: unknown, schema: unknown, options?: { readonly base?: unknown; readonly applies?: string }): VisionSettingsScopeFace
+}
+
 /** Recursively detect image blocks, walking tool-result content. */
 export function hasImageBlocks(blocks: readonly unknown[] | undefined): boolean {
   if (blocks === undefined) return false
@@ -371,27 +498,41 @@ const sleep = (ms: number): Promise<void> => new Promise(resolve => { setTimeout
 export class VisionTranscriber {
   private readonly cache = new Map<string, string>()
   private readonly cooldowns = new Map<string, number>()
-  private readonly ollamaProbe: Promise<EndpointAttempt | null>
+  private ollamaProbe: Promise<EndpointAttempt | null>
   private failure: string | null = null
 
   constructor(
-    readonly settings: VisionSettings,
+    private settings: VisionSettings,
     private readonly deps: VisionTranscriberDeps,
   ) {
-    this.ollamaProbe = settings.autoLocalOllama
-      ? detectLocalOllama(this.fetchImpl, settings.localOllamaUrl, OLLAMA_PROBE_TIMEOUT_MS, settings.localOllamaModel)
-        .then(local => local === null
-          ? null
-          : {
-              model: local.model,
-              baseURL: local.baseURL,
-              apiKey: '',
-              anonymous: true,
-              timeoutMs: Math.min(settings.timeoutMs, ANONYMOUS_TIMEOUT_CAP_MS),
-              maxTokens: settings.maxTokens,
-            })
-        .catch(() => null)
-      : Promise.resolve(null)
+    this.ollamaProbe = this.probeFor(settings)
+  }
+
+  /** One Ollama probe built from the given settings (restarted on reconfig). */
+  private probeFor(settings: VisionSettings): Promise<EndpointAttempt | null> {
+    if (!settings.autoLocalOllama) return Promise.resolve(null)
+    return detectLocalOllama(this.fetchImpl, settings.localOllamaUrl, OLLAMA_PROBE_TIMEOUT_MS, settings.localOllamaModel)
+      .then(local => local === null
+        ? null
+        : {
+            model: local.model,
+            baseURL: local.baseURL,
+            apiKey: '',
+            anonymous: true,
+            timeoutMs: Math.min(settings.timeoutMs, ANONYMOUS_TIMEOUT_CAP_MS),
+            maxTokens: settings.maxTokens,
+          })
+      .catch(() => null)
+  }
+
+  /**
+   * Adopt a freshly saved settings value (the settings-namespace watch path).
+   * The caches and cooldowns survive; only the configuration and the Ollama
+   * probe are replaced.
+   */
+  reconfigure(next: VisionSettings): void {
+    this.settings = next
+    this.ollamaProbe = this.probeFor(next)
   }
 
   private get fetchImpl(): typeof fetch {
@@ -802,10 +943,11 @@ type MarkedResolver = LlmResolverFace & { readonly __webEnhancedVisionAdmission?
  * model-visible replacements, and rewrites `read_image` results.
  */
 export class VisionInterceptor extends Service {
-  private readonly settings: VisionSettings
+  private settings: VisionSettings
   private readonly transcriber: VisionTranscriber
   private readonly llm: LlmVisionFace | undefined
   private readonly defaultModel: { currentSelection?: () => { provider?: unknown; model?: unknown } } | undefined
+  private readonly settingsScope: VisionSettingsScopeFace | null
   private readonly modelByAgent = new Map<string, { provider: string; model: string }>()
   private readonly pending = new Map<string, { content: ContentBlockFace[] }>()
   private readonly lastTurns = new Map<string, number>()
@@ -815,13 +957,21 @@ export class VisionInterceptor extends Service {
 
   constructor(ctx: Context, config: VisionConfigSource = {}) {
     super(ctx, 'visionIntegration')
-    this.settings = resolveVisionSettings(config)
     const llm = ctx.get('llm' as never, false) as unknown as LlmVisionFace | undefined
     const attachments = ctx.get('attachments' as never, false) as unknown as AttachmentsFace | undefined
     this.llm = llm
     this.defaultModel = ctx.get('agentDefaultModel' as never, false) as unknown as
       | { currentSelection?: () => { provider?: unknown; model?: unknown } }
       | undefined
+
+    // User-editable settings win over the static plugin config: the static
+    // values are the namespace's composition base, and `scope.watch` keeps the
+    // running integration in sync with every save (no restart).
+    this.settingsScope = this.registerSettings(ctx, config)
+    const effective = this.settingsScope === null
+      ? config
+      : visionConfigSourceOf(this.settingsScope.get() as VisionSettingsValue)
+    this.settings = resolveVisionSettings(effective)
     this.transcriber = new VisionTranscriber(this.settings, {
       ...(llm === undefined ? {} : { llm }),
       ...(attachments === undefined ? {} : { attachments }),
@@ -982,6 +1132,42 @@ export class VisionInterceptor extends Service {
       ollamaModel: ollama.model,
       cacheSize: this.transcriber.cacheSize,
       lastError: this.transcriber.lastError,
+    }
+  }
+
+  /**
+   * Register the user-editable settings namespace, with the static plugin
+   * config as its base layer. Returns null (and the static config stays in
+   * force) in a deployment without the settings service.
+   */
+  private registerSettings(ctx: Context, config: VisionConfigSource): VisionSettingsScopeFace | null {
+    const service = ctx.get('settings' as never, false) as unknown as VisionSettingsServiceFace | undefined
+    if (service === undefined || typeof service.register !== 'function') return null
+    try {
+      const scope = service.register(VISION_SETTINGS_NS, VisionSettingsSchema, {
+        base: staticVisionSettingsBase(config),
+        applies: 'live',
+      })
+      // Every committed save (in-process or an external settings.yaml edit)
+      // reconfigures the running integration immediately.
+      ctx.effect(() => scope.watch((next) => { this.applySettings(next) }), 'dsh-web-enhanced: vision settings watch')
+      return scope
+    } catch (error) {
+      this.logWarn(`settings namespace registration failed; static config stays in force: ${this.messageOf(error)}`)
+      return null
+    }
+  }
+
+  /** Adopt a freshly committed settings value: reconfigure and patch/unpatch. */
+  private applySettings(raw: unknown): void {
+    try {
+      const next = resolveVisionSettings(visionConfigSourceOf(raw as VisionSettingsValue))
+      this.settings = next
+      this.transcriber.reconfigure(next)
+      if (next.patchAdmission && !this.admissionPatched) this.patchAdmission()
+      else if (!next.patchAdmission && this.admissionPatched) this.restoreAdmission()
+    } catch (error) {
+      this.logWarn(`could not apply the saved vision settings: ${this.messageOf(error)}`)
     }
   }
 

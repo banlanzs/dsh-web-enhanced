@@ -9,12 +9,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import {
-  VisionInterceptor, VisionTranscriber,
+  VISION_SETTINGS_NS, VisionInterceptor, VisionSettingsSchema, VisionTranscriber,
   classifyVisionHttpError, detectLocalOllama, hasImageBlocks, isLocalVisionUrl,
-  parseRetryAfter, resolveVisionApiKey, resolveVisionSettings,
+  parseRetryAfter, resolveVisionApiKey, resolveVisionSettings, staticVisionSettingsBase,
+  visionConfigSourceOf,
 } from '../src/vision.ts'
 import type {
-  AttachmentsFace, ImageRefFace, LlmVisionFace, VisionSettings,
+  AttachmentsFace, ImageRefFace, LlmVisionFace, VisionSettings, VisionSettingsValue,
 } from '../src/vision.ts'
 
 const contexts: Context[] = []
@@ -157,6 +158,31 @@ describe('vision helpers', () => {
       { model: 'backup-anon', baseURL: '', apiKey: '', anonymous: true, timeoutMs: 0 },
     ])
     expect(settings.marker).toBe('[图片内容描述]')
+  })
+
+  it('maps static config into the settings base and back', () => {
+    const base = staticVisionSettingsBase({
+      visionEnabled: false,
+      visionBaseUrl: 'https://vlm.example/v1',
+      visionFallbackModels: [{ model: 'backup', anonymous: true }],
+    })
+    expect(base).toEqual({
+      enabled: false,
+      baseUrl: 'https://vlm.example/v1',
+      fallbackModels: [{ model: 'backup', anonymous: true }],
+    })
+    const value = {
+      enabled: true, patchAdmission: true, provider: 'glm', model: 'glm-4.6v',
+      prompt: 'p', marker: 'm', baseUrl: '', apiKey: 'sk', apiKeyEnv: 'VISION_API_KEY',
+      endpointModel: '', anonymous: false, timeoutMs: 120000, maxTokens: 4096,
+      autoLocalOllama: false, localOllamaModel: '', localOllamaUrl: '',
+      fallbackModels: [], cacheLimit: 200, cooldownMs: 60000,
+    } satisfies VisionSettingsValue
+    expect(visionConfigSourceOf(value)).toMatchObject({
+      visionEnabled: true, visionProvider: 'glm', visionModel: 'glm-4.6v',
+      visionApiKey: 'sk', visionAutoLocalOllama: false,
+    })
+    expect(visionConfigSourceOf(value).visionBaseUrl).toBe('')
   })
 })
 
@@ -536,5 +562,54 @@ describe('VisionInterceptor', () => {
       signal: new AbortController().signal,
     }, async () => decision)
     expect(stream).not.toHaveBeenCalled()
+  })
+
+  it('registers the settings namespace with static config as base and reconfigures live', async () => {
+    const scopeValue: VisionSettingsValue = {
+      enabled: true, patchAdmission: true, provider: '', model: '',
+      prompt: 'p', marker: 'm', baseUrl: '', apiKey: '', apiKeyEnv: 'VISION_API_KEY',
+      endpointModel: '', anonymous: false, timeoutMs: 120000, maxTokens: 4096,
+      autoLocalOllama: false, localOllamaModel: '', localOllamaUrl: '',
+      fallbackModels: [], cacheLimit: 200, cooldownMs: 60000,
+    }
+    const watchers: Array<(next: unknown, prev: unknown) => void> = []
+    const register = vi.fn(() => ({
+      get: () => scopeValue,
+      watch: (callback: (next: unknown, prev: unknown) => void) => {
+        watchers.push(callback)
+        return () => {}
+      },
+    }))
+    const ctx = new Context()
+    contexts.push(ctx)
+    ctx.provide('llm' as never, llmWithVision() as never)
+    ctx.provide('agentDefaultModel' as never, { currentSelection: () => undefined } as never)
+    ctx.provide('settings' as never, { register } as never)
+
+    // Static config says disabled; the namespace base carries that, while the
+    // resolved user value (enabled above) is what the integration actually runs.
+    const interceptor = new VisionInterceptor(ctx, { visionEnabled: false, visionPatchAdmission: true })
+    expect(register).toHaveBeenCalledWith(VISION_SETTINGS_NS, VisionSettingsSchema, {
+      base: expect.objectContaining({ enabled: false }),
+      applies: 'live',
+    })
+    expect((await interceptor.status()).enabled).toBe(true)
+
+    const llm = ctx.get('llm' as never) as { resolveModelInfo: (p: string, m: string) => Promise<{ inputModalities: string[] }> }
+    expect((await llm.resolveModelInfo('deepseek', 'chat')).inputModalities).toContain('image')
+
+    // A committed save that turns the admission patch off restores the real method.
+    watchers[0]!({ ...scopeValue, patchAdmission: false }, scopeValue)
+    expect((await llm.resolveModelInfo('deepseek', 'chat')).inputModalities).toEqual(['text'])
+    expect((await interceptor.status())).toMatchObject({ patchAdmission: false, admissionActive: false })
+
+    // And turning it back on re-patches.
+    watchers[0]!({ ...scopeValue, patchAdmission: true }, scopeValue)
+    expect((await llm.resolveModelInfo('deepseek', 'chat')).inputModalities).toContain('image')
+  })
+
+  it('keeps static config in force when the settings service is absent', async () => {
+    const { interceptor } = await mount({ config: { visionEnabled: false, visionPatchAdmission: false } })
+    expect((await interceptor.status())).toMatchObject({ enabled: false, patchAdmission: false })
   })
 })

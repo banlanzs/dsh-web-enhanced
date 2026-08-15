@@ -11,7 +11,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
 import { MemoryMediaPool, MemoryStorageBackend } from './helpers/memory-backend.ts'
 import { taskRecordSchema } from '../src/schemas.ts'
-import type { TaskId, TaskRecord } from '../src/types.ts'
+import type { TaskId, TaskRecord, VisionConfigPatch } from '../src/types.ts'
 import { WebEnhancedGateway } from '../src/index.ts'
 import { FakeSubprocess } from './helpers/fake-subprocess.ts'
 
@@ -227,7 +227,7 @@ describe('WebEnhancedGateway', () => {
     expect(gateway.typertRemote).toMatchObject({ serviceKey: 'webEnhanced', namespace: 'webEnhanced' })
     expect(remoteMethods(gateway).map(entry => entry.method)).toEqual([
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet', 'pricingGet',
-      'visionStatus',
+      'visionStatus', 'visionConfigGet', 'visionConfigSet',
       'gitBranches', 'gitLog', 'gitCommit', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',
@@ -648,6 +648,92 @@ describe('WebEnhancedGateway', () => {
       const { gateway } = await harness()
       const status = await gateway.visionStatus()
       expect(status).toMatchObject({ mounted: false, enabled: false, admissionActive: false })
+    })
+
+    it('answers vision-settings-unavailable when no settings service is mounted', async () => {
+      const { gateway } = await harness()
+      const view = await gateway.visionConfigGet()
+      expect(view).toMatchObject({ error: { code: 'vision-settings-unavailable' } })
+      expect(await gateway.visionConfigSet({ patch: { enabled: true } }))
+        .toMatchObject({ error: { code: 'vision-settings-unavailable' } })
+    })
+
+    it('reads the namespace without exposing the key and saves a filtered patch with CAS', async () => {
+      const { ctx, gateway } = await harness()
+      const section = {
+        enabled: true, patchAdmission: true, provider: '', model: '', prompt: 'p', marker: 'm',
+        baseUrl: '', apiKey: 'sk-secret', apiKeyEnv: 'VISION_API_KEY', endpointModel: '',
+        anonymous: false, timeoutMs: 120000, maxTokens: 4096, autoLocalOllama: true,
+        localOllamaModel: '', localOllamaUrl: 'http://localhost:11434/v1',
+        fallbackModels: [], cacheLimit: 200, cooldownMs: 60000,
+      }
+      const sections: Record<string, Record<string, unknown>> = { 'dsh-web-enhanced-vision': { ...section } }
+      const update = vi.fn(async (_ns: unknown, patch: object) => {
+        sections['dsh-web-enhanced-vision'] = { ...sections['dsh-web-enhanced-vision'], ...patch }
+      })
+      ctx.provide('settings' as never, {
+        get: (ns: unknown) => sections[String(ns)],
+        describe: () => [{ ns: 'dsh-web-enhanced-vision', revision: 7 }],
+        update,
+        writable: true,
+      } as never)
+      ctx.provide('llm' as never, {
+        listProviders: () => [{ id: 'deepseek-official', name: 'DeepSeek' }],
+        listModels: async () => [
+          { id: 'deepseek-chat', name: 'DeepSeek Chat', inputModalities: ['text'] },
+          { id: 'deepseek-vl', name: 'DeepSeek VL', inputModalities: ['text', 'image'] },
+        ],
+        listConfigurableProviders: () => [],
+      } as never)
+      const view = await gateway.visionConfigGet()
+      if ('error' in view) throw new Error(view.error.message)
+      expect(view).toMatchObject({
+        managed: true, writable: true, revision: 7, enabled: true,
+        apiKeySet: true, fallbackCount: 0, endpointModel: '',
+        providers: [{
+          provider: 'deepseek-official', name: 'DeepSeek',
+          models: [
+            { id: 'deepseek-chat', name: 'DeepSeek Chat', supportsImage: false },
+            { id: 'deepseek-vl', name: 'DeepSeek VL', supportsImage: true },
+          ],
+        }],
+      })
+      expect(JSON.stringify(view)).not.toContain('sk-secret')
+      // The integration service is absent in this harness; status still exists.
+      expect(view.status).toMatchObject({ mounted: false })
+
+      const saved = await gateway.visionConfigSet({
+        patch: {
+          baseUrl: 'https://vlm.example/v1',
+          endpointModel: 'qwen-vl',
+          unknownField: true,
+        } as unknown as VisionConfigPatch,
+        expectedRevision: 7,
+      })
+      expect(saved).toEqual({ ok: true, revision: 7 })
+      expect(update).toHaveBeenCalledWith('dsh-web-enhanced-vision', {
+        baseUrl: 'https://vlm.example/v1',
+        endpointModel: 'qwen-vl',
+      }, 7)
+      expect(sections['dsh-web-enhanced-vision']).toMatchObject({
+        baseUrl: 'https://vlm.example/v1', apiKey: 'sk-secret',
+      })
+    })
+
+    it('maps a settings conflict onto the conflict code', async () => {
+      const { ctx, gateway } = await harness()
+      ctx.provide('settings' as never, {
+        get: () => ({ enabled: true, patchAdmission: true, fallbackModels: [] }),
+        describe: () => [{ ns: 'dsh-web-enhanced-vision', revision: 9 }],
+        update: async () => {
+          const error = new Error('stale') as Error & { code: string }
+          error.code = 'SETTINGS_CONFLICT'
+          throw error
+        },
+        writable: true,
+      } as never)
+      expect(await gateway.visionConfigSet({ patch: { enabled: false }, expectedRevision: 3 }))
+        .toMatchObject({ error: { code: 'vision-config-conflict' } })
     })
   })
 

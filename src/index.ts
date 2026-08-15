@@ -12,8 +12,11 @@ import { WebEnhancedGateway, Config } from './gateway.ts'
 import { VisionInterceptor } from './vision.ts'
 
 export { WebEnhancedGateway, Config }
-export { VisionInterceptor, VisionTranscriber } from './vision.ts'
-export type { VisionConfigSource, VisionSettings } from './vision.ts'
+export { VisionInterceptor, VisionTranscriber, VISION_SETTINGS_NS, VisionSettingsSchema } from './vision.ts'
+export type {
+  VisionConfigSource, VisionSettings, VisionSettingsScopeFace, VisionSettingsServiceFace,
+  VisionSettingsValue,
+} from './vision.ts'
 
 /**
  * One package contribution as `TypertRegistry.register` accepts it.

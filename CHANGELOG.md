@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.10.0] - 2026-08-15
+
+### 新增：识图在线配置入口
+
+「设置 → Web 增强 → 识图」从只读状态页升级为**完整配置表单**，保存立即生效、无需重启：
+
+- **运行时可编辑的 settings 命名空间**：新增 `dsh-web-enhanced-vision` 命名空间，`VisionInterceptor` 启动时注册并 `watch` 每次提交——界面保存、`settings.yaml` 外部修改都会即时热更新（转写引擎 reconfigure、发送补丁按需打/拆）。`cordis.patch.yml` 里的 `vision*` 静态配置作为命名空间 base 层保留，界面保存的值优先。
+- **从 DSH 模型选择器同源目录手动选识别模型**：`visionConfigGet` 返回宿主 provider/model 目录（与模型选择器同一数据源），表单按 `supportsImage` 过滤后提供渠道/模型下拉；留空即保持原来的自动探测。
+- **独立识图 API 配置**：Base URL / 模型 / API Key（密码框，密钥只写不读、可清除）/ 匿名端点 / 超时 / 最大 token，全部在线编辑。该端点只服务于本插件的图片转写，**不注册进 DSH 原有渠道、不参与模型选择器**。
+- 本地 Ollama 开关与地址、描述提示词与标记同样在线可改。
+- 表单带 settings 修订号 CAS：并发修改返回 `vision-config-conflict`，前端自动重载提示重试；API key 永不回传（只返回 `apiKeySet`）。
+
+### 接口变化
+
+- 远程方法 28 → 30：新增 `visionConfigGet`、`visionConfigSet`。
+- 测试 287 → 293。
+
 ## [0.9.0] - 2026-08-15
 
 ### 新增：识图功能集成（TODO #6）
