@@ -793,6 +793,7 @@ export class WebEnhancedGateway extends TypertRemoteService {
         ollamaModel: null,
         cacheSize: 0,
         lastError: 'the vision integration service is not mounted in this deployment',
+        failures: [],
       }
     }
     return await service.status()

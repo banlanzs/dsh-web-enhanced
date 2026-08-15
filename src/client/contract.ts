@@ -93,9 +93,9 @@ export type {
   ModelPricingView, PricingGetRequest, PricingGetResult, PricingView, TaskCreateRequest,
   TaskCreateResult,
   TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
-  TaskStatus, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigPatch,
-  VisionConfigSaveRequest, VisionConfigSaveView, VisionConfigSetResult, VisionConfigView,
-  VisionEndpointModelView, VisionEndpointModelsRequest, VisionEndpointModelsResult,
+  TaskStatus, TaskUpdateRequest, TaskUpdateResult, VisionAttemptFailureView, VisionConfigGetResult,
+  VisionConfigPatch, VisionConfigSaveRequest, VisionConfigSaveView, VisionConfigSetResult,
+  VisionConfigView, VisionEndpointModelView, VisionEndpointModelsRequest, VisionEndpointModelsResult,
   VisionEndpointModelsView, VisionHarnessModelView, VisionModelOptionView, VisionProviderOptionView,
   VisionStatusResult, VisionStatusView,
 } from '../types.ts'

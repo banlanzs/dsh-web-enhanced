@@ -115,6 +115,11 @@ export declare const zh: {
     readonly 'vision.cacheEntries': "{count} 条（按图片内容哈希）";
     readonly 'vision.lastError': "最近失败";
     readonly 'vision.lastErrorNone': "无";
+    readonly 'vision.failuresTitle': "识别尝试失败记录";
+    readonly 'vision.failuresNone': "无";
+    readonly 'vision.source.dsh': "DSH 模型";
+    readonly 'vision.source.endpoint': "独立 API";
+    readonly 'vision.source.ollama': "Ollama";
     readonly 'vision.statusTitle': "当前状态";
     readonly 'vision.form.switchesTitle': "开关";
     readonly 'vision.form.enabled': "启用图片理解";

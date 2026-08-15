@@ -14,8 +14,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
-  VisionConfigPatch, VisionConfigView, VisionEndpointModelView, VisionHarnessModelView,
-  VisionStatusView, WebEnhancedRemote,
+  VisionAttemptFailureView, VisionConfigPatch, VisionConfigView, VisionEndpointModelView,
+  VisionHarnessModelView, VisionStatusView, WebEnhancedRemote,
 } from '../contract.ts'
 import type { Translate } from '../locale-keys.ts'
 import css from './VisionStatusPanel.module.css'
@@ -101,6 +101,15 @@ function keySourceKey(source: VisionStatusView['apiKeySource']): 'vision.key.con
     case 'env': return 'vision.key.env'
     case 'none-needed': return 'vision.key.none-needed'
     default: return 'vision.key.unset'
+  }
+}
+
+/** Locale key of one failure source. */
+function failureSourceKey(source: VisionAttemptFailureView['source']): 'vision.source.dsh' | 'vision.source.ollama' | 'vision.source.endpoint' {
+  switch (source) {
+    case 'ollama': return 'vision.source.ollama'
+    case 'endpoint': return 'vision.source.endpoint'
+    default: return 'vision.source.dsh'
   }
 }
 
@@ -428,7 +437,10 @@ export function VisionStatusPanel({ remote, t }: VisionStatusPanelProps) {
         </div>
       )}
 
-      <h3 className={css.sectionTitle}>{t('vision.statusTitle')}</h3>
+      <div className={css.statusHeader}>
+        <h3 className={css.sectionTitle}>{t('vision.statusTitle')}</h3>
+        <button type="button" className={css.minorButton} onClick={() => { void load() }}>{t('vision.refresh')}</button>
+      </div>
       {status === null
         ? <p className={css.note}>{t('vision.loading')}</p>
         : <div className={css.card}>
@@ -474,6 +486,22 @@ export function VisionStatusPanel({ remote, t }: VisionStatusPanelProps) {
               {status.lastError === null
                 ? <span className={css.muted}>{t('vision.lastErrorNone')}</span>
                 : <span className={css.failure}>{status.lastError}</span>}
+            </Row>
+            <Row label={t('vision.failuresTitle')}>
+              {status.failures.length === 0
+                ? <span className={css.muted}>{t('vision.failuresNone')}</span>
+                : (
+                    <div className={css.failures}>
+                      {status.failures.map((failure, index) => (
+                        <div key={`${failure.time}-${index}`} className={css.failureEntry}>
+                          <span className={css.badgeMuted}>{t(failureSourceKey(failure.source))}</span>
+                          <span className={css.failureTime}>{new Date(failure.time).toLocaleTimeString()}</span>
+                          <code className={css.code}>{failure.label}</code>
+                          <span className={css.failureMessage}>{failure.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
             </Row>
           </div>}
 

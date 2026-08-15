@@ -193,6 +193,12 @@ const visionStatusSchema = z.object({
   ollamaModel: z.string().nullable(),
   cacheSize: z.number(),
   lastError: z.string().nullable(),
+  failures: z.array(z.object({
+    time: z.number(),
+    source: z.enum(['dsh', 'ollama', 'endpoint']),
+    label: z.string(),
+    message: z.string(),
+  })),
 })
 
 /**

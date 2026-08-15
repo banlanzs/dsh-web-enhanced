@@ -46,6 +46,12 @@ const visionStatusSample = {
   ollamaModel: 'qwen3-vl:4b',
   cacheSize: 3,
   lastError: null,
+  failures: [{
+    time: 1755280000000,
+    source: 'dsh',
+    label: 'opencode-free/mimo-v2.5-free',
+    message: 'UNSUPPORTED_CONTENT',
+  }],
 }
 
 /** One representative payload per method, both the success and the error branch. */
@@ -77,6 +83,7 @@ const payloads: Record<string, unknown[]> = {
     ollamaModel: null,
     cacheSize: 0,
     lastError: 'not mounted',
+    failures: [],
   }, errorPayload],
   visionConfigGet: [{
     managed: true,

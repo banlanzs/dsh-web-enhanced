@@ -36,7 +36,7 @@ import type { Message } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
 import z from '@deepseek-ai/schemastery'
 import type { VisionFallbackConfig } from './gateway.ts'
-import type { VisionStatusView } from './types.ts'
+import type { VisionAttemptFailureView, VisionStatusView } from './types.ts'
 
 /** Default description prompt: thorough Chinese transcription + scene detail. */
 export const DEFAULT_VISION_PROMPT =
@@ -63,6 +63,8 @@ const ANONYMOUS_TIMEOUT_CAP_MS = 20_000
 const HARNESS_CANDIDATE_CAP = 4
 /** How many USER-SELECTED pool models may run before the pool is cut. */
 const HARNESS_POOL_CAP = 20
+/** Per-attempt failure history kept in memory for the Settings tab. */
+const ATTEMPT_FAILURE_CAP = 50
 /** Pause between failed vision-model attempts. */
 const RETRY_DELAY_MS = 600
 /** Upper bound for honoring a Retry-After header (seconds), paid endpoints only. */
@@ -534,6 +536,7 @@ const sleep = (ms: number): Promise<void> => new Promise(resolve => { setTimeout
 export class VisionTranscriber {
   private readonly cache = new Map<string, string>()
   private readonly cooldowns = new Map<string, number>()
+  private readonly failures: VisionAttemptFailureView[] = []
   private ollamaProbe: Promise<EndpointAttempt | null>
   private failure: string | null = null
 
@@ -542,6 +545,21 @@ export class VisionTranscriber {
     private readonly deps: VisionTranscriberDeps,
   ) {
     this.ollamaProbe = this.probeFor(settings)
+  }
+
+  /** Recent per-attempt failures, newest first (bounded, in-process only). */
+  attemptFailures(): readonly VisionAttemptFailureView[] {
+    return [...this.failures].reverse()
+  }
+
+  /** Record one failed transcription attempt for the Settings tab. */
+  private recordFailure(
+    source: VisionAttemptFailureView['source'],
+    label: string,
+    message: string,
+  ): void {
+    this.failures.push({ time: Date.now(), source, label, message })
+    if (this.failures.length > ATTEMPT_FAILURE_CAP) this.failures.splice(0, this.failures.length - ATTEMPT_FAILURE_CAP)
   }
 
   /** One Ollama probe built from the given settings (restarted on reconfig). */
@@ -710,16 +728,22 @@ export class VisionTranscriber {
   private async describeFresh(ref: ImageRefFace, signal?: AbortSignal): Promise<string> {
     const errors: string[] = []
     for (const candidate of await this.harnessCandidates()) {
-      const text = await this.streamHarness(candidate, ref, signal)
-      if (text !== null) return text
-      errors.push(`vision model ${candidate.provider}/${candidate.model} returned no text`)
+      const result = await this.streamHarness(candidate, ref, signal)
+      if (result.text !== null) return result.text
+      const message = result.error ?? 'returned no text'
+      const label = `${candidate.provider}/${candidate.model}`
+      this.recordFailure('dsh', label, message)
+      errors.push(`vision model ${label} ${message}`)
       await sleep(RETRY_DELAY_MS)
     }
     for (const attempt of await this.endpointAttempts()) {
+      const label = `${attempt.model} @ ${attempt.baseURL}`
       const until = this.cooldowns.get(attempt.baseURL)
       if (until !== undefined) {
         if (Date.now() < until) {
-          errors.push(`${attempt.model} @ ${attempt.baseURL}: skipped — endpoint cooling down after a recent failure`)
+          const message = 'skipped — endpoint cooling down after a recent failure'
+          this.recordFailure('endpoint', label, message)
+          errors.push(`${label}: ${message}`)
           continue
         }
         this.cooldowns.delete(attempt.baseURL)
@@ -728,7 +752,9 @@ export class VisionTranscriber {
         try {
           resolveVisionApiKey(attempt, attempt.baseURL, this.settings.apiKeyEnv)
         } catch (error) {
-          errors.push(error instanceof Error ? error.message : String(error))
+          const message = error instanceof Error ? error.message : String(error)
+          this.recordFailure('endpoint', label, message)
+          errors.push(message)
           continue
         }
       }
@@ -736,7 +762,8 @@ export class VisionTranscriber {
         return await this.transcribeEndpoint(attempt, ref, signal)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        errors.push(`${attempt.model} @ ${attempt.baseURL}: ${message}`)
+        this.recordFailure('endpoint', label, message)
+        errors.push(`${label}: ${message}`)
         const timedOut = error instanceof Error && error.name === 'TimeoutError'
           || /aborted due to timeout|timed out|timeout/iu.test(message)
         if (message.includes('(rate_limit)') || timedOut) {
@@ -754,9 +781,9 @@ export class VisionTranscriber {
     candidate: { provider: string; model: string },
     ref: ImageRefFace,
     signal?: AbortSignal,
-  ): Promise<string | null> {
+  ): Promise<{ text: string | null; error: string | null }> {
     const llm = this.deps.llm
-    if (llm === undefined || typeof llm.stream !== 'function') return null
+    if (llm === undefined || typeof llm.stream !== 'function') return { text: null, error: 'llm service unavailable' }
     const messages = [{
       id: `web-enhanced-vision-${String(Math.random().toString(36).slice(2))}`,
       role: 'user',
@@ -777,14 +804,12 @@ export class VisionTranscriber {
         if (chunk.type === 'text-delta' && typeof chunk.text === 'string') text += chunk.text
       }
     } catch (error) {
-      this.deps.logger.warn(
-        `dsh-web-enhanced vision: ${candidate.provider}/${candidate.model} failed — `
-        + (error instanceof Error ? error.message : String(error)),
-      )
-      return null
+      const message = error instanceof Error ? error.message : String(error)
+      this.deps.logger.warn(`dsh-web-enhanced vision: ${candidate.provider}/${candidate.model} failed — ${message}`)
+      return { text: null, error: message }
     }
     const trimmed = text.trim()
-    return trimmed === '' ? null : trimmed
+    return trimmed === '' ? { text: null, error: null } : { text: trimmed, error: null }
   }
 
   /**
@@ -1190,6 +1215,7 @@ export class VisionInterceptor extends Service {
       ollamaModel: ollama.model,
       cacheSize: this.transcriber.cacheSize,
       lastError: this.transcriber.lastError,
+      failures: this.transcriber.attemptFailures(),
     }
   }
 

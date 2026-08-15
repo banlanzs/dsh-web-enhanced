@@ -252,6 +252,12 @@ describe('VisionTranscriber', () => {
     expect(await transcriber.describe(ref(), new Map())).toBe('B 成功')
     expect(order).toEqual(['a', 'b'])
     expect(listModels).not.toHaveBeenCalled()
+    expect(transcriber.attemptFailures()).toEqual([{
+      time: expect.any(Number),
+      source: 'dsh',
+      label: 'p/a',
+      message: 'returned no text',
+    }])
   })
 
   it('tries the preferred endpoint model, then the rest of the saved pool', async () => {
@@ -282,6 +288,11 @@ describe('VisionTranscriber', () => {
     expect(urls).toHaveLength(2)
     const bodies = fetchImpl.mock.calls.map(call => JSON.parse(String((call[1] as RequestInit).body)) as { model: string })
     expect(bodies.map(body => body.model)).toEqual(['first', 'second'])
+    expect(transcriber.attemptFailures()).toMatchObject([{
+      source: 'endpoint',
+      label: 'first @ https://vlm.example/v1',
+      message: expect.stringContaining('first failed'),
+    }])
   })
 
   it('falls back to the configured endpoint and caches by content hash', async () => {

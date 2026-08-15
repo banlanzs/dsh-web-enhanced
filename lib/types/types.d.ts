@@ -489,6 +489,16 @@ export interface VisionHarnessModelView {
     readonly provider: string;
     readonly model: string;
 }
+/** One transcription attempt that failed, kept for the Settings tab. */
+export interface VisionAttemptFailureView {
+    /** Unix epoch ms. */
+    readonly time: number;
+    /** Which source was being tried. */
+    readonly source: 'dsh' | 'ollama' | 'endpoint';
+    /** The model or endpoint that failed (never contains secrets). */
+    readonly label: string;
+    readonly message: string;
+}
 /** Live state of the image-understanding integration, shown in Settings. */
 export interface VisionStatusView {
     /** False when the integration service is absent from this deployment. */
@@ -511,6 +521,8 @@ export interface VisionStatusView {
     readonly cacheSize: number;
     /** The most recent transcription failure, or null. */
     readonly lastError: string | null;
+    /** Recent per-attempt failures, newest first (bounded, in-process). */
+    readonly failures: readonly VisionAttemptFailureView[];
 }
 export type VisionStatusResult = VisionStatusView | {
     readonly error: ApiError;

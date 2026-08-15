@@ -176,6 +176,43 @@
   padding: 14px;
 }
 
+.statusHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.failures {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.failureEntry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.failureTime {
+  opacity: 0.55;
+}
+
+.failureMessage {
+  flex: 1 1 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  opacity: 0.8;
+}
+
 .row {
   display: grid;
   grid-template-columns: minmax(130px, 200px) 1fr;
