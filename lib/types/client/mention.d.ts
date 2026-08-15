@@ -76,6 +76,10 @@ export declare function mentionOf(path: string): string;
  * crowd out real project files. Files inside a skipped directory are still
  * reachable through the browse row, whose walker applies no such filter.
  *
+ * The host walk also lists each directory's files before descending into its
+ * subdirectories, so root-level documents like `TODO.md` stay in the batch
+ * instead of being cut off by the entry cap behind a deep `lib` tree.
+ *
  * A session with no project still gets the browse row: it has no listing to
  * offer, but nothing about it forbids naming a path.
  * @param deps - remote and workspace resolution.

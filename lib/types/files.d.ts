@@ -40,6 +40,11 @@ export declare function listDirectory(root: string, rel: string, limits: FsLimit
  * are the files a composer mention is least likely to name, and letting them
  * flood a bounded list would crowd out the actual project files; the host-wide
  * browse walker is the escape hatch for anything inside a skipped directory.
+ *
+ * Within one directory, FILES come before subdirectories (each group
+ * name-sorted). That ordering is what makes a root-level `TODO.md` / README /
+ * config reach the bounded result even when a deep `lib` or `src` tree would
+ * otherwise consume every remaining seat first.
  */
 export declare function searchFiles(root: string, rel: string, query: string, limits: FsLimits): Promise<FsEntryView[]>;
 /**

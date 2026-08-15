@@ -90,6 +90,19 @@ describe('searchFiles', () => {
     expect(entries.map(entry => entry.path)).toEqual(['src/DemoFile.ts'])
   })
 
+  it('lists a level’s files before descending, so root documents survive the entry cap', async () => {
+    // The old DFS order let the first subdirectory consume the whole cap, so
+    // a root TODO.md / README beyond seat 200 was unreachable in the mention
+    // picker. Files first (name-sorted) makes those entries deterministic.
+    const root = await tempRoot()
+    await mkdir(join(root, 'z-dir', 'nested'), { recursive: true })
+    await writeFile(join(root, 'z-dir', 'nested', 'deep.txt'), 'x')
+    await writeFile(join(root, 'a.txt'), 'x')
+    await writeFile(join(root, 'todo.md'), 'x')
+    const capped = await searchFiles(root, '', '', { ...limits, searchMaxEntries: 2 })
+    expect(capped.map(entry => entry.path)).toEqual(['a.txt', 'todo.md'])
+  })
+
   it('walks subdirectories and matches directory names', async () => {
     const root = await tempRoot()
     await mkdir(join(root, 'docs', 'guide'), { recursive: true })

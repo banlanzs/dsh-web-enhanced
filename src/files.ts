@@ -96,13 +96,30 @@ export async function listDirectory(root: string, rel: string, limits: FsLimits)
  * are the files a composer mention is least likely to name, and letting them
  * flood a bounded list would crowd out the actual project files; the host-wide
  * browse walker is the escape hatch for anything inside a skipped directory.
+ *
+ * Within one directory, FILES come before subdirectories (each group
+ * name-sorted). That ordering is what makes a root-level `TODO.md` / README /
+ * config reach the bounded result even when a deep `lib` or `src` tree would
+ * otherwise consume every remaining seat first.
  */
 export async function searchFiles(root: string, rel: string, query: string, limits: FsLimits): Promise<FsEntryView[]> {
   const needle = query.trim().toLowerCase()
   const out: FsEntryView[] = []
+
+  /** Files first, then directories; each group name-ascending. */
+  const compareDirents = (
+    left: { readonly name: string; isDirectory(): boolean },
+    right: { readonly name: string; isDirectory(): boolean },
+  ): number => {
+    const leftDir = left.isDirectory() ? 1 : 0
+    const rightDir = right.isDirectory() ? 1 : 0
+    if (leftDir !== rightDir) return leftDir - rightDir
+    return left.name < right.name ? -1 : left.name > right.name ? 1 : 0
+  }
+
   const walk = async (dir: string, depth: number): Promise<void> => {
     if (depth > limits.searchMaxDepth || out.length >= limits.searchMaxEntries) return
-    const entries = await readdir(dir, { withFileTypes: true })
+    const entries = (await readdir(dir, { withFileTypes: true })).sort(compareDirents)
     for (const entry of entries) {
       if (out.length >= limits.searchMaxEntries) return
       if (entry.name === '.git') continue
