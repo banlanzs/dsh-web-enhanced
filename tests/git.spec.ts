@@ -144,6 +144,72 @@ describe('GitClient', () => {
     expect(detail.parents).toEqual([])
   })
 
+  it('working reads three diffs, caps the list, and only counts retained untracked files', async () => {
+    const { fake, git } = client()
+    fake.enqueue({ stdout: 'abc\n' })
+    fake.enqueue({ stdout: '3\t1\tsrc/a.ts\n' })
+    fake.enqueue({ stdout: '2\t0\tsrc/a.ts\n-\t-\tlogo.png\n' })
+    fake.enqueue({ stdout: 'new-one.md\0new-two.md\0' })
+    const counted: string[] = []
+    const view = await git.working(3, async (path) => {
+      counted.push(path)
+      return 7
+    })
+    expect(view.head).toBe('abc')
+    expect(view).toMatchObject({ staged: 1, unstaged: 2, untracked: 2, truncated: true })
+    expect(view.files).toEqual([
+      { path: 'src/a.ts', state: 'staged', added: 3, removed: 1 },
+      { path: 'src/a.ts', state: 'unstaged', added: 2, removed: 0 },
+      { path: 'logo.png', state: 'unstaged', added: null, removed: null },
+    ])
+    // The cap cut both untracked entries, so nothing was read from disk — the
+    // point of capping before counting rather than after.
+    expect(counted).toEqual([])
+    expect(fake.calls.map(call => call.argv.join(' '))).toEqual([
+      'git rev-parse HEAD',
+      'git diff --cached --numstat',
+      'git diff --numstat',
+      'git ls-files --others --exclude-standard -z',
+    ])
+  })
+
+  it('working counts untracked files, tolerates an unborn HEAD, and leaves counts null without a counter', async () => {
+    const { fake, git } = client()
+    fake.enqueue({ exitCode: 128, stderr: 'fatal: ambiguous argument HEAD\n' })
+    fake.enqueue({ stdout: '' })
+    fake.enqueue({ stdout: '' })
+    fake.enqueue({ stdout: 'a.md\0' })
+    const counted = await git.working(50, async () => 12)
+    // An unborn branch has no HEAD; the row simply has no commit to attach to.
+    expect(counted.head).toBe('')
+    expect(counted.files).toEqual([{ path: 'a.md', state: 'untracked', added: 12, removed: null }])
+
+    fake.enqueue({ stdout: 'abc\n' })
+    fake.enqueue({ stdout: '' })
+    fake.enqueue({ stdout: '' })
+    fake.enqueue({ stdout: 'a.md\0' })
+    const uncounted = await git.working(50)
+    expect(uncounted.files).toEqual([{ path: 'a.md', state: 'untracked', added: null, removed: null }])
+  })
+
+  it('working surfaces the failing git command', async () => {
+    const { fake, git } = client()
+    fake.enqueue({ stdout: 'abc\n' })
+    fake.enqueue({ exitCode: 128, stderr: 'fatal: bad index\n' })
+    await expect(git.working(50)).rejects.toThrow('fatal: bad index')
+
+    fake.enqueue({ stdout: 'abc\n' })
+    fake.enqueue({ stdout: '' })
+    fake.enqueue({ exitCode: 128, stderr: '' })
+    await expect(git.working(50)).rejects.toThrow('git diff failed')
+
+    fake.enqueue({ stdout: 'abc\n' })
+    fake.enqueue({ stdout: '' })
+    fake.enqueue({ stdout: '' })
+    fake.enqueue({ exitCode: 128, stderr: '' })
+    await expect(git.working(50)).rejects.toThrow('git ls-files failed')
+  })
+
   it('checkout succeeds or carries the rejection message', async () => {
     const { fake, git } = client()
     fake.enqueue({ exitCode: 0 })

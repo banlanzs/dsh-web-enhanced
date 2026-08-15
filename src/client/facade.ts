@@ -73,6 +73,7 @@ export function createRemoteFacade(
     gitBranches: async request => open(await raw.gitBranches(request)),
     gitLog: async request => open(await raw.gitLog(request)),
     gitCommit: async request => open(await raw.gitCommit(request)),
+    gitWorking: async request => open(await raw.gitWorking(request)),
     gitCheckout: async request => open(await raw.gitCheckout(request)),
     gitStatus: async request => open(await raw.gitStatus(request)),
     gitDiff: async request => open(await raw.gitDiff(request)),

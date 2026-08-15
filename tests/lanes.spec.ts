@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { laneColor, layoutLanes, shortHash } from '../src/client/git/lanes.ts'
+import { laneColor, layoutLanes, placeWorking, shortHash } from '../src/client/git/lanes.ts'
 import type { GitCommitView } from '../src/types.ts'
 
 /** One commit; `parents` drives every layout decision. */
@@ -61,6 +61,34 @@ describe('layoutLanes', () => {
 
   it('reports no columns for an empty history', () => {
     expect(layoutLanes([])).toEqual({ rows: [], width: 0 })
+  })
+})
+
+describe('placeWorking', () => {
+  it('sits above HEAD on HEAD lane, with the lanes that pass it by', () => {
+    // Two tips: `x` is newer, but HEAD is `c` on the second lane.
+    const layout = layoutLanes([commit('x', ['a']), commit('c', ['b']), commit('b'), commit('a')])
+    const head = layout.rows.find(row => row.commit.hash === 'c')!
+    const placement = placeWorking(layout.rows, 'c')
+    expect(placement.index).toBe(1)
+    expect(placement.lane).toBe(head.lane)
+    // HEAD's own lane is excluded: the dashed stub draws it, and drawing both
+    // would put a solid rail under a row that has no commit.
+    expect(placement.through).not.toContain(head.lane)
+    expect(placement.through).toEqual(layout.rows[0]!.through.filter(lane => lane !== head.lane))
+  })
+
+  it('goes to the top with nothing to connect to when HEAD is not drawn', () => {
+    const layout = layoutLanes([commit('b', ['a']), commit('a')])
+    // Filtered to a branch HEAD is not on, or HEAD fell past the row cap: the
+    // changes are still real, so the row stays.
+    expect(placeWorking(layout.rows, 'elsewhere')).toEqual({ index: 0, lane: 0, through: [] })
+    expect(placeWorking([], 'anything')).toEqual({ index: 0, lane: 0, through: [] })
+  })
+
+  it('has no rails above it when HEAD is the first row', () => {
+    const layout = layoutLanes([commit('b', ['a']), commit('a')])
+    expect(placeWorking(layout.rows, 'b')).toEqual({ index: 0, lane: 0, through: [] })
   })
 })
 

@@ -31,15 +31,32 @@ function timeOf(at: number | null): string {
   return at === null ? '—' : new Date(at).toLocaleString()
 }
 
+/**
+ * Whether a card starts collapsed.
+ *
+ * Only the done column. A finished task's prompt and result are what made the
+ * column scroll for pages, and both are already history — but a FAILED task is
+ * the opposite case: its message is the reason to look at the board at all, so
+ * it stays open.
+ * @param status - the task's column.
+ * @returns true when the card collapses by default.
+ */
+export function collapsesByDefault(status: TaskRecord['status']): boolean {
+  return status === 'done'
+}
+
 /** One task card: summary, schedule, outcome, and the actions for its column. */
 export function TaskCard({ task, workspaces, t, onRun, onOpen, onRemove, onUpdate }: TaskCardProps) {
   const [editing, setEditing] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const [title, setTitle] = useState(task.title)
   const [prompt, setPrompt] = useState(task.prompt)
   const [cron, setCron] = useState(task.cron ?? '')
   const [workspaceId, setWorkspaceId] = useState(task.workspaceId ?? '')
 
   const running = task.status === 'running'
+  const collapsible = collapsesByDefault(task.status)
+  const collapsed = collapsible && !expanded
 
   const submit = (): void => {
     onUpdate({
@@ -90,9 +107,42 @@ export function TaskCard({ task, workspaces, t, onRun, onOpen, onRemove, onUpdat
     )
   }
 
+  if (collapsed) {
+    return (
+      <li className={css.card} data-testid="task-card" data-status={task.status} data-collapsed="true">
+        <button
+          type="button"
+          className={css.summary}
+          aria-expanded={false}
+          title={t('board.expand')}
+          data-testid="task-expand"
+          onClick={() => { setExpanded(true) }}
+        >
+          <span className={css.chevron} aria-hidden>▸</span>
+          <span className={css.summaryTitle}>{task.title}</span>
+          <span className={css.summaryTime}>{timeOf(task.lastRunAt)}</span>
+        </button>
+      </li>
+    )
+  }
+
   return (
     <li className={css.card} data-testid="task-card" data-status={task.status}>
-      <h4 className={css.title}>{task.title}</h4>
+      {collapsible
+        ? (
+            <button
+              type="button"
+              className={css.summary}
+              aria-expanded
+              title={t('board.collapse')}
+              data-testid="task-collapse"
+              onClick={() => { setExpanded(false) }}
+            >
+              <span className={css.chevron} aria-hidden>▾</span>
+              <span className={css.summaryTitle}>{task.title}</span>
+            </button>
+          )
+        : <h4 className={css.title}>{task.title}</h4>}
       <p className={css.prompt}>{task.prompt}</p>
       <dl className={css.meta}>
         {task.cron !== null && <div className={css.metaRow}>{t('board.meta.cron', { cron: task.cron })}</div>}

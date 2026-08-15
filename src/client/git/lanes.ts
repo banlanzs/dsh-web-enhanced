@@ -107,6 +107,39 @@ export function layoutLanes(commits: readonly GitCommitView[]): GraphLayout {
   return { rows, width: Math.max(width, rows.length === 0 ? 0 : 1) }
 }
 
+/** Where the uncommitted row sits relative to the laid-out commits. */
+export interface WorkingPlacement {
+  /** Render the row immediately BEFORE the commit row at this index. */
+  readonly index: number
+  /** Lane of its dot — HEAD's own lane, so the dashed stub lands on it. */
+  readonly lane: number
+  /** Lanes that pass this row untouched (HEAD's lane excluded; the stub owns it). */
+  readonly through: readonly number[]
+}
+
+/**
+ * Place the uncommitted-changes row against HEAD.
+ *
+ * It is drawn where HEAD is rather than always on top, because that is what it
+ * describes: with `--all` the newest commit in view may belong to another
+ * branch entirely. When HEAD is not among the drawn rows — the graph is
+ * filtered to a branch that is not checked out, or HEAD fell past the row cap —
+ * the row goes to the top on lane 0 with nothing to connect to, because the
+ * changes are still real even though their base is off-screen.
+ * @param rows - the laid-out commit rows.
+ * @param head - HEAD's commit hash.
+ * @returns the placement.
+ */
+export function placeWorking(rows: readonly GraphRow[], head: string): WorkingPlacement {
+  const index = rows.findIndex(row => row.commit.hash === head)
+  if (index === -1) return { index: 0, lane: 0, through: [] }
+  const lane = rows[index]!.lane
+  // Lanes alive between the row above and HEAD's row are exactly what the row
+  // above reports as continuing below it.
+  const above = index === 0 ? [] : rows[index - 1]!.through
+  return { index, lane, through: above.filter(candidate => candidate !== lane) }
+}
+
 /** Stable colour index of a lane (the renderer maps it onto its palette). */
 export function laneColor(lane: number, paletteSize: number): number {
   return paletteSize <= 0 ? 0 : lane % paletteSize

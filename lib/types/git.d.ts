@@ -5,15 +5,23 @@
  * @module dsh-web-enhanced/src/git
  */
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess';
-import type { GitBranchView, GitCommitDetailView, GitCommitView, GitStatusEntry } from './types.ts';
+import type { GitBranchView, GitCommitDetailView, GitCommitFileView, GitCommitView, GitStatusEntry, GitWorkingView } from './types.ts';
+/**
+ * Read `--numstat` rows into per-file line counts.
+ *
+ * One `<added>\t<removed>\t<path>` per file, with `-` for a binary file's
+ * counts. A rename is emitted as three NUL-free fields where the path is
+ * `old => new` inside braces, so it is kept verbatim — the display shows what
+ * git says rather than guessing at the halves.
+ * @param text - the numstat section.
+ * @returns one entry per parsable row.
+ */
+export declare function parseNumstat(text: string): GitCommitFileView[];
 /**
  * Read `git show --numstat` output into one commit detail.
  *
  * The header is everything before the record separator the format appends;
- * the numstat rows follow it, one `<added>\t<removed>\t<path>` per file, with
- * `-` for a binary file's counts. A rename is emitted as three NUL-free
- * fields where the path is `old => new` inside braces, so it is kept verbatim
- * — the display shows what git says rather than guessing at the halves.
+ * the numstat rows follow it.
  * @param stdout - the command's output.
  * @returns the parsed detail; a missing separator yields an empty file list.
  */
@@ -58,6 +66,24 @@ export declare class GitClient {
      * @returns identity, message body, and changed files.
      */
     commit(hash: string): Promise<GitCommitDetailView>;
+    /**
+     * The uncommitted state of the work tree, as the graph's top row shows it.
+     *
+     * Three reads, because git computes three different diffs and there is no
+     * single command that answers all of them: `--cached` is the index against
+     * HEAD, a plain `diff` is the work tree against the index, and untracked
+     * files are in neither — they are listed by `ls-files --others`.
+     *
+     * An untracked file has no numstat at all (git would have to add it to the
+     * index first, which this must not do), so its added-line count comes from
+     * `countLines`, applied only to the entries that survive the cap. Without a
+     * counter, or when the file is binary or over the read cap, the count stays
+     * `null` and the display shows what a binary file shows.
+     * @param maxFiles - cap on the returned file list.
+     * @param countLines - optional line counter for untracked files.
+     * @returns the working view; totals are pre-cap.
+     */
+    working(maxFiles: number, countLines?: (path: string) => Promise<number | null>): Promise<GitWorkingView>;
     /** Branch names per commit hash (heads and remotes). */
     private collectRefs;
     /** Check out one branch; a rejected switch returns its stderr. */

@@ -16,12 +16,12 @@
 
 | 功能 | 说明 |
 |---|---|
-| **任务看板** | 侧边栏入口打开看板；任务按五列组织（待规划 / 待办 / 进行中 / 已完成 / 已失败）；卡片「执行」在宿主上开一个真实 DSH 智能体会话运行任务提示词，会话按部署的 agent preset 组合（因此拿得到 bash / read_file / write_file 等工具）并附着到任务绑定的项目上，完成后状态与结果自动回写；「查看会话」跳转到执行会话；**每张卡片带内联编辑表单**（title / prompt / cron / 状态列——done/failed 改回 planned/todo 即重开）；支持 5 字段 cron 定时（如 `0 23 * * *`），到期自动运行，宿主重启后补跑并恢复中断任务。 |
-| **Git 图谱** | 侧边栏入口打开图谱覆盖层；分支泳道 + 提交历史以 SVG 渲染（首父连续泳道 + 合并横向连线）；标题栏的分支下拉只筛选图谱显示的提交（全部分支 / 单分支），不切换仓库；点击任一提交展开详情：完整 hash、父提交、作者与邮箱、时间、提交正文，以及逐文件增删行数。输入框上方另有分支选择条（切换分支、最近提交、打开图谱）——那是真正的 checkout，与图谱筛选是两回事。 |
+| **任务看板** | 侧边栏入口打开看板；任务按五列组织（待规划 / 待办 / 进行中 / 已完成 / 已失败）；卡片「执行」在宿主上开一个真实 DSH 智能体会话运行任务提示词，会话按部署的 agent preset 组合（因此拿得到 bash / read_file / write_file 等工具）并附着到任务绑定的项目上，完成后状态与结果自动回写；「查看会话」跳转到执行会话；**每张卡片带内联编辑表单**（title / prompt / cron / 状态列——done/failed 改回 planned/todo 即重开）；**「已完成」列的卡片默认折叠为一行标题**（点击展开），「已失败」不折叠，因为那一列的错误信息正是要看的东西；支持 5 字段 cron 定时（如 `0 23 * * *`），到期自动运行，宿主重启后补跑并恢复中断任务。 |
+| **Git 图谱** | 侧边栏入口打开图谱覆盖层；分支泳道 + 提交历史以 SVG 渲染（首父连续泳道 + 合并横向连线）；标题栏的分支下拉只筛选图谱显示的提交（全部分支 / 单分支），不切换仓库；点击任一提交展开详情：完整 hash、父提交、作者与邮箱、时间、提交正文，以及逐文件增删行数。**顶部另有「未提交的改动」一行**：空心虚线圆点画在 HEAD 所在泳道上并虚线连到 HEAD，展开后逐文件列出暂存 / 未暂存 / 未跟踪的增删行数（未跟踪文件的行数由宿主读文件数出，二进制或超限报 `—`）。输入框上方另有分支选择条——那是真正的 checkout，与图谱筛选是两回事；切换前若工作区不干净会先问一句，并分开报「已跟踪 / 未跟踪」的条数。 |
 | **工作区视图** | 会话顶部视图栏中的「工作区」标签页，与「对话」「轨迹」并列，内含文件 / 预览 / 变更三个面板。文件树支持整行展开、文件名搜索、点击打开预览；预览支持 markdown（含 GFM 表格、HTML 表格与行内 HTML）/ HTML（sandbox iframe）/ 代码 / **diff**（行级高亮 unified diff）/ CSV / 图片 / PDF / 文本 / **Office（docx/xlsx，宿主侧结构化转换）**，且支持**源码 / 分屏 / 预览**三态与保存；变更页基于真实 git status，支持 stage / unstage / discard 与逐文件 diff。当前面板与展开的目录按工作区持久化。 |
 | **文件 mention** | 输入框 `+` 菜单里的「引用文件」「引用文件夹」两项：先给出项目内条目的扁平列表（可本地过滤），第一行「浏览其他位置…」打开插件自带的文件浏览器，可走到**项目外的任意目录**（面包屑 / 上一级 / 主目录 / 按名过滤）。选中后把 `@路径` 插入草稿，含空格的路径自动加引号。 |
 | **余额显示** | 输入框下方显示 DeepSeek API 余额（`GET /user/balance`），带刷新与弱化错误态。**仅在当前会话的模型路由确实指向该余额所属账户时显示**——切到别家渠道（或把 deepseek-official 改指到自建网关）后整行隐藏，因为那时的数字说的是另一个账户。 |
-| **设置页 + 插件管理** | 设置面板左侧多一行「Web 增强」（注册到 `settings.section`）。页内的**插件管理**列出当前 profile 装了哪些插件（名称、版本、依赖 spec、是否已启用为层），可**更新**或**移除**。列的是 profile `package.json` 的 `dependencies`——那才是 pnpm 能操作的集合；模板层（`@deepseek-ai/dsh-base` 等）单独列出且不给按钮，因为没有任何依赖提供它们。**所有操作都在下次启动才生效**（层栈在启动时组合），界面照直说明；移除本插件自己不被阻止，但确认框会说清代价。 |
+| **设置页 + 插件管理** | 设置面板左侧多一行「Web 增强」（注册到 `settings.section`）。页内的**插件管理**列出当前 profile 装了哪些插件（名称、版本、依赖 spec、是否已启用为层），可**更新**或**移除**。列的是 profile `package.json` 的 `dependencies`——那才是 pnpm 能操作的集合；模板层（`@deepseek-ai/dsh-base` 等）单独列出且不给按钮，因为没有任何依赖提供它们。**只看得到启动时所用的那个 profile**（`dsh --profile web` 就只列 web 的依赖），profile 名与路径印在标题下。**所有操作都在下次启动才生效**（层栈在启动时组合），界面照直说明；移除本插件自己不被阻止，但确认框会说清代价。 |
 
 ## 截图
 
@@ -42,7 +42,7 @@
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # 推荐
 # 或：
-# dsh plugin --profile web add ./dsh-web-enhanced-0.6.0.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.7.0.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -111,7 +111,7 @@ host 能力失效）。改用打包重装来迭代：
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.6.0.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.7.0.tgz
 ```
 
 Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPackage` 步骤）。
@@ -134,6 +134,7 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 | `binaryMaxBytes` | 5 MiB | 二进制预览（base64）上限 |
 | `gitOutputMaxBytes` | 256 KiB | git 单流输出上限 |
 | `gitMaxCount` | 100 | git log 行数上限 |
+| `gitWorkingMaxFiles` | 300 | 未提交改动的文件数上限；也限定了最多读多少个未跟踪文件来数行数 |
 | `searchMaxDepth` / `searchMaxEntries` | 8 / 200 | 文件搜索深度与条数上限 |
 | `officeMaxBytes` | 5 MiB | Office（docx/xlsx）预览文件大小上限 |
 | `browseMaxEntries` | 500 | mention 浏览器单层目录的条目上限 |
@@ -147,6 +148,7 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 - **任务执行**：`agentPresets.resolve()` 解析部署默认 preset → 写进 `meta.agentPreset` → 在 `setup` 里 `mount`（与宿主 `ensureSession` 同序），随后 `workspace.attachSession` 把会话记到项目上；之后 `followup` + `whenIdle` + `sessions.flush`，结果按 `turn/end` reason 回写。没有 preset 名册的部署照常运行，只是会话只带宿主根注册的工具。
 - **手写 remote contribution**：host 方法用 `@Remote` 装饰器（Typert SRC 模式，宿主网关自动发现 `ctx.webEnhanced` 服务）；客户端在 apply 里 `ctx.remote.$mount()` 手写的 src-json contribution，无需 typert 生成管线。
 - **持久化**：任务记录存 `ctx.storageDomain` 域 `web_enhanced`（JSON 后端），重启恢复 running → failed（host-restart）。
+- **未提交改动只读不写**：三条命令（`diff --cached --numstat`、`diff --numstat`、`ls-files --others --exclude-standard`）——git 算的是三个不同的 diff，没有哪一条能一次回答完。未跟踪文件根本没有 numstat，而唯一能让它有的办法是先入索引（那是改仓库），所以它的新增行数改由宿主侧有界读取数出；文件列表先截断**再**去读，因此几千个未跟踪文件不会变成几千次读盘。
 - **路径安全**：所有 fs/git 路径经工作区根校验（拒绝绝对路径、`..`、反斜杠）；单 ref 参数拒绝 `-` 开头、`..` 范围与空白/通配（防止一个参数变成两个或变成选项）；git 输出有界收集；文件读有字节上限与二进制嗅探。Office 文件在宿主侧用 fflate 解包为有界结构化 blocks（标题/段落/列表/表格，≤ 2000 块、≤ 200×50 表格），绝不产出原始 HTML。
 - **唯一的例外：`fsBrowse`**。它列出任意绝对目录，不受工作区根约束——因为 mention 产出的只是一个**路径字符串**，而用户要的路径可能就在项目外。它只返回名称、类型与大小；读、写、预览仍然全部锁在工作区内。
 - **插件管理不改宿主任何文件**：设置页注册进既有的 `settings.section` 槽；配置与清单走本插件自己的 Typert 网关，因此不需要像 DSH-vision 那样去改 apiproxy 的 settings 暴露白名单（那是改 `node_modules` 里的宿主发布产物，每次升级会被覆盖）。remove/update 只在 profile 目录里跑 pnpm、重写该 profile 的 `dsh.profile.bundles`——与 `dsh plugin` 完全同一条路径。也没有把 `@deepseek-ai/dsh-app-boot`（CLI 里这些例程的归属）写成 peer：它是 dsh 安装的依赖而非 profile 的依赖，那样恰好会在这段代码唯一运行的部署里解析失败。
@@ -156,7 +158,7 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + 全部测试 + 构建（212 个测试）
+pnpm run check   # typecheck + 全部测试 + 构建（252 个测试）
 ```
 
 构建产物：
@@ -186,7 +188,10 @@ node scripts/e2e.mjs --capture   # 顺带刷新本 README 使用的 assets/*.png
 - 定时任务为 best-effort：tick 粒度 30s，宿主关机期间错过的窗口在启动时补跑一次，不留积压。
 - 余额 key 与模型提供商同源（环境变量）；未配置时显示错误态而非报错。切到非 `balanceProviders` 的渠道时整行隐藏。
 - 图谱泳道为简化算法（首父连续性），非 git 完整拓扑着色；提交详情的文件清单按首父 diff 统计，合并提交因此只显示它带进来的改动。
+- 未提交改动行：未跟踪文件的行数由宿主读文件数出（git 对未跟踪路径没有 numstat，而生成 numstat 就得先入索引——那是修改仓库），二进制、超过 `readMaxBytes` 或读取时已消失的文件报 `—`；同一文件既暂存又继续改过会出现两行（那是 git 算的两个 diff）。HEAD 不在当前绘制范围内时该行置顶且不连线。
+- 分支切换不做 stash，也不阻止脏切换：git 会把不冲突的改动带过去，冲突时自行拒绝；这里只是切换前告知并让你确认。
 - 插件管理**不重载运行中的进程**：Cordis 在启动时组合层栈，所以 update/remove 描述的是下一次启动。同理它也不做 enable/disable——那要改的是 profile 的 `cordis.patch.yml`，与安装是两回事。
+- 插件管理**只看得到启动时所用的 profile**：`dsh --profile web` 列的是 `~/.dsh/profiles/web` 的依赖，装在别的 profile 里的插件不会出现。profile 目录就是 pnpm 的工作目录，跨 profile 操作会在一个此刻并未组合层栈的目录里跑 pnpm。要管别的 profile，用那个 profile 启动，或走 `dsh plugin --profile <name>`。
 - 插件管理需要 PATH 上有 `pnpm`，且 profile 目录在本插件模块的祖先链上（正常安装即满足；源码检出或测试环境会显示「没有可管理的插件」而不是报错）。同时只允许一个 pnpm 操作在跑，第二个请求会被告知而不是排队。
 
 ## License

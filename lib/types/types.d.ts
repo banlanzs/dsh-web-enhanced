@@ -128,6 +128,39 @@ export interface GitCommitDetailView {
     readonly files: readonly GitCommitFileView[];
 }
 /**
+ * How one working-tree file differs, i.e. which diff it came out of.
+ *
+ * The three are not exclusive per path: a file staged and then edited again
+ * appears once as `staged` (index vs HEAD) and once as `unstaged` (worktree vs
+ * index), with different counts. Collapsing them would invent a third number
+ * git never computed.
+ */
+export type GitWorkingState = 'staged' | 'unstaged' | 'untracked';
+/** One uncommitted file with its line counts. */
+export interface GitWorkingFileView {
+    readonly path: string;
+    readonly state: GitWorkingState;
+    /** Added lines; `null` when unknown (binary, or an untracked file over the read cap). */
+    readonly added: number | null;
+    /** Removed lines; always `null` for an untracked file, which has no old side. */
+    readonly removed: number | null;
+}
+/** The uncommitted state of a work tree, as the graph's top row shows it. */
+export interface GitWorkingView {
+    /**
+     * HEAD's commit hash, so the graph can attach the row to the commit it sits
+     * on. Empty in a repository with no commits yet.
+     */
+    readonly head: string;
+    readonly files: readonly GitWorkingFileView[];
+    /** Totals BEFORE the file cap, so a truncated list still reports the truth. */
+    readonly staged: number;
+    readonly unstaged: number;
+    readonly untracked: number;
+    /** True when `files` was cut at the cap. */
+    readonly truncated: boolean;
+}
+/**
  * One porcelain-v1 status entry. `path` is always the entry's CURRENT path,
  * so it is what stage/unstage/discard pass to git; a rename or copy carries
  * its source separately in `origPath` for display (`origPath -> path`).
@@ -151,6 +184,11 @@ export type GitLogResult = {
 };
 export type GitCommitResult = {
     readonly commit: GitCommitDetailView;
+} | {
+    readonly error: ApiError;
+};
+export type GitWorkingResult = {
+    readonly working: GitWorkingView;
 } | {
     readonly error: ApiError;
 };
@@ -195,6 +233,9 @@ export interface GitLogRequest {
 export interface GitCommitRequest {
     readonly workspaceId: string;
     readonly hash: string;
+}
+export interface GitWorkingRequest {
+    readonly workspaceId: string;
 }
 export interface GitCheckoutRequest {
     readonly workspaceId: string;

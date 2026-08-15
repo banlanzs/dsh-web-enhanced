@@ -206,3 +206,43 @@
 
 .added { color: #4caf72; }
 .removed { color: #d9534f; }
+
+/* The uncommitted row: dashed and hollow, because nothing in the repository
+   records it and it disappears the moment it is committed. */
+.pendingEdge {
+  stroke-width: 1.6;
+  stroke-dasharray: 3 3;
+  fill: none;
+}
+
+.pendingDot {
+  fill: var(--dsh-surface, Canvas);
+  stroke-width: 1.6;
+  stroke-dasharray: 2.5 2;
+}
+
+.pendingEdge[data-lane='0'], .pendingDot[data-lane='0'] { stroke: #6a8fd8; }
+.pendingEdge[data-lane='1'], .pendingDot[data-lane='1'] { stroke: #4caf72; }
+.pendingEdge[data-lane='2'], .pendingDot[data-lane='2'] { stroke: #d9a441; }
+.pendingEdge[data-lane='3'], .pendingDot[data-lane='3'] { stroke: #b978d1; }
+.pendingEdge[data-lane='4'], .pendingDot[data-lane='4'] { stroke: #48b3c2; }
+.pendingEdge[data-lane='5'], .pendingDot[data-lane='5'] { stroke: #d9534f; }
+
+.workingCounts {
+  flex: none;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.stateTag {
+  flex: none;
+  border-radius: 8px;
+  font-size: 10px;
+  min-width: 44px;
+  padding: 1px 6px;
+  text-align: center;
+}
+
+.stateTag[data-state='staged'] { background: rgb(76 175 114 / 22%); }
+.stateTag[data-state='unstaged'] { background: rgb(217 164 65 / 22%); }
+.stateTag[data-state='untracked'] { background: rgb(128 128 160 / 18%); }

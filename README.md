@@ -16,12 +16,12 @@ Developed and built independently of the deepseek-harness repo — the plugin on
 
 | Feature | Description |
 |---|---|
-| **Task board** | Sidebar entry opens a board with five columns (Planned / To do / Running / Done / Failed). 「Run」opens a real DSH agent session that executes the task prompt — composed from the deployment's agent preset (so it has bash / read_file / write_file) and attached to the task's project — and the status and result write back automatically when it finishes. 「View session」jumps to the execution session. **Each card has an inline edit form** (title / prompt / cron / column — done or failed tasks reopen via planned/todo). Supports 5-field cron scheduling (e.g. `0 23 * * *`): runs automatically at the due time, catches up after a host restart, and recovers interrupted runs. |
-| **Git graph** | Sidebar entry opens a graph overlay; branch lanes + commit history rendered as SVG (first-parent continuous lanes + horizontal merge links). The header's branch dropdown filters which commits the graph DRAWS (all branches, or one) and changes nothing in the repository; clicking a commit expands its full hash, parents, author and email, date, message body, and per-file added/removed line counts. The branch strip above the composer is the other operation — it checks a branch out. |
+| **Task board** | Sidebar entry opens a board with five columns (Planned / To do / Running / Done / Failed). 「Run」opens a real DSH agent session that executes the task prompt — composed from the deployment's agent preset (so it has bash / read_file / write_file) and attached to the task's project — and the status and result write back automatically when it finishes. 「View session」jumps to the execution session. **Each card has an inline edit form** (title / prompt / cron / column — done or failed tasks reopen via planned/todo). **A card in the Done column starts collapsed to a single title line** (click to expand); Failed does not collapse, because that column's message is the thing you came to read. Supports 5-field cron scheduling (e.g. `0 23 * * *`): runs automatically at the due time, catches up after a host restart, and recovers interrupted runs. |
+| **Git graph** | Sidebar entry opens a graph overlay; branch lanes + commit history rendered as SVG (first-parent continuous lanes + horizontal merge links). The header's branch dropdown filters which commits the graph DRAWS (all branches, or one) and changes nothing in the repository; clicking a commit expands its full hash, parents, author and email, date, message body, and per-file added/removed line counts. **An「Uncommitted changes」row sits on HEAD**: a hollow dashed dot on HEAD's own lane, joined to it by a dashed stub, expanding to the staged / unstaged / untracked files with their added and removed line counts (an untracked file's count comes from reading it on the host; binary or over-cap files report `—`). The branch strip above the composer is the other operation — it checks a branch out, and asks first when the work tree is dirty, counting tracked and untracked entries apart. |
 | **Workspace view** | A **Workspace** tab in the conversation's view ring, beside Chat and Trajectory, with three panes (Files / Preview / Changes). The file tree expands, searches by name, and opens files in preview; preview supports markdown (GFM tables, HTML tables, and inline HTML) / HTML (sandboxed iframe) / code / **diff** (line-highlighted unified diff) / CSV / images / PDF / text / **Office docx & xlsx** (host-side structural conversion) with source / **split** (editor + preview side by side) / view modes and save. The Changes pane is backed by real `git status` with stage / unstage / discard and per-file diffs. The active pane and the open directories persist per workspace. |
 | **File mentions** | 「Mention file」and「Mention folder」in the composer's `+` menu: a flat, locally filterable list of the project's entries, with a first row「Browse elsewhere…」that opens the plugin's own file browser and walks **any directory outside the project** (breadcrumbs / parent / home / filter by name). Picking one inserts its `@path` into the draft (paths with spaces are quoted). |
 | **Balance line** | Shows the DeepSeek API balance (`GET /user/balance`) below the composer, with a refresh button and a muted error state. **Only while the session's model route actually bills that account** — switching to another channel (or repointing `deepseek-official` at a private gateway) hides the whole line, because the number would then be about somebody else's account. |
-| **Settings page + plugin management** | One more row in the Settings nav, "Web Enhanced" (registered into `settings.section`). Its **Plugins** tab lists what the current profile has installed — name, version, dependency spec, whether it is an active layer — and offers **Update** and **Remove**. What it lists is the profile `package.json`'s `dependencies`, because that is the set pnpm can act on; template layers (`@deepseek-ai/dsh-base` and friends) are shown apart with no buttons, since no dependency provides them. **Every operation takes effect on the next start** (the layer stack is composed at boot) and the UI says so. Removing this plugin itself is not blocked — the confirmation just spells out what it costs. |
+| **Settings page + plugin management** | One more row in the Settings nav, "Web Enhanced" (registered into `settings.section`). Its **Plugins** tab lists what the current profile has installed — name, version, dependency spec, whether it is an active layer — and offers **Update** and **Remove**. What it lists is the profile `package.json`'s `dependencies`, because that is the set pnpm can act on; template layers (`@deepseek-ai/dsh-base` and friends) are shown apart with no buttons, since no dependency provides them. **Only the profile this host started with is visible** (`dsh --profile web` lists web's dependencies and nothing else); the profile name and path are printed under the title. **Every operation takes effect on the next start** (the layer stack is composed at boot) and the UI says so. Removing this plugin itself is not blocked — the confirmation just spells out what it costs. |
 
 ## Screenshots
 
@@ -42,7 +42,7 @@ The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # recommended
 # or:
-# dsh plugin --profile web add ./dsh-web-enhanced-0.6.0.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.7.0.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -112,7 +112,7 @@ reinstalling from a packed tarball instead:
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.6.0.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.7.0.tgz
 ```
 
 On Windows, tarball installs need real symlink permission (pnpm's
@@ -136,6 +136,7 @@ Plugin-row `config` fields (all have defaults):
 | `binaryMaxBytes` | 5 MiB | Binary preview (base64) cap |
 | `gitOutputMaxBytes` | 256 KiB | Single git stream output cap |
 | `gitMaxCount` | 100 | `git log` row cap |
+| `gitWorkingMaxFiles` | 300 | Cap on the uncommitted file list, and with it how many untracked files are read to count their lines |
 | `searchMaxDepth` / `searchMaxEntries` | 8 / 200 | File search depth and entry caps |
 | `officeMaxBytes` | 5 MiB | Office preview (docx/xlsx) file size cap |
 | `browseMaxEntries` | 500 | Entry cap of one directory level in the mention browser |
@@ -158,6 +159,7 @@ Plugin-row `config` fields (all have defaults):
 - **Cross-scope shared state**: the overlays are `root`-scoped and the branch strip and balance line are `session`-scoped, so a single slot-store handle cannot serve both ("one handle, one scope"). Shared state lives in `apply` as plain observables and reaches components through each registration's inject `hooks` compartment.
 - **Task execution**: `agentPresets.resolve()` names the deployment preset, it is recorded on `meta.agentPreset` and mounted inside `setup` (the host's own `ensureSession` order), then `workspace.attachSession` records the run's session on its project; the run itself is `followup` + `whenIdle` + `sessions.flush` and the result is written back from the `turn/end` reason. A deployment with no preset roster still runs tasks — its sessions just carry whatever the host root registered.
 - **Persistence**: task records live in the `ctx.storageDomain` domain `web_enhanced` (JSON backend); restart recovery settles `running` → `failed` (host-restart). Panel geometry (width, collapsed, expanded directories) persists to `localStorage` keyed per workspace.
+- **The uncommitted row is read, never written**: three commands (`diff --cached --numstat`, `diff --numstat`, `ls-files --others --exclude-standard`), because git computes three different diffs and no single command answers all of them. An untracked file has no numstat at all, and the only way to give it one is to stage it — so its added-line count comes from a bounded host-side read instead, and the list is capped BEFORE those reads happen.
 - **Path safety**: every fs/git path is validated against the workspace root (absolute paths, `..`, and backslashes are rejected); a single-ref argument rejects a leading `-`, `..` ranges, and whitespace or globs, so one argument can never become two or become an option; git output is collected with bounds; file reads have byte caps and binary sniffing. Office files are converted on the host (fflate) into bounded structural blocks — headings, paragraphs, list items, tables (≤ 2000 blocks, ≤ 200×50 table) — never raw HTML.
 - **The one exception, `fsBrowse`**: it lists any absolute directory and is deliberately not workspace-scoped, because a mention produces a path STRING and the path the user wants may sit outside the project. It returns names, kinds, and sizes only; reads, writes, and previews all stay behind the workspace root.
 - **Plugin management modifies no host file**: the settings page registers into the existing `settings.section` slot, and the inventory rides this plugin's own Typert gateway — so unlike DSH-vision it needs no edit to the api-proxy's settings allowlist (that patches the host's published output inside `node_modules`, which every upgrade overwrites). Remove and update only run pnpm in the profile directory and rewrite that profile's `dsh.profile.bundles`, exactly the path `dsh plugin` takes. `@deepseek-ai/dsh-app-boot`, which owns those routines for the CLI, is deliberately NOT a peer dependency: it belongs to the dsh installation rather than the profile, so peer resolution would fail in precisely the deployment this code runs in.
@@ -167,7 +169,7 @@ Plugin-row `config` fields (all have defaults):
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + full tests + build (212 tests)
+pnpm run check   # typecheck + full tests + build (252 tests)
 ```
 
 Build outputs:
@@ -197,7 +199,10 @@ Prereqs: `dsh`/`pnpm` on PATH, and the main repo's web build output (playwright 
 - Scheduled tasks are best-effort: 30s tick granularity; windows missed while the host is down are caught up once at startup, no backlog is kept.
 - The balance key shares its source with the model provider (env var); when unconfigured it shows an error state rather than failing. On a route outside `balanceProviders` the line is hidden entirely.
 - The graph lanes use a simplified algorithm (first-parent continuity), not git's full topology coloring; a commit's file list is the first-parent diff, so a merge shows only what it brought in.
+- The uncommitted row: an untracked file's line count comes from reading it on the host (git has no numstat for a path it does not track, and producing one would mean staging it — a mutation), and a binary file, one over `readMaxBytes`, or one already gone reports `—`. A file both staged and edited again appears twice, because those are two diffs git computed separately. When HEAD is not among the drawn rows the row goes to the top with nothing to connect to.
+- Branch switching neither stashes nor blocks a dirty switch: git carries non-conflicting changes across and refuses the rest on its own. What this adds is being told first.
 - Plugin management does **not** reload the running process: Cordis composes the layer stack at boot, so an update or removal describes the next start. For the same reason it offers no enable/disable — that edits the profile's `cordis.patch.yml`, a different thing from installing.
+- Plugin management sees **only the profile this host started with**: `dsh --profile web` lists `~/.dsh/profiles/web`'s dependencies, and a plugin installed into another profile does not appear. The profile directory is pnpm's working directory, and acting across profiles would run pnpm in a directory whose layer stack is not the one composed right now. To manage another profile, start with it — or use `dsh plugin --profile <name>`.
 - Plugin management needs `pnpm` on PATH and the profile directory on this module's ancestor chain (true of any normal install; a source checkout or a test reports "nothing to manage" rather than an error). One pnpm operation runs at a time — a second request is told so rather than queued.
 
 ## License

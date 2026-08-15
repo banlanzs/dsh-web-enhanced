@@ -17,7 +17,8 @@ import type {
   FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest,
   GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
   GitLogRequest, GitLogResult, GitMutateRequest,
-  GitMutateResult, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, PluginListRequest,
+  GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
+  OfficeBlock, OfficeKind, PluginListRequest,
   PluginListResult, PluginMutateRequest, PluginMutateResult, TaskCreateRequest,
   TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest,
   TaskRunResult, TaskUpdateRequest, TaskUpdateResult,
@@ -48,6 +49,7 @@ export interface WebEnhancedRemote {
   gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>
   gitLog(request: GitLogRequest): Promise<GitLogResult>
   gitCommit(request: GitCommitRequest): Promise<GitCommitResult>
+  gitWorking(request: GitWorkingRequest): Promise<GitWorkingResult>
   gitCheckout(request: GitCheckoutRequest): Promise<GitCheckoutResult>
   gitStatus(request: GitStatusRequest): Promise<GitStatusResult>
   gitDiff(request: GitDiffRequest): Promise<GitDiffResult>
@@ -76,7 +78,9 @@ export type {
   GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitDetailView, GitCommitFileView,
   GitCommitRequest, GitCommitResult, GitCommitView, GitDiffRequest,
   GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry,
-  GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, PluginListRequest, PluginListResult,
+  GitStatusRequest, GitStatusResult, GitWorkingFileView, GitWorkingRequest, GitWorkingResult,
+  GitWorkingState, GitWorkingView,
+  OfficeBlock, OfficeKind, PluginListRequest, PluginListResult,
   PluginListView, PluginMutateRequest, PluginMutateResult, PluginMutateView, PluginView,
   TaskCreateRequest, TaskCreateResult,
   TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,

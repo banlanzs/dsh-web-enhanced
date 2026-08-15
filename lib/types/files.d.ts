@@ -39,6 +39,22 @@ export declare function searchFiles(root: string, rel: string, query: string, li
  * enough for preview). Binary detection sniffs the first 8 KiB for a NUL.
  */
 export declare function readFileView(root: string, rel: string, limits: FsLimits): Promise<FsReadResult>;
+/**
+ * Count the lines of one text file, for an untracked file's added-line count.
+ *
+ * `null` rather than a number whenever the answer would be a guess: a binary
+ * file (git reports `-` for those), a file over the read cap (a partial read
+ * would undercount), or one that cannot be read at all — an untracked entry can
+ * vanish between `git ls-files` and this read, and that is not worth an error.
+ *
+ * Counts the way git does: newlines, plus one for a final line without its own
+ * terminator.
+ * @param root - canonical workspace root.
+ * @param rel - workspace-relative path.
+ * @param limits - the read caps.
+ * @returns the line count, or null when it is not knowable.
+ */
+export declare function countTextLines(root: string, rel: string, limits: FsLimits): Promise<number | null>;
 /** Write one UTF-8 text file (capped). */
 export declare function writeFileView(root: string, rel: string, content: string, limits: FsLimits): Promise<void>;
 /** Delete one file (never a directory). */

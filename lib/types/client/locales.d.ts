@@ -40,6 +40,8 @@ export declare const zh: {
     readonly 'board.meta.cron': "定时 {cron}";
     readonly 'board.result.summary': "结果";
     readonly 'board.result.error': "失败：{message}";
+    readonly 'board.expand': "展开任务详情";
+    readonly 'board.collapse': "折叠任务详情";
     readonly 'board.error': "操作失败：{message}";
     readonly 'board.loading': "加载中…";
     readonly 'graph.entry': "Git 图谱";
@@ -57,6 +59,13 @@ export declare const zh: {
     readonly 'graph.detail.author': "作者";
     readonly 'graph.detail.date': "时间";
     readonly 'graph.detail.files': "变更文件（{count}）";
+    readonly 'graph.working.title': "未提交的改动";
+    readonly 'graph.working.counts': "暂存 {staged} · 未暂存 {unstaged} · 未跟踪 {untracked}";
+    readonly 'graph.working.staged': "暂存";
+    readonly 'graph.working.unstaged': "未暂存";
+    readonly 'graph.working.untracked': "未跟踪";
+    readonly 'graph.working.truncated': "文件过多，仅显示前 {count} 个";
+    readonly 'graph.working.unknown': "行数未知（二进制或超过读取上限）";
     readonly 'mention.file': "引用文件";
     readonly 'mention.fileDescription': "选择文件，把路径插入输入框";
     readonly 'mention.folder': "引用文件夹";
@@ -116,6 +125,10 @@ export declare const zh: {
     readonly 'branch.loading': "读取分支…";
     readonly 'branch.error': "读取分支失败";
     readonly 'branch.none': "非 Git 仓库";
+    readonly 'branch.dirty': "有 {count} 处未提交改动（已跟踪 {tracked} · 未跟踪 {untracked}）。切换到「{branch}」时 git 会带着这些改动走；两个分支都改过同一个文件时它会拒绝切换，改动不会丢。";
+    readonly 'branch.dirtyConfirm': "仍然切换";
+    readonly 'branch.dirtyCancel': "取消";
+    readonly 'branch.failed': "切换失败：";
     readonly 'view.workspace': "工作区";
     readonly 'panel.tab.files': "文件";
     readonly 'panel.tab.preview': "预览";

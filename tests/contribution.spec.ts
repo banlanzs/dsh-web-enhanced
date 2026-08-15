@@ -47,6 +47,23 @@ const payloads: Record<string, unknown[]> = {
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
   gitCommit: [{ commit: commitDetail }, errorPayload],
+  gitWorking: [{
+    working: {
+      head: 'abc',
+      files: [
+        { path: 'a.ts', state: 'staged', added: 3, removed: 1 },
+        { path: 'b.ts', state: 'unstaged', added: 0, removed: 2 },
+        { path: 'new.md', state: 'untracked', added: 12, removed: null },
+        { path: 'bin.png', state: 'untracked', added: null, removed: null },
+      ],
+      staged: 1,
+      unstaged: 1,
+      untracked: 2,
+      truncated: false,
+    },
+  }, {
+    working: { head: '', files: [], staged: 0, unstaged: 0, untracked: 0, truncated: false },
+  }, errorPayload],
   gitCheckout: [{ ok: true, message: 'm' }, errorPayload],
   gitStatus: [{ entries: [{ path: 'a', staged: 'M', unstaged: '' }] }, { entries: [{ path: 'new', origPath: 'old', staged: 'R', unstaged: ' ' }] }, errorPayload],
   gitDiff: [{ text: 'diff' }, errorPayload],
@@ -129,10 +146,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 25 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 26 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(25)
+    expect(methods).toHaveLength(26)
   })
 
   it('every result schema accepts its success and error payloads', () => {

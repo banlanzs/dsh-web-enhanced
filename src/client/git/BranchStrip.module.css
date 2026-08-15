@@ -14,11 +14,19 @@
   width: calc(100% - var(--dsh-composer-side-clearance) * 2);
   max-width: var(--dsh-composer-card-max-width);
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   padding: 2px 8px;
   font-size: 11px;
   color: var(--dsw-alias-label-secondary, inherit);
+}
+
+/* The switcher itself stays one row; the warning and the rejection stack under
+   it, because both are sentences rather than labels. */
+.line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .label {
@@ -36,9 +44,48 @@
   padding: 1px 5px;
 }
 
+.confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  border: 1px solid rgb(217 164 65 / 45%);
+  border-radius: 4px;
+  background: rgb(217 164 65 / 10%);
+  padding: 4px 8px;
+}
+
+.confirmText {
+  flex: 1;
+  min-width: 200px;
+}
+
+.confirmAction {
+  flex: none;
+  border: 1px solid rgb(128 128 128 / 32%);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  padding: 1px 8px;
+}
+
 .message {
-  overflow: hidden;
   color: #d9534f;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.messageTitle {
+  font-weight: 600;
+}
+
+.messageBody {
+  margin: 2px 0 0;
+  max-height: 120px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

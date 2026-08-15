@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
-  compareFsEntries, deleteFileView, entryName, listDirectory, readFileView, resolveWithin, searchFiles, writeFileView,
+  compareFsEntries, countTextLines, deleteFileView, entryName, listDirectory, readFileView, resolveWithin, searchFiles, writeFileView,
 } from '../src/files.ts'
 import type { FsLimits } from '../src/files.ts'
 
@@ -157,6 +157,29 @@ describe('writeFileView / deleteFileView', () => {
     await deleteFileView(root, 'gone.txt')
     await mkdir(join(root, 'dir'))
     await expect(deleteFileView(root, 'dir')).rejects.toThrow(/directory/)
+  })
+})
+
+describe('countTextLines', () => {
+  it('counts the way git does and answers null when the number would be a guess', async () => {
+    const root = await tempRoot()
+    await writeFile(join(root, 'trailing.txt'), 'a\nb\n')
+    await writeFile(join(root, 'no-trailing.txt'), 'a\nb')
+    await writeFile(join(root, 'empty.txt'), '')
+    await writeFile(join(root, 'binary.bin'), Buffer.from([0x61, 0x00, 0x62]))
+    // Over readMaxBytes (16 here): a partial read would undercount, so the
+    // count is withheld rather than reported wrong.
+    await writeFile(join(root, 'big.txt'), 'x\n'.repeat(40))
+    await mkdir(join(root, 'dir'))
+
+    expect(await countTextLines(root, 'trailing.txt', limits)).toBe(2)
+    expect(await countTextLines(root, 'no-trailing.txt', limits)).toBe(2)
+    expect(await countTextLines(root, 'empty.txt', limits)).toBe(0)
+    expect(await countTextLines(root, 'binary.bin', limits)).toBeNull()
+    expect(await countTextLines(root, 'big.txt', limits)).toBeNull()
+    expect(await countTextLines(root, 'dir', limits)).toBeNull()
+    expect(await countTextLines(root, 'missing.txt', limits)).toBeNull()
+    expect(await countTextLines(root, '../escape.txt', limits)).toBeNull()
   })
 })
 

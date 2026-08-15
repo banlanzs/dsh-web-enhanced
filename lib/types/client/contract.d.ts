@@ -6,7 +6,7 @@
  * @module dsh-web-enhanced/src/client/contract
  */
 import type { InjectFace, PropsLocale, PropsRuntime, SlotMap } from '@deepseek-ai/dsh-client-ui-slots';
-import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from '../types.ts';
+import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, OfficeBlock, OfficeKind, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from '../types.ts';
 import type { BrowseActions, BrowseState, Observable, OverlayActions, OverlayState, PanelActions, PanelState, PreviewActions, PreviewState } from './stores.ts';
 /**
  * The remote facade components call. Every member mirrors one `@Remote`
@@ -29,6 +29,7 @@ export interface WebEnhancedRemote {
     gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>;
     gitLog(request: GitLogRequest): Promise<GitLogResult>;
     gitCommit(request: GitCommitRequest): Promise<GitCommitResult>;
+    gitWorking(request: GitWorkingRequest): Promise<GitWorkingResult>;
     gitCheckout(request: GitCheckoutRequest): Promise<GitCheckoutResult>;
     gitStatus(request: GitStatusRequest): Promise<GitStatusResult>;
     gitDiff(request: GitDiffRequest): Promise<GitDiffResult>;
@@ -47,7 +48,7 @@ export interface WebEnhancedRemote {
     pluginUpdate(request: PluginMutateRequest): Promise<PluginMutateResult>;
 }
 /** Re-exported payload types (components, tests, and preview helpers). */
-export type { ApiError, BalanceGetRequest, BalanceView, FsBrowseEntry, FsBrowseRequest, FsBrowseResult, FsBrowseView, FsDeleteRequest, FsEntryView, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchView, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitDetailView, GitCommitFileView, GitCommitRequest, GitCommitResult, GitCommitView, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry, GitStatusRequest, GitStatusResult, OfficeBlock, OfficeKind, PluginListRequest, PluginListResult, PluginListView, PluginMutateRequest, PluginMutateResult, PluginMutateView, PluginView, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskStatus, TaskUpdateRequest, TaskUpdateResult, } from '../types.ts';
+export type { ApiError, BalanceGetRequest, BalanceView, FsBrowseEntry, FsBrowseRequest, FsBrowseResult, FsBrowseView, FsDeleteRequest, FsEntryView, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchView, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitDetailView, GitCommitFileView, GitCommitRequest, GitCommitResult, GitCommitView, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry, GitStatusRequest, GitStatusResult, GitWorkingFileView, GitWorkingRequest, GitWorkingResult, GitWorkingState, GitWorkingView, OfficeBlock, OfficeKind, PluginListRequest, PluginListResult, PluginListView, PluginMutateRequest, PluginMutateResult, PluginMutateView, PluginView, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskStatus, TaskUpdateRequest, TaskUpdateResult, } from '../types.ts';
 /** Right-panel tab selection. */
 export type PanelTab = 'files' | 'preview' | 'scm';
 /**

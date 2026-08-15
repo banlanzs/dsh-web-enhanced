@@ -16,7 +16,7 @@ import { browseDirectory } from './browse.ts'
 import { balanceApplies } from './channel.ts'
 import { TaskBoard } from './board.ts'
 import type { BoardDeps } from './board.ts'
-import { deleteFileView, listDirectory, readFileView, searchFiles, writeFileView } from './files.ts'
+import { deleteFileView, countTextLines, listDirectory, readFileView, searchFiles, writeFileView } from './files.ts'
 import type { FsLimits } from './files.ts'
 import { GitClient } from './git.ts'
 import type { GitLimits } from './git.ts'
@@ -33,7 +33,8 @@ import type {
   FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest,
   GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
   GitLogRequest, GitLogResult, GitMutateRequest,
-  GitMutateResult, GitStatusRequest, GitStatusResult, PluginListRequest, PluginListResult,
+  GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
+  PluginListRequest, PluginListResult,
   PluginMutateRequest, PluginMutateResult, TaskCreateRequest, TaskCreateResult,
   TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
   TaskUpdateRequest, TaskUpdateResult, WorkspaceId,
@@ -71,6 +72,7 @@ export interface Config {
   binaryMaxBytes?: number
   gitOutputMaxBytes?: number
   gitMaxCount?: number
+  gitWorkingMaxFiles?: number
   searchMaxDepth?: number
   searchMaxEntries?: number
   officeMaxBytes?: number
@@ -91,6 +93,10 @@ export const Config: z<Config> = z.object({
   binaryMaxBytes: z.number().default(5_242_880),
   gitOutputMaxBytes: z.number().default(262_144),
   gitMaxCount: z.number().default(100),
+  // Caps the uncommitted file list, and with it how many untracked files are
+  // read to count their lines. A repository with thousands of untracked files
+  // would otherwise turn one graph open into thousands of reads.
+  gitWorkingMaxFiles: z.number().default(300),
   searchMaxDepth: z.number().default(8),
   searchMaxEntries: z.number().default(200),
   officeMaxBytes: z.number().default(5_242_880),
@@ -115,6 +121,7 @@ export function resolveConfig(config: Config): Required<Config> {
     binaryMaxBytes: config.binaryMaxBytes ?? 5_242_880,
     gitOutputMaxBytes: config.gitOutputMaxBytes ?? 262_144,
     gitMaxCount: config.gitMaxCount ?? 100,
+    gitWorkingMaxFiles: config.gitWorkingMaxFiles ?? 300,
     searchMaxDepth: config.searchMaxDepth ?? 8,
     searchMaxEntries: config.searchMaxEntries ?? 200,
     officeMaxBytes: config.officeMaxBytes ?? 5_242_880,
@@ -230,6 +237,20 @@ export class WebEnhancedGateway extends TypertRemoteService {
   @Remote('gitCommit')
   async gitCommit(request: GitCommitRequest): Promise<GitCommitResult> {
     return this.withGit(request.workspaceId, async client => ({ commit: await client.commit(request.hash) }))
+  }
+
+  /**
+   * The uncommitted state of the work tree: staged, unstaged, and untracked
+   * files with their line counts, plus the HEAD the graph attaches them to.
+   */
+  @Remote('gitWorking')
+  async gitWorking(request: GitWorkingRequest): Promise<GitWorkingResult> {
+    return this.withGit(request.workspaceId, async (client, root) => ({
+      working: await client.working(
+        this.resolved.gitWorkingMaxFiles,
+        path => countTextLines(root, path, this.fsLimits),
+      ),
+    }))
   }
 
   /** Check out one branch; a rejected switch carries its stderr message. */
@@ -523,11 +544,14 @@ export class WebEnhancedGateway extends TypertRemoteService {
     return found?.path ?? process.cwd()
   }
 
-  private async withGit<T>(workspaceId: string, fn: (client: GitClient) => Promise<T>): Promise<T | { error: ApiError }> {
+  private async withGit<T>(
+    workspaceId: string,
+    fn: (client: GitClient, root: string) => Promise<T>,
+  ): Promise<T | { error: ApiError }> {
     const root = this.workspaceRootFor(workspaceId)
     if (root === null) return { error: { code: 'workspace-not-found', message: `workspace '${workspaceId}' does not exist` } }
     try {
-      return await fn(new GitClient(this.ctx.subprocess, root, this.gitLimits))
+      return await fn(new GitClient(this.ctx.subprocess, root, this.gitLimits), root)
     } catch (error) {
       return { error: this.errorOf(error, 'git-error') }
     }

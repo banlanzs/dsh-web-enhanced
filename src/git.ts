@@ -8,26 +8,22 @@
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type {
   GitBranchView, GitCommitDetailView, GitCommitFileView, GitCommitView, GitStatusEntry,
+  GitWorkingFileView, GitWorkingView,
 } from './types.ts'
 
 /**
- * Read `git show --numstat` output into one commit detail.
+ * Read `--numstat` rows into per-file line counts.
  *
- * The header is everything before the record separator the format appends;
- * the numstat rows follow it, one `<added>\t<removed>\t<path>` per file, with
- * `-` for a binary file's counts. A rename is emitted as three NUL-free
- * fields where the path is `old => new` inside braces, so it is kept verbatim
- * — the display shows what git says rather than guessing at the halves.
- * @param stdout - the command's output.
- * @returns the parsed detail; a missing separator yields an empty file list.
+ * One `<added>\t<removed>\t<path>` per file, with `-` for a binary file's
+ * counts. A rename is emitted as three NUL-free fields where the path is
+ * `old => new` inside braces, so it is kept verbatim — the display shows what
+ * git says rather than guessing at the halves.
+ * @param text - the numstat section.
+ * @returns one entry per parsable row.
  */
-export function parseCommitDetail(stdout: string): GitCommitDetailView {
-  const split = stdout.indexOf('\x1e')
-  const header = split === -1 ? stdout : stdout.slice(0, split)
-  const rest = split === -1 ? '' : stdout.slice(split + 1)
-  const [hash = '', parents = '', author = '', email = '', at = '', subject = '', ...bodyParts] = header.split('\x1f')
+export function parseNumstat(text: string): GitCommitFileView[] {
   const files: GitCommitFileView[] = []
-  for (const line of rest.split('\n')) {
+  for (const line of text.split('\n')) {
     const row = line.trimEnd()
     if (row === '') continue
     const fields = row.split('\t')
@@ -39,6 +35,22 @@ export function parseCommitDetail(stdout: string): GitCommitDetailView {
       removed: removed === '-' ? null : Number(removed),
     })
   }
+  return files
+}
+
+/**
+ * Read `git show --numstat` output into one commit detail.
+ *
+ * The header is everything before the record separator the format appends;
+ * the numstat rows follow it.
+ * @param stdout - the command's output.
+ * @returns the parsed detail; a missing separator yields an empty file list.
+ */
+export function parseCommitDetail(stdout: string): GitCommitDetailView {
+  const split = stdout.indexOf('\x1e')
+  const header = split === -1 ? stdout : stdout.slice(0, split)
+  const rest = split === -1 ? '' : stdout.slice(split + 1)
+  const [hash = '', parents = '', author = '', email = '', at = '', subject = '', ...bodyParts] = header.split('\x1f')
   return {
     hash,
     parents: parents === '' ? [] : parents.split(' '),
@@ -47,7 +59,7 @@ export function parseCommitDetail(stdout: string): GitCommitDetailView {
     date: Number(at),
     subject,
     body: bodyParts.join('\x1f').trim(),
-    files,
+    files: parseNumstat(rest),
   }
 }
 
@@ -189,6 +201,68 @@ export class GitClient {
     ])
     if (run.exitCode !== 0) throw new Error(run.stderr.trim() || 'git show failed')
     return parseCommitDetail(run.stdout)
+  }
+
+  /**
+   * The uncommitted state of the work tree, as the graph's top row shows it.
+   *
+   * Three reads, because git computes three different diffs and there is no
+   * single command that answers all of them: `--cached` is the index against
+   * HEAD, a plain `diff` is the work tree against the index, and untracked
+   * files are in neither — they are listed by `ls-files --others`.
+   *
+   * An untracked file has no numstat at all (git would have to add it to the
+   * index first, which this must not do), so its added-line count comes from
+   * `countLines`, applied only to the entries that survive the cap. Without a
+   * counter, or when the file is binary or over the read cap, the count stays
+   * `null` and the display shows what a binary file shows.
+   * @param maxFiles - cap on the returned file list.
+   * @param countLines - optional line counter for untracked files.
+   * @returns the working view; totals are pre-cap.
+   */
+  async working(
+    maxFiles: number,
+    countLines?: (path: string) => Promise<number | null>,
+  ): Promise<GitWorkingView> {
+    const headRun = await this.run(['rev-parse', 'HEAD'])
+    // An unborn branch has no HEAD; that is a state, not a failure — the row
+    // simply has no commit to attach itself to.
+    const head = headRun.exitCode === 0 ? headRun.stdout.trim() : ''
+
+    const stagedRun = await this.run(['diff', '--cached', '--numstat'])
+    if (stagedRun.exitCode !== 0) throw new Error(stagedRun.stderr.trim() || 'git diff --cached failed')
+    const unstagedRun = await this.run(['diff', '--numstat'])
+    if (unstagedRun.exitCode !== 0) throw new Error(unstagedRun.stderr.trim() || 'git diff failed')
+    const othersRun = await this.run(['ls-files', '--others', '--exclude-standard', '-z'])
+    if (othersRun.exitCode !== 0) throw new Error(othersRun.stderr.trim() || 'git ls-files failed')
+
+    const staged = parseNumstat(stagedRun.stdout)
+    const unstaged = parseNumstat(unstagedRun.stdout)
+    const untracked = othersRun.stdout.split('\0').filter(path => path !== '')
+
+    const all: GitWorkingFileView[] = [
+      ...staged.map(file => ({ ...file, state: 'staged' as const })),
+      ...unstaged.map(file => ({ ...file, state: 'unstaged' as const })),
+      ...untracked.map(path => ({ path, state: 'untracked' as const, added: null, removed: null })),
+    ]
+    const truncated = all.length > maxFiles
+    const files = truncated ? all.slice(0, maxFiles) : all
+
+    if (countLines !== undefined) {
+      await Promise.all(files.map(async (file, index) => {
+        if (file.state !== 'untracked') return
+        files[index] = { ...file, added: await countLines(file.path) }
+      }))
+    }
+
+    return {
+      head,
+      files,
+      staged: staged.length,
+      unstaged: unstaged.length,
+      untracked: untracked.length,
+      truncated,
+    }
   }
 
   /** Branch names per commit hash (heads and remotes). */

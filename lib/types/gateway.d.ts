@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
 /** Plugin config; every bound defaults when unset. */
 export interface Config {
     cronIntervalMs?: number;
@@ -23,6 +23,7 @@ export interface Config {
     binaryMaxBytes?: number;
     gitOutputMaxBytes?: number;
     gitMaxCount?: number;
+    gitWorkingMaxFiles?: number;
     searchMaxDepth?: number;
     searchMaxEntries?: number;
     officeMaxBytes?: number;
@@ -70,6 +71,11 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     gitLog(request: GitLogRequest): Promise<GitLogResult>;
     /** One commit's identity, message, and per-file line counts. */
     gitCommit(request: GitCommitRequest): Promise<GitCommitResult>;
+    /**
+     * The uncommitted state of the work tree: staged, unstaged, and untracked
+     * files with their line counts, plus the HEAD the graph attaches them to.
+     */
+    gitWorking(request: GitWorkingRequest): Promise<GitWorkingResult>;
     /** Check out one branch; a rejected switch carries its stderr message. */
     gitCheckout(request: GitCheckoutRequest): Promise<GitCheckoutResult>;
     /** Worktree status (porcelain v1). */

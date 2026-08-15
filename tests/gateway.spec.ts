@@ -227,7 +227,7 @@ describe('WebEnhancedGateway', () => {
     expect(gateway.typertRemote).toMatchObject({ serviceKey: 'webEnhanced', namespace: 'webEnhanced' })
     expect(remoteMethods(gateway).map(entry => entry.method)).toEqual([
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet',
-      'gitBranches', 'gitLog', 'gitCommit', 'gitCheckout', 'gitStatus', 'gitDiff',
+      'gitBranches', 'gitLog', 'gitCommit', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',
       'pluginList', 'pluginRemove', 'pluginUpdate',
@@ -483,6 +483,34 @@ describe('WebEnhancedGateway', () => {
       expect(await gateway.gitUnstage({ workspaceId: 'w1', paths: ['a.txt'] })).toEqual({ ok: true })
       subprocess.enqueue({ exitCode: 0 })
       expect(await gateway.gitDiscard({ workspaceId: 'w1', paths: ['a.txt'] })).toEqual({ ok: true })
+    })
+
+    it('reads the uncommitted state and counts an untracked file for real', async () => {
+      const root = await tempRoot()
+      await writeFile(join(root, 'fresh.md'), 'one\ntwo\nthree')
+      const { gateway, subprocess } = await harness({ workspaces: [{ id: 'w1', path: root }] })
+      subprocess.enqueue({ stdout: 'head-hash\n' })
+      subprocess.enqueue({ stdout: '3\t1\tsrc/a.ts\n' })
+      subprocess.enqueue({ stdout: '0\t2\tsrc/b.ts\n' })
+      subprocess.enqueue({ stdout: 'fresh.md\0gone.txt\0' })
+      const working = await gateway.gitWorking({ workspaceId: 'w1' })
+      if ('error' in working) throw new Error(working.error.message)
+      expect(working.working).toEqual({
+        head: 'head-hash',
+        files: [
+          { path: 'src/a.ts', state: 'staged', added: 3, removed: 1 },
+          { path: 'src/b.ts', state: 'unstaged', added: 0, removed: 2 },
+          // Counted by reading the file: git has no numstat for a path it does
+          // not track, and staging it to get one would be a mutation.
+          { path: 'fresh.md', state: 'untracked', added: 3, removed: null },
+          // Listed by git but gone by the time it was read — not an error.
+          { path: 'gone.txt', state: 'untracked', added: null, removed: null },
+        ],
+        staged: 1,
+        unstaged: 1,
+        untracked: 2,
+        truncated: false,
+      })
     })
 
     it('answers errors for unknown workspaces', async () => {

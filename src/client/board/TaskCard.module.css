@@ -27,6 +27,50 @@
   overflow-wrap: anywhere;
 }
 
+/* A collapsed card is one line: a finished task's prompt and result are
+   history, and printing them for every past run is what made the done column
+   scroll for pages. The whole line is the toggle. */
+.card[data-collapsed='true'] {
+  padding: 4px 6px;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: start;
+}
+
+.chevron {
+  flex: none;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.summaryTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryTime {
+  flex: none;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
+}
+
 /* No line clamp anywhere on the card: the column scrolls, so a card may grow
    to whatever it has to say. Clamping traded a tidy grid for prompts and run
    results that could not be read at all. */

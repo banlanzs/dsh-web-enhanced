@@ -97,6 +97,20 @@ const gitCommitDetailSchema = z.object({
   })),
 })
 
+const gitWorkingSchema = z.object({
+  head: z.string(),
+  files: z.array(z.object({
+    path: z.string(),
+    state: z.enum(['staged', 'unstaged', 'untracked']),
+    added: z.number().nullable(),
+    removed: z.number().nullable(),
+  })),
+  staged: z.number(),
+  unstaged: z.number(),
+  untracked: z.number(),
+  truncated: z.boolean(),
+})
+
 const gitStatusEntrySchema = z.object({
   path: z.string(),
   origPath: z.string().optional(),
@@ -232,6 +246,7 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
   unary('gitBranches', 'GitBranchesRequest', 'GitBranchesResult', okOrError(z.object({ branches: z.array(gitBranchViewSchema) }))),
   unary('gitLog', 'GitLogRequest', 'GitLogResult', okOrError(z.object({ commits: z.array(gitCommitViewSchema) }))),
   unary('gitCommit', 'GitCommitRequest', 'GitCommitResult', okOrError(z.object({ commit: gitCommitDetailSchema }))),
+  unary('gitWorking', 'GitWorkingRequest', 'GitWorkingResult', okOrError(z.object({ working: gitWorkingSchema }))),
   unary('gitCheckout', 'GitCheckoutRequest', 'GitCheckoutResult', okOrError(gitOkSchema)),
   unary('gitStatus', 'GitStatusRequest', 'GitStatusResult', okOrError(z.object({ entries: z.array(gitStatusEntrySchema) }))),
   unary('gitDiff', 'GitDiffRequest', 'GitDiffResult', okOrError(z.object({ text: z.string() }))),
