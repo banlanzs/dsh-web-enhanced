@@ -1,8 +1,8 @@
 /**
- * Git graph overlay: branch lanes and commit history for the current
- * session's workspace. Registered into `shell.overlay` and rendered only
- * while the overlay state selects it, so an unopened graph costs one
- * subscription and nothing else.
+ * Git graph: branch lanes and commit history for one workspace. Two surfaces
+ * share the same panel — the full-frame overlay and the workspace view's「Git
+ * 图谱」tab — so the data/logic lives in {@link GraphPanel} and the wrappers
+ * own only their chrome.
  *
  * The branch selector here is the GRAPH's own filter: it decides which
  * history the lanes are drawn from and changes nothing in the repository.
@@ -50,15 +50,16 @@ type Detail =
   | { readonly phase: 'ready'; readonly value: GitCommitDetailView }
   | { readonly phase: 'error'; readonly message: string }
 
-/** The git graph overlay. */
-export function GraphOverlay({
-  useOverlay, useSessions, useWorkspaces, remote, closeOverlay, t,
-}: GraphOverlayProps) {
-  const open = useOverlay(state => state.open === 'graph')
-  const sessions = useSessions(state => state)
-  const workspaces = useWorkspaces(state => state)
-  const workspaceId = workspaceOfSession(sessions, workspaces)?.workspaceId
+/** What the chrome-free panel needs from its host surface. */
+export interface GraphPanelProps {
+  /** Workspace whose repository is drawn; undefined renders the empty state. */
+  readonly workspaceId: string | undefined
+  readonly remote: WebEnhancedRemote
+  readonly t: WebEnhancedProps<'shell.overlay'>['t']
+}
 
+/** The chrome-free graph: filter, refresh, and the laid-out commit list. */
+export function GraphPanel({ workspaceId, remote, t }: GraphPanelProps) {
   const [commits, setCommits] = useState<Commits>({ phase: 'loading' })
   const [working, setWorking] = useState<GitWorkingView | null>(null)
   const [workingOpen, setWorkingOpen] = useState(false)
@@ -84,75 +85,85 @@ export function GraphOverlay({
     setWorking('error' in uncommitted ? null : uncommitted.working)
   }, [branch, remote, workspaceId])
 
+  // The panel is mounted only while visible, so mount = open.
   useEffect(() => {
-    if (!open || workspaceId === undefined) return
+    if (workspaceId === undefined) return
     // The filter list is repository state, not view state: it is loaded with
-    // the overlay and left alone while the user switches filters.
+    // the panel and left alone while the user switches filters.
     void (async () => {
       const result = await remote.gitBranches({ workspaceId })
       if (live.current && !('error' in result)) setBranches(result.branches)
     })()
-  }, [open, remote, workspaceId])
+  }, [remote, workspaceId])
 
   useEffect(() => {
-    if (open) void load()
-  }, [load, open])
+    if (workspaceId !== undefined) void load()
+  }, [load, workspaceId])
 
   // A filter change re-cuts the list, so an open detail no longer has a row.
   useEffect(() => { setExpanded(null) }, [branch])
 
-  if (!open) return null
-
   return (
-    <OverlayShell
-      title={t('graph.title')}
-      closeLabel={t('graph.close')}
-      onClose={closeOverlay}
-      testId="graph-overlay"
-      actions={workspaceId === undefined
-        ? null
-        : (
-            <>
-              <label className={css.filter}>
-                <span className={css.filterLabel}>{t('graph.filter')}</span>
-                <select
-                  className={css.select}
-                  value={branch}
-                  data-testid="graph-branch-filter"
-                  onChange={event => { setBranch(event.target.value) }}
-                >
-                  <option value={ALL_BRANCHES}>{t('graph.allBranches')}</option>
-                  {branches.map(item => (
-                    <option key={item.name} value={item.name}>{item.name}</option>
-                  ))}
-                </select>
-              </label>
-              <button type="button" className={css.action} onClick={() => { void load() }}>
-                {t('graph.refresh')}
-              </button>
-            </>
-          )}
-    >
+    <div className={css.panel} data-testid="graph-panel">
       {workspaceId === undefined
         ? <p className={css.empty}>{t('graph.noWorkspace')}</p>
-        : commits.phase === 'loading'
-          ? <p className={css.empty}>{t('graph.loading')}</p>
-          : commits.phase === 'error'
-            ? <p className={css.error}>{t('graph.error', { message: commits.message })}</p>
-            : (
-                <GraphBody
-                  commits={commits.items}
-                  working={working}
-                  empty={t('graph.empty')}
-                  expanded={expanded}
-                  workingOpen={workingOpen}
-                  workspaceId={workspaceId}
-                  remote={remote}
-                  onToggle={hash => { setExpanded(current => (current === hash ? null : hash)) }}
-                  onToggleWorking={() => { setWorkingOpen(value => !value) }}
-                  t={t}
-                />
-              )}
+        : (
+            <>
+              <div className={css.toolbar}>
+                <label className={css.filter}>
+                  <span className={css.filterLabel}>{t('graph.filter')}</span>
+                  <select
+                    className={css.select}
+                    value={branch}
+                    data-testid="graph-branch-filter"
+                    onChange={event => { setBranch(event.target.value) }}
+                  >
+                    <option value={ALL_BRANCHES}>{t('graph.allBranches')}</option>
+                    {branches.map(item => (
+                      <option key={item.name} value={item.name}>{item.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" className={css.action} onClick={() => { void load() }}>
+                  {t('graph.refresh')}
+                </button>
+              </div>
+              {commits.phase === 'loading'
+                ? <p className={css.empty}>{t('graph.loading')}</p>
+                : commits.phase === 'error'
+                  ? <p className={css.error}>{t('graph.error', { message: commits.message })}</p>
+                  : (
+                      <GraphBody
+                        commits={commits.items}
+                        working={working}
+                        empty={t('graph.empty')}
+                        expanded={expanded}
+                        workingOpen={workingOpen}
+                        workspaceId={workspaceId}
+                        remote={remote}
+                        onToggle={hash => { setExpanded(current => (current === hash ? null : hash)) }}
+                        onToggleWorking={() => { setWorkingOpen(value => !value) }}
+                        t={t}
+                      />
+                    )}
+            </>
+          )}
+    </div>
+  )
+}
+
+/** The git graph overlay: the same panel under the full-frame chrome. */
+export function GraphOverlay({
+  useOverlay, useSessions, useWorkspaces, remote, closeOverlay, t,
+}: GraphOverlayProps) {
+  const open = useOverlay(state => state.open === 'graph')
+  const sessions = useSessions(state => state)
+  const workspaces = useWorkspaces(state => state)
+  const workspaceId = workspaceOfSession(sessions, workspaces)?.workspaceId
+  if (!open) return null
+  return (
+    <OverlayShell title={t('graph.title')} closeLabel={t('graph.close')} onClose={closeOverlay} testId="graph-overlay" fill>
+      <GraphPanel workspaceId={workspaceId === undefined ? undefined : String(workspaceId)} remote={remote} t={t} />
     </OverlayShell>
   )
 }
@@ -169,7 +180,7 @@ interface GraphBodyProps {
   readonly remote: WebEnhancedRemote
   readonly onToggle: (hash: string) => void
   readonly onToggleWorking: () => void
-  readonly t: GraphOverlayProps['t']
+  readonly t: GraphPanelProps['t']
 }
 
 /** Whether a working view has anything to show. */
@@ -281,7 +292,7 @@ interface WorkingRowProps {
   readonly railWidth: number
   readonly open: boolean
   readonly onToggle: () => void
-  readonly t: GraphOverlayProps['t']
+  readonly t: GraphPanelProps['t']
 }
 
 /**
@@ -344,7 +355,7 @@ function WorkingRow({ working, lane, through, railWidth, open, onToggle, t }: Wo
 }
 
 /** The expanded file list of the uncommitted row. */
-function WorkingDetail({ working, t }: { readonly working: GitWorkingView; readonly t: GraphOverlayProps['t'] }) {
+function WorkingDetail({ working, t }: { readonly working: GitWorkingView; readonly t: GraphPanelProps['t'] }) {
   return (
     <div className={css.detail} data-testid="graph-working-detail">
       {working.truncated && (
@@ -376,7 +387,7 @@ function WorkingDetail({ working, t }: { readonly working: GitWorkingView; reado
 }
 
 /** Short tag naming which diff a working file came out of. */
-function stateLabel(file: GitWorkingFileView, t: GraphOverlayProps['t']): string {
+function stateLabel(file: GitWorkingFileView, t: GraphPanelProps['t']): string {
   if (file.state === 'staged') return t('graph.working.staged')
   return file.state === 'unstaged' ? t('graph.working.unstaged') : t('graph.working.untracked')
 }
@@ -386,7 +397,7 @@ function CommitDetail({ hash, workspaceId, remote, t }: {
   readonly hash: string
   readonly workspaceId: string
   readonly remote: WebEnhancedRemote
-  readonly t: GraphOverlayProps['t']
+  readonly t: GraphPanelProps['t']
 }) {
   const [detail, setDetail] = useState<Detail>({ phase: 'loading' })
   const live = useRef(true)

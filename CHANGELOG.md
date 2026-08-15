@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.8.0] - 2026-08-15
+
+### 修复：输入框下方余额行不再被裁掉
+
+余额行之前按自身内容宽度排版，超出输入卡宽度的那部分被容器裁掉。现在采用宿主 StatsLine 同一套宽度纪律：`max-width: var(--dsh-chat-content-width)` + 居中，标签与刷新钮固定，余额数值与错误信息 `min-width: 0` + 单行省略，任何长度都不会再溢出被截。
+
+### 新增：本轮会话花费估算（models.dev 价格）
+
+余额行现在显示当前会话已计费 token 的估算花费。宿主新增 `pricingGet` 远程方法：每 TTL 拉一次 `models.dev/api.json`（默认缓存 6 小时、10 秒超时、单飞共享、失败后可重试），按配置的 `pricingProviderMap`（默认 `deepseek-official → deepseek`）与当前 model id 查 USD/百万 token 价格；缓存读/写价缺省时回退到 input 价。客户端读会话的 `tokenUsage` projection 四个桶（未缓存输入 / 缓存读 / 缓存写 / 输出）计算 `≈ $x`，价格未命中或没有计费 token 时不显示。
+
+新增 config：`modelsDevUrl`、`modelsDevCacheTtlMs`、`modelsDevTimeoutMs`、`pricingProviderMap`。
+
+### 调整：「任务看板」「Git 图谱」进入工作区标签页
+
+侧边栏底部的两个入口取消，改到「工作区」视图的 tablist 里统一显示：文件 / 预览 / 变更 / **任务看板** / **Git 图谱** 五页。实现上把 `BoardOverlay` / `GraphOverlay` 拆成无壳面板（`BoardPanel` / `GraphPanel`）与浮层壳两层，标签页直接复用面板——数据、轮询、展开逻辑只有一份；侧边栏 footer 与对应 `shell.overlay` 注册移除（mention 的 `fsBrowse` 浏览器浮层保留）。
+
+### 接口变化
+
+- 远程方法 26 → 27：新增 `pricingGet`。
+- 测试 256 → 266。
+
 ## [0.7.2] - 2026-08-15
 
 ### 改进：mention 文件选择器按资源管理器方式浏览

@@ -1,7 +1,7 @@
 /**
- * Workspace view: file tree, preview, and SCM for the session's project,
- * registered as one tab in the conversation's view ring beside Chat and
- * Trajectory.
+ * Workspace view: file tree, preview, SCM, the task board, and the git graph
+ * for the session's project, registered as one tab in the conversation's view
+ * ring beside Chat and Trajectory.
  *
  * It lives in `conversation.view` rather than floating over the frame. The
  * view ring renders one entry at a time at full column width, so this surface
@@ -15,6 +15,8 @@ import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { PanelTab, WebEnhancedProps } from '../contract.ts'
 import { workspaceOfSessionId } from '../workspace.ts'
+import { BoardPanel } from '../board/BoardOverlay.tsx'
+import { GraphPanel } from '../git/GraphOverlay.tsx'
 import { FileTree } from './FileTree.tsx'
 import { PreviewPane } from './PreviewPane.tsx'
 import { ScmPane } from './ScmPane.tsx'
@@ -24,10 +26,15 @@ import css from './WorkspaceView.module.css'
 export type WorkspaceViewProps = WebEnhancedProps<'conversation.view'>
 
 /** Tabs in display order with their dictionary keys. */
-const TABS: ReadonlyArray<{ tab: PanelTab; key: 'panel.tab.files' | 'panel.tab.preview' | 'panel.tab.scm' }> = [
+const TABS: ReadonlyArray<{
+  tab: PanelTab
+  key: 'panel.tab.files' | 'panel.tab.preview' | 'panel.tab.scm' | 'panel.tab.board' | 'panel.tab.graph'
+}> = [
   { tab: 'files', key: 'panel.tab.files' },
   { tab: 'preview', key: 'panel.tab.preview' },
   { tab: 'scm', key: 'panel.tab.scm' },
+  { tab: 'board', key: 'panel.tab.board' },
+  { tab: 'graph', key: 'panel.tab.graph' },
 ]
 
 /** The workspace view. */
@@ -72,9 +79,15 @@ export function WorkspaceView(props: WorkspaceViewProps) {
         ))}
       </nav>
       <div className={css.body} role="tabpanel">
-        {tab === 'files' && <FileTree {...props} workspaceId={workspaceId} />}
-        {tab === 'preview' && <PreviewPane {...props} workspaceId={workspaceId} />}
-        {tab === 'scm' && <ScmPane {...props} workspaceId={workspaceId} />}
+        {tab === 'files' && <FileTree {...props} workspaceId={String(workspaceId)} />}
+        {tab === 'preview' && <PreviewPane {...props} workspaceId={String(workspaceId)} />}
+        {tab === 'scm' && <ScmPane {...props} workspaceId={String(workspaceId)} />}
+        {tab === 'board' && (
+          <BoardPanel remote={props.remote} workspaces={workspaces.items} openSession={props.openSession} t={t} />
+        )}
+        {tab === 'graph' && (
+          <GraphPanel workspaceId={String(workspaceId)} remote={props.remote} t={t} />
+        )}
       </div>
     </section>
   )

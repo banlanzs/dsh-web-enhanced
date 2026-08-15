@@ -23,6 +23,7 @@ import type { GitLimits } from './git.ts'
 import { officePreviewView } from './office.ts'
 import type { OfficeLimits } from './office.ts'
 import { PnpmRunner, pnpmFailureCode } from './pnpm.ts'
+import { ModelsDevPricing } from './pricing.ts'
 import { findProfileDir, readInventory } from './profile.ts'
 import type { PresetRoster, RunDeps } from './run-task.ts'
 import type {
@@ -35,7 +36,8 @@ import type {
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
   PluginListRequest, PluginListResult,
-  PluginMutateRequest, PluginMutateResult, TaskCreateRequest, TaskCreateResult,
+  PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
+  TaskCreateRequest, TaskCreateResult,
   TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
   TaskUpdateRequest, TaskUpdateResult, WorkspaceId,
 } from './types.ts'
@@ -66,6 +68,10 @@ export interface Config {
   balanceCacheTtlMs?: number
   balanceBaseUrl?: string
   balanceProviders?: string[]
+  modelsDevUrl?: string
+  modelsDevCacheTtlMs?: number
+  modelsDevTimeoutMs?: number
+  pricingProviderMap?: Record<string, string>
   skipDirs?: string[]
   readMaxBytes?: number
   writeMaxBytes?: number
@@ -87,6 +93,11 @@ export const Config: z<Config> = z.object({
   balanceCacheTtlMs: z.number().default(60_000),
   balanceBaseUrl: z.string().default('https://api.deepseek.com'),
   balanceProviders: z.array(z.string()).default(['deepseek-official']),
+  modelsDevUrl: z.string().default('https://models.dev/api.json'),
+  modelsDevCacheTtlMs: z.number().default(21_600_000),
+  modelsDevTimeoutMs: z.number().default(10_000),
+  // models.dev names the official vendor `deepseek`; the route id is `deepseek-official`.
+  pricingProviderMap: z.dict(z.string()).default({ 'deepseek-official': 'deepseek' }),
   skipDirs: z.array(z.string()).default(['node_modules']),
   readMaxBytes: z.number().default(1_048_576),
   writeMaxBytes: z.number().default(2_097_152),
@@ -115,6 +126,10 @@ export function resolveConfig(config: Config): Required<Config> {
     balanceCacheTtlMs: config.balanceCacheTtlMs ?? 60_000,
     balanceBaseUrl: config.balanceBaseUrl ?? 'https://api.deepseek.com',
     balanceProviders: config.balanceProviders ?? ['deepseek-official'],
+    modelsDevUrl: config.modelsDevUrl ?? 'https://models.dev/api.json',
+    modelsDevCacheTtlMs: config.modelsDevCacheTtlMs ?? 21_600_000,
+    modelsDevTimeoutMs: config.modelsDevTimeoutMs ?? 10_000,
+    pricingProviderMap: config.pricingProviderMap ?? { 'deepseek-official': 'deepseek' },
     skipDirs: config.skipDirs ?? ['node_modules'],
     readMaxBytes: config.readMaxBytes ?? 1_048_576,
     writeMaxBytes: config.writeMaxBytes ?? 2_097_152,
@@ -139,6 +154,7 @@ export class WebEnhancedGateway extends TypertRemoteService {
   private readonly resolved: Required<Config>
   private readonly balance: BalanceClient
   private readonly board: TaskBoard
+  private readonly pricing: ModelsDevPricing
   /** Resolved lazily: the walk is filesystem work no other capability needs. */
   private profileDirCache: Promise<string | undefined> | undefined
   /** Built on first mutation, so a deployment outside a profile never makes one. */
@@ -172,6 +188,12 @@ export class WebEnhancedGateway extends TypertRemoteService {
     )
     this.board = new TaskBoard(ctx, this.boardDeps(ctx), {
       cronIntervalMs: this.resolved.cronIntervalMs,
+    })
+    this.pricing = new ModelsDevPricing({
+      url: this.resolved.modelsDevUrl,
+      ttlMs: this.resolved.modelsDevCacheTtlMs,
+      timeoutMs: this.resolved.modelsDevTimeoutMs,
+      providerMap: this.resolved.pricingProviderMap,
     })
   }
 
@@ -214,6 +236,25 @@ export class WebEnhancedGateway extends TypertRemoteService {
       return { applicable: false, isAvailable: false, infos: [], cachedAt: Date.now() }
     }
     return { ...await this.balance.get(), applicable: true }
+  }
+
+  /** models.dev pricing for one model route (cached, USD per 1M tokens). */
+  @Remote('pricingGet')
+  async pricingGet(request: PricingGetRequest): Promise<PricingGetResult> {
+    try {
+      const pricing = await this.pricing.pricingFor(request.provider, request.model)
+      if (pricing === undefined) {
+        return {
+          error: {
+            code: 'pricing-not-found',
+            message: `models.dev has no pricing for '${request.provider}/${request.model}'`,
+          },
+        }
+      }
+      return { provider: request.provider, model: request.model, pricing }
+    } catch (error) {
+      return { error: this.errorOf(error, 'pricing-error') }
+    }
   }
 
   // ── git ──────────────────────────────────────────────────────────────────

@@ -6,15 +6,20 @@
  */
 
 import { useState } from 'react'
-import type { WorkspaceView } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TaskRecord, TaskUpdateRequest } from '../contract.ts'
 import type { Translate } from '../locale-keys.ts'
 import css from './TaskCard.module.css'
 
+/** The slice of a workspace row the card's project picker needs. */
+export interface WorkspaceOption {
+  readonly workspaceId: string
+  readonly title: string
+}
+
 /** Props of one task card. */
 export interface TaskCardProps {
   readonly task: TaskRecord
-  readonly workspaces: readonly WorkspaceView[]
+  readonly workspaces: readonly WorkspaceOption[]
   readonly t: Translate
   /** Start the task now. */
   readonly onRun: (task: TaskRecord) => void

@@ -226,7 +226,7 @@ function revivePanel(raw: unknown): PanelState | undefined {
     }
   }
   return {
-    tab: tab === 'files' || tab === 'preview' || tab === 'scm' ? tab : 'files',
+    tab: tab === 'files' || tab === 'preview' || tab === 'scm' || tab === 'board' || tab === 'graph' ? tab : 'files',
     expanded,
     // The filter is a live gesture, not a place: a reload starts unfiltered.
     query: '',

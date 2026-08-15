@@ -1,3 +1,18 @@
+.panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+}
+
 .action {
   border: 1px solid rgb(128 128 128 / 30%);
   border-radius: 4px;

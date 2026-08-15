@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
 /** Plugin config; every bound defaults when unset. */
 export interface Config {
     cronIntervalMs?: number;
@@ -17,6 +17,10 @@ export interface Config {
     balanceCacheTtlMs?: number;
     balanceBaseUrl?: string;
     balanceProviders?: string[];
+    modelsDevUrl?: string;
+    modelsDevCacheTtlMs?: number;
+    modelsDevTimeoutMs?: number;
+    pricingProviderMap?: Record<string, string>;
     skipDirs?: string[];
     readMaxBytes?: number;
     writeMaxBytes?: number;
@@ -42,6 +46,7 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     private readonly resolved;
     private readonly balance;
     private readonly board;
+    private readonly pricing;
     /** Resolved lazily: the walk is filesystem work no other capability needs. */
     private profileDirCache;
     /** Built on first mutation, so a deployment outside a profile never makes one. */
@@ -65,6 +70,8 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     taskRun(request: TaskRunRequest): Promise<TaskRunResult>;
     /** One balance view (cached), hidden when the route bills another account. */
     balanceGet(request: BalanceGetRequest): Promise<BalanceView>;
+    /** models.dev pricing for one model route (cached, USD per 1M tokens). */
+    pricingGet(request: PricingGetRequest): Promise<PricingGetResult>;
     /** Local branches; the current branch carries the flag. */
     gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>;
     /** Recent commits with branch markers; one branch when the graph filters. */

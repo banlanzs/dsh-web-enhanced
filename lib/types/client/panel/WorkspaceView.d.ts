@@ -1,7 +1,7 @@
 /**
- * Workspace view: file tree, preview, and SCM for the session's project,
- * registered as one tab in the conversation's view ring beside Chat and
- * Trajectory.
+ * Workspace view: file tree, preview, SCM, the task board, and the git graph
+ * for the session's project, registered as one tab in the conversation's view
+ * ring beside Chat and Trajectory.
  *
  * It lives in `conversation.view` rather than floating over the frame. The
  * view ring renders one entry at a time at full column width, so this surface

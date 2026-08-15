@@ -243,6 +243,16 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
     sessionId: z.string().nullable(),
   }))),
   unary('balanceGet', 'BalanceGetRequest', 'BalanceView', balanceViewSchema),
+  unary('pricingGet', 'PricingGetRequest', 'PricingGetResult', okOrError(z.object({
+    provider: z.string(),
+    model: z.string(),
+    pricing: z.object({
+      input: z.number(),
+      output: z.number(),
+      cacheRead: z.number().nullable(),
+      cacheWrite: z.number().nullable(),
+    }),
+  }))),
   unary('gitBranches', 'GitBranchesRequest', 'GitBranchesResult', okOrError(z.object({ branches: z.array(gitBranchViewSchema) }))),
   unary('gitLog', 'GitLogRequest', 'GitLogResult', okOrError(z.object({ commits: z.array(gitCommitViewSchema) }))),
   unary('gitCommit', 'GitCommitRequest', 'GitCommitResult', okOrError(z.object({ commit: gitCommitDetailSchema }))),

@@ -1,7 +1,8 @@
 /**
- * Task board overlay: the five status columns, the create form, and the
- * refresh cadence. Registered into `shell.overlay`; the sidebar entry only
- * flips the shared overlay state.
+ * Task board: the five status columns, the create form, and the refresh
+ * cadence. Two surfaces share the same panel — the full-frame overlay and the
+ * workspace view's「任务看板」tab — so the data/logic lives in {@link
+ * BoardPanel} and the two wrappers own only their chrome.
  *
  * A running task settles on the host (the agent session finishes and the
  * record is written back), so the board polls WHILE it shows a running task
@@ -34,13 +35,16 @@ const COLUMNS: ReadonlyArray<{ status: TaskStatus; key: 'board.column.planned' |
   { status: 'failed', key: 'board.column.failed' },
 ]
 
-/** The task board overlay. */
-export function BoardOverlay({
-  useOverlay, useWorkspaces, remote, openSession, closeOverlay, t,
-}: BoardOverlayProps) {
-  const open = useOverlay(state => state.open === 'board')
-  const workspaces = useWorkspaces(state => state.items)
+/** What the chrome-free panel needs from its host surface. */
+export interface BoardPanelProps {
+  readonly remote: WebEnhancedProps<'shell.overlay'>['remote']
+  readonly workspaces: readonly { workspaceId: string; title: string }[]
+  readonly openSession: (sessionId: string) => void
+  readonly t: WebEnhancedProps<'shell.overlay'>['t']
+}
 
+/** The chrome-free board: error strip, create form, and the five columns. */
+export function BoardPanel({ remote, workspaces, openSession, t }: BoardPanelProps) {
   const [tasks, setTasks] = useState<readonly TaskRecord[]>([])
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -58,16 +62,15 @@ export function BoardOverlay({
     setTasks(result.tasks)
   }, [remote])
 
-  useEffect(() => {
-    if (open) void reload()
-  }, [open, reload])
+  // The panel is mounted only while visible, so mount = open.
+  useEffect(() => { void reload() }, [reload])
 
   const anyRunning = tasks.some(task => task.status === 'running')
   useEffect(() => {
-    if (!open || !anyRunning) return
+    if (!anyRunning) return
     const timer = setInterval(() => { void reload() }, RUNNING_POLL_MS)
     return () => { clearInterval(timer) }
-  }, [anyRunning, open, reload])
+  }, [anyRunning, reload])
 
   /** Run one host mutation and refresh; failures land in the banner. */
   const mutate = useCallback(async (call: Promise<unknown>): Promise<void> => {
@@ -81,21 +84,13 @@ export function BoardOverlay({
     await reload()
   }, [reload])
 
-  if (!open) return null
-
   return (
-    <OverlayShell
-      title={t('board.title')}
-      closeLabel={t('board.close')}
-      onClose={closeOverlay}
-      testId="board-overlay"
-      fill
-      actions={(
+    <div className={css.panel} data-testid="board-panel">
+      <div className={css.toolbar}>
         <button type="button" className={css.action} data-testid="board-create-toggle" onClick={() => { setCreating(value => !value) }}>
           {t('board.create')}
         </button>
-      )}
-    >
+      </div>
       {error !== null && <p className={css.error} data-testid="board-error">{t('board.error', { message: error })}</p>}
       {creating && (
         <CreateForm
@@ -139,6 +134,20 @@ export function BoardOverlay({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/** The task board overlay: the same panel under the full-frame chrome. */
+export function BoardOverlay({
+  useOverlay, useWorkspaces, remote, openSession, closeOverlay, t,
+}: BoardOverlayProps) {
+  const open = useOverlay(state => state.open === 'board')
+  const workspaces = useWorkspaces(state => state.items)
+  if (!open) return null
+  return (
+    <OverlayShell title={t('board.title')} closeLabel={t('board.close')} onClose={closeOverlay} testId="board-overlay" fill>
+      <BoardPanel remote={remote} workspaces={workspaces} openSession={openSession} t={t} />
     </OverlayShell>
   )
 }
@@ -146,7 +155,7 @@ export function BoardOverlay({
 /** Props of the create form. */
 interface CreateFormProps {
   readonly workspaces: readonly { workspaceId: string; title: string }[]
-  readonly t: BoardOverlayProps['t']
+  readonly t: BoardPanelProps['t']
   readonly onCancel: () => void
   readonly onCreate: (request: { title: string; prompt: string; cron?: string; workspaceId?: string | null }) => void
 }

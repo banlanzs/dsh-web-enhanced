@@ -39,11 +39,8 @@ import { applyMention, mentionOptions } from './mention.ts'
 import type { MentionDeps, MentionKind, MentionOption } from './mention.ts'
 import { workspaceOfSessionId } from './workspace.ts'
 import { createBrowse, createOverlay, createPanel, createPreview } from './stores.ts'
-import { BoardSidebarEntry, GraphSidebarEntry } from './board/SidebarEntry.tsx'
-import { BoardOverlay } from './board/BoardOverlay.tsx'
 import { BrowseOverlay } from './browse/BrowseOverlay.tsx'
 import { BranchStrip } from './git/BranchStrip.tsx'
-import { GraphOverlay } from './git/GraphOverlay.tsx'
 import { WorkspaceView } from './panel/WorkspaceView.tsx'
 import { SettingsSection } from './settings/SettingsSection.tsx'
 import { BalanceLine } from './balance/BalanceLine.tsx'
@@ -235,34 +232,6 @@ export function apply(ctx: ClientContext): void {
         })
 
         disposers.push(
-          ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-            name: 'sidebar.footer.action',
-            id: 'web-enhanced-board',
-            order: 10,
-            locale: NS,
-            inject: face,
-          }, BoardSidebarEntry)),
-          ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-            name: 'sidebar.footer.action',
-            id: 'web-enhanced-graph',
-            order: 20,
-            locale: NS,
-            inject: face,
-          }, GraphSidebarEntry)),
-          ctx.slots.inject('shell.overlay', () => ctx.slots.register({
-            name: 'shell.overlay',
-            id: 'web-enhanced-board-overlay',
-            order: 10,
-            locale: NS,
-            inject: face,
-          }, BoardOverlay)),
-          ctx.slots.inject('shell.overlay', () => ctx.slots.register({
-            name: 'shell.overlay',
-            id: 'web-enhanced-graph-overlay',
-            order: 20,
-            locale: NS,
-            inject: face,
-          }, GraphOverlay)),
           ctx.slots.inject('shell.overlay', () => ctx.slots.register({
             name: 'shell.overlay',
             id: 'web-enhanced-browse-overlay',

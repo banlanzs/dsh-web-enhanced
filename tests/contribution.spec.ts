@@ -44,6 +44,11 @@ const payloads: Record<string, unknown[]> = {
     { applicable: true, isAvailable: true, infos: [{ currency: 'CNY', totalBalance: 1, grantedBalance: 2, toppedUpBalance: 3 }], cachedAt: 4 },
     { applicable: false, isAvailable: false, infos: [], cachedAt: 4 },
   ],
+  pricingGet: [{
+    provider: 'deepseek-official',
+    model: 'deepseek-chat',
+    pricing: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: null },
+  }, errorPayload],
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
   gitCommit: [{ commit: commitDetail }, errorPayload],
@@ -146,10 +151,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 26 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 27 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(26)
+    expect(methods).toHaveLength(27)
   })
 
   it('every result schema accepts its success and error payloads', () => {

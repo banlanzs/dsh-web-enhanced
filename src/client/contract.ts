@@ -19,7 +19,8 @@ import type {
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
   OfficeBlock, OfficeKind, PluginListRequest,
-  PluginListResult, PluginMutateRequest, PluginMutateResult, TaskCreateRequest,
+  PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
+  PricingView, TaskCreateRequest,
   TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest,
   TaskRunResult, TaskUpdateRequest, TaskUpdateResult,
 } from '../types.ts'
@@ -46,6 +47,7 @@ export interface WebEnhancedRemote {
   taskRemove(request: TaskRemoveRequest): Promise<TaskRemoveResult>
   taskRun(request: TaskRunRequest): Promise<TaskRunResult>
   balanceGet(request: BalanceGetRequest): Promise<BalanceView>
+  pricingGet(request: PricingGetRequest): Promise<PricingGetResult>
   gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>
   gitLog(request: GitLogRequest): Promise<GitLogResult>
   gitCommit(request: GitCommitRequest): Promise<GitCommitResult>
@@ -82,13 +84,14 @@ export type {
   GitWorkingState, GitWorkingView,
   OfficeBlock, OfficeKind, PluginListRequest, PluginListResult,
   PluginListView, PluginMutateRequest, PluginMutateResult, PluginMutateView, PluginView,
-  TaskCreateRequest, TaskCreateResult,
+  ModelPricingView, PricingGetRequest, PricingGetResult, PricingView, TaskCreateRequest,
+  TaskCreateResult,
   TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
   TaskStatus, TaskUpdateRequest, TaskUpdateResult,
 } from '../types.ts'
 
 /** Right-panel tab selection. */
-export type PanelTab = 'files' | 'preview' | 'scm'
+export type PanelTab = 'files' | 'preview' | 'scm' | 'board' | 'graph'
 
 /**
  * How one preview tab renders. `source` is the raw editor, `view` the
@@ -158,6 +161,12 @@ export interface ModelRouteFace {
    * @returns the route, or undefined before the first load / without the plugin.
    */
   provider(sessionId: string): string | undefined
+  /**
+   * Model id of that same selection, as models.dev names it.
+   * @param sessionId - the session to read.
+   * @returns the model id, or undefined when unknown.
+   */
+  model(sessionId: string): string | undefined
   /**
    * Subscribe to that session's selection changes.
    * @param sessionId - the session to watch.

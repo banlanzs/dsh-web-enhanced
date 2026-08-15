@@ -226,7 +226,7 @@ describe('WebEnhancedGateway', () => {
     const { gateway } = await harness()
     expect(gateway.typertRemote).toMatchObject({ serviceKey: 'webEnhanced', namespace: 'webEnhanced' })
     expect(remoteMethods(gateway).map(entry => entry.method)).toEqual([
-      'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet',
+      'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet', 'pricingGet',
       'gitBranches', 'gitLog', 'gitCommit', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',

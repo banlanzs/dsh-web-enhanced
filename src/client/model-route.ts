@@ -15,7 +15,7 @@ import type { ModelRouteFace } from './contract.ts'
 interface ModelDirectoriesFace {
   directoryFor(sessionId: never): {
     readonly store: {
-      getSnapshot(): { readonly current: { readonly provider: string } | null }
+      getSnapshot(): { readonly current: { readonly provider: string; readonly model: string } | null }
       subscribe(listener: () => void): () => void
     }
   }
@@ -45,6 +45,7 @@ export function createModelRoute(deps: ModelRouteDeps): ModelRouteFace {
   }
   return {
     provider: sessionId => storeOf(sessionId)?.getSnapshot().current?.provider,
+    model: sessionId => storeOf(sessionId)?.getSnapshot().current?.model,
     subscribe: (sessionId, listener) => storeOf(sessionId)?.subscribe(listener) ?? (() => {}),
   }
 }

@@ -296,6 +296,35 @@ export interface BalanceGetRequest {
 /** The balance itself, before the channel decision is folded in. */
 export type BalanceReading = Omit<BalanceView, 'applicable'>
 
+/** Per-million-token prices of one model, as models.dev publishes them. */
+export interface ModelPricingView {
+  /** Cache-miss input price, USD per 1M tokens. */
+  readonly input: number
+  /** Output price, USD per 1M tokens. */
+  readonly output: number
+  /** Cached-read price, USD per 1M tokens; null when not published. */
+  readonly cacheRead: number | null
+  /** Cache-write price, USD per 1M tokens; null when not published. */
+  readonly cacheWrite: number | null
+}
+
+/** One models.dev pricing lookup for the session's current model route. */
+export interface PricingGetRequest {
+  readonly provider: string
+  readonly model: string
+}
+
+/** Pricing lookup result; `error` is a field, never a throw. */
+export interface PricingView {
+  /** The provider route the request named (echoed for client-side cache keys). */
+  readonly provider: string
+  /** The model id the request named. */
+  readonly model: string
+  readonly pricing: ModelPricingView
+}
+
+export type PricingGetResult = PricingView | { readonly error: ApiError }
+
 /** One installed profile plugin. */
 export interface PluginView {
   readonly name: string

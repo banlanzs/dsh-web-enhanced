@@ -133,6 +133,8 @@ export declare const zh: {
     readonly 'panel.tab.files': "文件";
     readonly 'panel.tab.preview': "预览";
     readonly 'panel.tab.scm': "变更";
+    readonly 'panel.tab.board': "任务看板";
+    readonly 'panel.tab.graph': "Git 图谱";
     readonly 'panel.noWorkspace': "当前会话未绑定项目";
     readonly 'files.search': "按文件名搜索";
     readonly 'files.empty': "目录为空";
@@ -160,6 +162,7 @@ export declare const zh: {
     readonly 'balance.title': "余额";
     readonly 'balance.refresh': "刷新";
     readonly 'balance.error': "余额不可用：{message}";
+    readonly 'balance.cost': "本会话约 {cost}";
 };
 /** English copy; the key set is checked against {@link zh}. */
 export declare const en: Record<keyof typeof zh, string>;

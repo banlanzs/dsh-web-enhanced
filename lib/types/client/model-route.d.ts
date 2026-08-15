@@ -16,6 +16,7 @@ interface ModelDirectoriesFace {
             getSnapshot(): {
                 readonly current: {
                     readonly provider: string;
+                    readonly model: string;
                 } | null;
             };
             subscribe(listener: () => void): () => void;
