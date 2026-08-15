@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionStatusResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
 /** One fallback vision endpoint entry, as declared in plugin config. */
 export interface VisionFallbackConfig {
     model: string;
@@ -52,6 +52,8 @@ export interface Config {
     visionApiKey?: string;
     visionApiKeyEnv?: string;
     visionEndpointModel?: string;
+    /** Candidate pool for the dedicated endpoint; the active model is one of them. */
+    visionEndpointModels?: string[];
     visionAnonymous?: boolean;
     visionTimeoutMs?: number;
     visionMaxTokens?: number;
@@ -117,6 +119,12 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
      * no restart is needed; `expectedRevision` gives the save CAS semantics.
      */
     visionConfigSet(request: VisionConfigSaveRequest): Promise<VisionConfigSetResult>;
+    /**
+     * Fetch the dedicated endpoint's `/models` listing. A typed key is one-shot
+     * for this call; otherwise the SAVED key (or its env fallback) is used. The
+     * key is never stored, logged, or returned.
+     */
+    visionEndpointModels(request: VisionEndpointModelsRequest): Promise<VisionEndpointModelsResult>;
     /** Local branches; the current branch carries the flag. */
     gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>;
     /** Recent commits with branch markers; one branch when the graph filters. */

@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.11.0] - 2026-08-15
+
+### 新增：独立识图 API 的模型池（拉取 → 多选 → 选一）
+
+「设置 → Web 增强 → 识图」的独立 API 区块不再只能手填一个模型：
+
+- **拉取模型列表**：新增 `visionEndpointModels` 远程，向独立端点请求 OpenAI 兼容的 `GET {baseURL}/models`（15s 上限，密钥优先用表单刚输入的 one-shot key，否则用已保存 key / 环境变量回退；key 永不落日志、永不回传），错误按 auth/quota/rate_limit/404 等分类提示。
+- **多选保存为池**：拉回后表单勾选一批候选模型，随主保存写入 settings 命名空间的新字段 `endpointModels`（静态配置对应 `visionEndpointModels` 作为底值）。
+- **从池里选一使用**：`endpointModel` 字段在池非空时变为下拉，只能从池里挑（池空时仍可手填）；勾选第一个模型时会自动把它设为当前模型。用户自己判断模型是否支持识图——选错只会在转写时失败，不影响保存。
+
+### 接口变化
+
+- 远程方法 30 → 31：新增 `visionEndpointModels`。
+- 新增 config / settings 字段：`visionEndpointModels`（候选池）。
+- 测试 293 → 295。
+
 ## [0.10.0] - 2026-08-15
 
 ### 新增：识图在线配置入口

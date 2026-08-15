@@ -21,7 +21,7 @@ Developed and built independently of the deepseek-harness repo — the plugin on
 | **Workspace view** | A **Workspace** tab in the conversation's view ring, beside Chat and Trajectory, with five panes (Files / Preview / Changes / **Task Board** / **Git Graph**). The file tree expands, searches by name, and opens files in preview; preview supports markdown (GFM tables, HTML tables, and inline HTML) / HTML (sandboxed iframe) / code / **diff** (line-highlighted unified diff) / CSV / images / PDF / text / **Office docx & xlsx** (host-side structural conversion) with source / **split** (editor + preview side by side) / view modes and save. The Changes pane is backed by real `git status` with stage / unstage / discard and per-file diffs. The active pane and the open directories persist per workspace. |
 | **File mentions** | 「Mention file」and「Mention folder」in the composer's `+` menu: an indented project directory view (folders and files, locally filterable) whose folder rows **enter that folder** — they open the plugin's own file browser at it, which works like a file manager (breadcrumbs / parent / home / per-level listing / filter by name; a file click picks, a folder click enters). The first row opens the same browser at the project root, and it can also walk **outside the project**. Picking a file inserts its `@path` into the draft (paths with spaces are quoted). |
 | **Balance line** | Shows the DeepSeek API balance (`GET /user/balance`) below the composer, with a refresh button, a muted error state, and **an estimated cost of the current session's billed tokens** (prices fetched from models.dev, USD per million tokens). **Only while the session's model route actually bills that account** — switching to another channel (or repointing `deepseek-official` at a private gateway) hides the balance part, because the number would then be about somebody else's account; the cost part appears only when models.dev has a price for the exact provider/model selection. |
-| **Image understanding** | Transparent image support for text-only models, built in (supersedes `DSH-vision`). Sending an image to a text-only model passes the「model does not support images」gate and the `read_image` tool gate; the transcript keeps the image (the UI shows it exactly like on a multimodal route) while the model sees a `[图片内容描述]` text transcription; multimodal models are detected through the REAL pre-patch resolver and pass through untouched, so no token is spent describing images they can see. The transcription source order is: DSH-configured multimodal models (auto-detect, or pick one in Settings) → local Ollama (auto-detected) → a **dedicated transcription API** configured in Settings (OpenAI-compatible, never registered into DSH channels) with an ordered `visionFallbackModels` chain, content-hash cache, classified errors, anonymous-endpoint timeout caps, and cooldowns. **The Vision tab in Settings → Web Enhanced is a full configuration form** (switches, a DSH provider/model picker filtered to image-capable models, dedicated endpoint + key, Ollama, prompt/marker) whose saves apply immediately through a settings namespace — the static `vision*` keys in `cordis.patch.yml` remain as the base layer. |
+| **Image understanding** | Transparent image support for text-only models, built in (supersedes `DSH-vision`). Sending an image to a text-only model passes the「model does not support images」gate and the `read_image` tool gate; the transcript keeps the image (the UI shows it exactly like on a multimodal route) while the model sees a `[图片内容描述]` text transcription; multimodal models are detected through the REAL pre-patch resolver and pass through untouched, so no token is spent describing images they can see. The transcription source order is: DSH-configured multimodal models (auto-detect, or pick one in Settings) → local Ollama (auto-detected) → a **dedicated transcription API** configured in Settings (OpenAI-compatible, never registered into DSH channels) with an ordered `visionFallbackModels` chain, content-hash cache, classified errors, anonymous-endpoint timeout caps, and cooldowns. **The Vision tab in Settings → Web Enhanced is a full configuration form** (switches, a DSH provider/model picker filtered to image-capable models, dedicated endpoint + key, Ollama, prompt/marker) whose saves apply immediately through a settings namespace — the static `vision*` keys in `cordis.patch.yml` remain as the base layer. For the dedicated API it can **fetch the endpoint's `/models` listing, check a batch of candidate models into a saved pool, and pick one active model from the pool** (`visionEndpointModels` remote); the user decides which are vision-capable — an unsupported pick just fails at transcription time. |
 | **Settings page + plugin management** | One more row in the Settings nav, "Web Enhanced" (registered into `settings.section`). Its **Plugins** tab lists what the current profile has installed — name, version, dependency spec, whether it is an active layer — and offers **Update** and **Remove**. What it lists is the profile `package.json`'s `dependencies`, because that is the set pnpm can act on; template layers (`@deepseek-ai/dsh-base` and friends) are shown apart with no buttons, since no dependency provides them. **Only the profile this host started with is visible** (`dsh --profile web` lists web's dependencies and nothing else); the profile name and path are printed under the title. **Every operation takes effect on the next start** (the layer stack is composed at boot) and the UI says so. Removing this plugin itself is not blocked — the confirmation just spells out what it costs. |
 
 ## Screenshots
@@ -43,7 +43,7 @@ The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # recommended
 # or:
-# dsh plugin --profile web add ./dsh-web-enhanced-0.10.0.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.11.0.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -113,7 +113,7 @@ reinstalling from a packed tarball instead:
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.10.0.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.11.0.tgz
 ```
 
 On Windows, tarball installs need real symlink permission (pnpm's
@@ -152,6 +152,7 @@ Plugin-row `config` fields (all have defaults; the `vision*` ones can also be ed
 | `visionProvider` / `visionModel` | empty | Pin the DSH-configured provider/model used for transcription; empty = auto-detect the first image-capable models from all configured providers |
 | `visionPrompt` / `visionMarker` | Chinese thorough-description prompt / `[图片内容描述]` | Transcription prompt and the marker the model sees instead of the image block |
 | `visionBaseUrl` / `visionApiKey` / `visionEndpointModel` | empty | OpenAI-compatible VLM endpoint (e.g. DashScope compatible mode); key falls back to `visionApiKeyEnv` → `VISION_API_KEY` → `DASHSCOPE_API_KEY`. Empty base URL or model disables this source |
+| `visionEndpointModels` | `[]` | Saved candidate pool for the dedicated endpoint; the Settings tab fills it by fetching `/models` and multi-selecting, and `visionEndpointModel` is then picked from it |
 | `visionApiKeyEnv` / `visionAnonymous` | `VISION_API_KEY` / false | Env var for the endpoint key; `true` skips the Authorization header (free/local endpoints get a hard 20 s timeout cap) |
 | `visionTimeoutMs` / `visionMaxTokens` | 120000 / 4096 | VLM request timeout and output cap |
 | `visionAutoLocalOllama` | true | Probe `visionLocalOllamaUrl` at startup; when an Ollama is running, its first vision-capable model is prepended to the transcription chain (images stay on this machine) |
@@ -185,11 +186,11 @@ Plugin-row `config` fields (all have defaults; the `vision*` ones can also be ed
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + full tests + build (293 tests)
+pnpm run check   # typecheck + full tests + build (295 tests)
 ```
 
 Build outputs:
-- `lib/index.js` — node half: the `web-enhanced` function plugin (mounts the `WebEnhancedGateway` Typert service: task*/git*/fs*/balanceGet/pricingGet/visionStatus/visionConfigGet/visionConfigSet + cron scheduler + restart recovery, and the `VisionInterceptor` image-understanding service with its settings namespace)
+- `lib/index.js` — node half: the `web-enhanced` function plugin (mounts the `WebEnhancedGateway` Typert service: task*/git*/fs*/balanceGet/pricingGet/visionStatus/visionConfigGet/visionConfigSet/visionEndpointModels + cron scheduler + restart recovery, and the `VisionInterceptor` image-understanding service with its settings namespace)
 - `lib/client.js` — browser half: module-loader closure format (`window.__ModuleLoader__.load`), declared by the `dsh.client` manifest
 - `cordis.patch.yml` — bundle patch: inserts the `web-enhanced` row (one row carries both the node and browser halves)
 

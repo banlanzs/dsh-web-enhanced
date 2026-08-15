@@ -284,6 +284,7 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
     apiKeySet: z.boolean(),
     apiKeyEnv: z.string(),
     endpointModel: z.string(),
+    endpointModels: z.array(z.string()),
     anonymous: z.boolean(),
     timeoutMs: z.number(),
     maxTokens: z.number(),
@@ -307,6 +308,11 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
   unary('visionConfigSet', 'VisionConfigSaveRequest', 'VisionConfigSetResult', okOrError(z.object({
     ok: z.literal(true),
     revision: z.number(),
+  }))),
+  unary('visionEndpointModels', 'VisionEndpointModelsRequest', 'VisionEndpointModelsResult', okOrError(z.object({
+    baseUrl: z.string(),
+    models: z.array(z.object({ id: z.string(), name: z.string() })),
+    truncated: z.boolean(),
   }))),
   unary('gitBranches', 'GitBranchesRequest', 'GitBranchesResult', okOrError(z.object({ branches: z.array(gitBranchViewSchema) }))),
   unary('gitLog', 'GitLogRequest', 'GitLogResult', okOrError(z.object({ commits: z.array(gitCommitViewSchema) }))),

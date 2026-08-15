@@ -23,7 +23,8 @@ import type {
   PricingView, TaskCreateRequest,
   TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest,
   TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigPatch,
-  VisionConfigSaveRequest, VisionConfigSetResult, VisionStatusResult,
+  VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelView,
+  VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult,
 } from '../types.ts'
 import type {
   BrowseActions, BrowseState, Observable, OverlayActions, OverlayState, PanelActions, PanelState,
@@ -52,6 +53,7 @@ export interface WebEnhancedRemote {
   visionStatus(): Promise<VisionStatusResult>
   visionConfigGet(): Promise<VisionConfigGetResult>
   visionConfigSet(request: VisionConfigSaveRequest): Promise<VisionConfigSetResult>
+  visionEndpointModels(request: VisionEndpointModelsRequest): Promise<VisionEndpointModelsResult>
   gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>
   gitLog(request: GitLogRequest): Promise<GitLogResult>
   gitCommit(request: GitCommitRequest): Promise<GitCommitResult>
@@ -93,8 +95,9 @@ export type {
   TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
   TaskStatus, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigPatch,
   VisionConfigSaveRequest, VisionConfigSaveView, VisionConfigSetResult, VisionConfigView,
-  VisionHarnessModelView, VisionModelOptionView, VisionProviderOptionView, VisionStatusResult,
-  VisionStatusView,
+  VisionEndpointModelView, VisionEndpointModelsRequest, VisionEndpointModelsResult,
+  VisionEndpointModelsView, VisionHarnessModelView, VisionModelOptionView, VisionProviderOptionView,
+  VisionStatusResult, VisionStatusView,
 } from '../types.ts'
 
 /** Right-panel tab selection. */

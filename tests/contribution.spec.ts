@@ -92,6 +92,7 @@ const payloads: Record<string, unknown[]> = {
     apiKeySet: true,
     apiKeyEnv: 'VISION_API_KEY',
     endpointModel: 'qwen3.7-flash',
+    endpointModels: ['qwen3.7-flash', 'qwen3-vl-flash'],
     anonymous: false,
     timeoutMs: 120000,
     maxTokens: 4096,
@@ -112,6 +113,18 @@ const payloads: Record<string, unknown[]> = {
     status: visionStatusSample,
   }, errorPayload],
   visionConfigSet: [{ ok: true, revision: 4 }, errorPayload],
+  visionEndpointModels: [{
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    models: [
+      { id: 'qwen3.7-flash', name: 'Qwen3.7 Flash' },
+      { id: 'qwen3-vl-flash', name: 'Qwen3-VL Flash' },
+    ],
+    truncated: false,
+  }, {
+    baseUrl: 'http://localhost:11434/v1',
+    models: [],
+    truncated: true,
+  }, errorPayload],
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
   gitCommit: [{ commit: commitDetail }, errorPayload],
@@ -214,10 +227,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 30 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 31 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(30)
+    expect(methods).toHaveLength(31)
   })
 
   it('every result schema accepts its success and error payloads', () => {

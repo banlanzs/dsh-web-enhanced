@@ -14,7 +14,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
-  VisionConfigPatch, VisionConfigView, VisionStatusView, WebEnhancedRemote,
+  VisionConfigPatch, VisionConfigView, VisionEndpointModelView, VisionStatusView,
+  WebEnhancedRemote,
 } from '../contract.ts'
 import type { Translate } from '../locale-keys.ts'
 import css from './VisionStatusPanel.module.css'
@@ -30,6 +31,8 @@ interface Draft {
   baseUrl: string
   apiKeyInput: string
   endpointModel: string
+  /** Candidate pool checked in the fetched model list. */
+  endpointModels: string[]
   anonymous: boolean
   timeoutMs: string
   maxTokens: string
@@ -50,6 +53,7 @@ function draftOf(value: VisionConfigView): Draft {
     baseUrl: value.baseUrl,
     apiKeyInput: '',
     endpointModel: value.endpointModel,
+    endpointModels: [...value.endpointModels],
     anonymous: value.anonymous,
     timeoutMs: String(value.timeoutMs),
     maxTokens: String(value.maxTokens),
@@ -107,6 +111,10 @@ export function VisionStatusPanel({ remote, t }: VisionStatusPanelProps) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [discovered, setDiscovered] = useState<readonly VisionEndpointModelView[] | null>(null)
+  const [discoveredTruncated, setDiscoveredTruncated] = useState(false)
+  const [discovering, setDiscovering] = useState(false)
+  const [discoverError, setDiscoverError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -131,6 +139,49 @@ export function VisionStatusPanel({ remote, t }: VisionStatusPanelProps) {
   useEffect(() => {
     void load()
   }, [load])
+
+  /** Pull the dedicated endpoint's model list (one-shot key if typed). */
+  const fetchModels = useCallback(async () => {
+    if (draft === null) return
+    setDiscovering(true)
+    setDiscoverError(null)
+    const result = await remote.visionEndpointModels({
+      baseUrl: draft.baseUrl.trim(),
+      ...(draft.apiKeyInput.trim() === '' ? {} : { apiKey: draft.apiKeyInput.trim() }),
+      anonymous: draft.anonymous,
+    })
+    if ('error' in result) {
+      setDiscoverError(result.error.message)
+    } else {
+      setDiscovered(result.models)
+      setDiscoveredTruncated(result.truncated)
+      // Keep the already-saved pool selection for this fetched list; the
+      // first model the user checks becomes the active model when none is set.
+      setDraft(current => current === null ? current : {
+        ...current,
+        endpointModels: result.models
+          .filter(model => current.endpointModels.includes(model.id))
+          .map(model => model.id),
+      })
+    }
+    setDiscovering(false)
+  }, [draft, remote])
+
+  /** Check/uncheck one fetched model in the candidate pool. */
+  const toggleEndpointModel = (id: string): void => {
+    setDraft(current => {
+      if (current === null) return current
+      const checked = current.endpointModels.includes(id)
+      const pool = checked
+        ? current.endpointModels.filter(existing => existing !== id)
+        : [...current.endpointModels, id]
+      return {
+        ...current,
+        endpointModels: pool,
+        endpointModel: current.endpointModel === '' && !checked ? id : current.endpointModel,
+      }
+    })
+  }
 
   /** Providers that offer at least one image-capable model (picker source). */
   const visionProviders = (view?.providers ?? [])
@@ -178,6 +229,7 @@ export function VisionStatusPanel({ remote, t }: VisionStatusPanelProps) {
       marker: draft.marker,
       baseUrl: draft.baseUrl.trim(),
       endpointModel: draft.endpointModel.trim(),
+      endpointModels: [...draft.endpointModels],
       anonymous: draft.anonymous,
       timeoutMs,
       maxTokens,
@@ -259,9 +311,21 @@ export function VisionStatusPanel({ remote, t }: VisionStatusPanelProps) {
                 <input className={css.input} value={draft.baseUrl} placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1"
                   onChange={event => { setDraft({ ...draft, baseUrl: event.target.value }) }} />
               </Field>
-              <Field label={t('vision.form.endpointModel')}>
-                <input className={css.input} value={draft.endpointModel} placeholder="qwen3.7-flash"
-                  onChange={event => { setDraft({ ...draft, endpointModel: event.target.value }) }} />
+              <Field label={t('vision.form.endpointModel')} hint={t('vision.form.endpointModelHint')}>
+                {draft.endpointModels.length > 0
+                  ? (
+                      <select className={css.input} value={draft.endpointModel}
+                        onChange={event => { setDraft({ ...draft, endpointModel: event.target.value }) }}>
+                        {draft.endpointModels.map(id => <option key={id} value={id}>{id}</option>)}
+                        {draft.endpointModel !== '' && !draft.endpointModels.includes(draft.endpointModel) && (
+                          <option value={draft.endpointModel}>{draft.endpointModel}</option>
+                        )}
+                      </select>
+                    )
+                  : (
+                      <input className={css.input} value={draft.endpointModel} placeholder="qwen3.7-flash"
+                        onChange={event => { setDraft({ ...draft, endpointModel: event.target.value }) }} />
+                    )}
               </Field>
               <Field label={t('vision.form.apiKey')} hint={t('vision.form.apiKeyHint')}>
                 <div className={css.keyRow}>
@@ -287,6 +351,38 @@ export function VisionStatusPanel({ remote, t }: VisionStatusPanelProps) {
                 <input className={css.input} inputMode="numeric" value={draft.maxTokens}
                   onChange={event => { setDraft({ ...draft, maxTokens: event.target.value }) }} />
               </Field>
+            </div>
+
+            <div className={css.poolBlock}>
+              <div className={css.poolToolbar}>
+                <button type="button" className={css.minorButton}
+                  disabled={discovering || draft.baseUrl.trim() === ''}
+                  onClick={() => { void fetchModels() }}>
+                  {discovering ? t('vision.form.fetchingModels') : t('vision.form.fetchModels')}
+                </button>
+                {discovered !== null && (
+                  <span className={css.fieldHint}>
+                    {t('vision.form.fetchedCount', { count: String(discovered.length) })}
+                    {discoveredTruncated ? ` · ${t('vision.form.fetchedTruncated')}` : ''}
+                  </span>
+                )}
+              </div>
+              {discoverError !== null && <p className={css.failure}>{t('vision.form.fetchError', { message: discoverError })}</p>}
+              {discovered !== null && discovered.length > 0 && (
+                <div className={css.poolList}>
+                  {discovered.map(model => (
+                    <label key={model.id} className={css.poolRow}>
+                      <input type="checkbox" checked={draft.endpointModels.includes(model.id)}
+                        onChange={() => { toggleEndpointModel(model.id) }} />
+                      <span className={css.poolName}>{model.name === model.id ? model.id : `${model.name}（${model.id}）`}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {discovered !== null && discovered.length === 0 && (
+                <p className={css.sectionHint}>{t('vision.form.noFetchedModels')}</p>
+              )}
+              {discovered === null && <p className={css.sectionHint}>{t('vision.form.poolHint')}</p>}
             </div>
           </section>
 

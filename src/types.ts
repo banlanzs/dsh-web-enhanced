@@ -453,7 +453,10 @@ export interface VisionConfigView {
   readonly baseUrl: string
   readonly apiKeySet: boolean
   readonly apiKeyEnv: string
+  /** The ACTIVE transcription model, picked from {@link endpointModels}. */
   readonly endpointModel: string
+  /** The saved candidate pool; the active model is chosen from these. */
+  readonly endpointModels: readonly string[]
   readonly anonymous: boolean
   readonly timeoutMs: number
   readonly maxTokens: number
@@ -484,6 +487,8 @@ export interface VisionConfigPatch {
   /** Present only when the user typed a new key; omitted keeps the old one. */
   apiKey?: string
   endpointModel?: string
+  /** Candidate pool saved from the fetched model list. */
+  endpointModels?: string[]
   anonymous?: boolean
   timeoutMs?: number
   maxTokens?: number
@@ -507,3 +512,29 @@ export interface VisionConfigSaveView {
 }
 
 export type VisionConfigSetResult = VisionConfigSaveView | { readonly error: ApiError }
+
+/** One model reported by the dedicated endpoint's `/models` listing. */
+export interface VisionEndpointModelView {
+  readonly id: string
+  readonly name: string
+}
+
+/**
+ * Fetch the dedicated endpoint's model list. Omitted fields fall back to the
+ * SAVED settings (base URL, key, anonymous flag); a typed key is one-shot and
+ * is never stored or returned.
+ */
+export interface VisionEndpointModelsRequest {
+  readonly baseUrl?: string
+  readonly apiKey?: string
+  readonly anonymous?: boolean
+}
+
+/** The endpoint's model list; `truncated` says the cap cut it. */
+export interface VisionEndpointModelsView {
+  readonly baseUrl: string
+  readonly models: readonly VisionEndpointModelView[]
+  readonly truncated: boolean
+}
+
+export type VisionEndpointModelsResult = VisionEndpointModelsView | { readonly error: ApiError }

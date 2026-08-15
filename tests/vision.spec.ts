@@ -164,23 +164,26 @@ describe('vision helpers', () => {
     const base = staticVisionSettingsBase({
       visionEnabled: false,
       visionBaseUrl: 'https://vlm.example/v1',
+      visionEndpointModels: ['qwen-vl', 'backup-vl'],
       visionFallbackModels: [{ model: 'backup', anonymous: true }],
     })
     expect(base).toEqual({
       enabled: false,
       baseUrl: 'https://vlm.example/v1',
+      endpointModels: ['qwen-vl', 'backup-vl'],
       fallbackModels: [{ model: 'backup', anonymous: true }],
     })
     const value = {
       enabled: true, patchAdmission: true, provider: 'glm', model: 'glm-4.6v',
       prompt: 'p', marker: 'm', baseUrl: '', apiKey: 'sk', apiKeyEnv: 'VISION_API_KEY',
-      endpointModel: '', anonymous: false, timeoutMs: 120000, maxTokens: 4096,
+      endpointModel: '', endpointModels: ['qwen-vl'], anonymous: false,
+      timeoutMs: 120000, maxTokens: 4096,
       autoLocalOllama: false, localOllamaModel: '', localOllamaUrl: '',
       fallbackModels: [], cacheLimit: 200, cooldownMs: 60000,
     } satisfies VisionSettingsValue
     expect(visionConfigSourceOf(value)).toMatchObject({
       visionEnabled: true, visionProvider: 'glm', visionModel: 'glm-4.6v',
-      visionApiKey: 'sk', visionAutoLocalOllama: false,
+      visionApiKey: 'sk', visionAutoLocalOllama: false, visionEndpointModels: ['qwen-vl'],
     })
     expect(visionConfigSourceOf(value).visionBaseUrl).toBe('')
   })
@@ -568,8 +571,8 @@ describe('VisionInterceptor', () => {
     const scopeValue: VisionSettingsValue = {
       enabled: true, patchAdmission: true, provider: '', model: '',
       prompt: 'p', marker: 'm', baseUrl: '', apiKey: '', apiKeyEnv: 'VISION_API_KEY',
-      endpointModel: '', anonymous: false, timeoutMs: 120000, maxTokens: 4096,
-      autoLocalOllama: false, localOllamaModel: '', localOllamaUrl: '',
+      endpointModel: '', endpointModels: [], anonymous: false, timeoutMs: 120000,
+      maxTokens: 4096, autoLocalOllama: false, localOllamaModel: '', localOllamaUrl: '',
       fallbackModels: [], cacheLimit: 200, cooldownMs: 60000,
     }
     const watchers: Array<(next: unknown, prev: unknown) => void> = []

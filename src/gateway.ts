@@ -26,7 +26,7 @@ import { PnpmRunner, pnpmFailureCode } from './pnpm.ts'
 import { ModelsDevPricing } from './pricing.ts'
 import { findProfileDir, readInventory } from './profile.ts'
 import type { PresetRoster, RunDeps } from './run-task.ts'
-import { DEFAULT_VISION_MARKER, DEFAULT_VISION_PROMPT, VISION_SETTINGS_NS } from './vision.ts'
+import { classifyVisionHttpError, DEFAULT_VISION_MARKER, DEFAULT_VISION_PROMPT, resolveVisionApiKey, VISION_SETTINGS_NS } from './vision.ts'
 import type { VisionSettingsValue } from './vision.ts'
 import type {
   ApiError, BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest,
@@ -42,8 +42,9 @@ import type {
   TaskCreateRequest, TaskCreateResult,
   TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
   TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigPatch,
-  VisionConfigSaveRequest, VisionConfigSetResult, VisionModelOptionView, VisionProviderOptionView,
-  VisionStatusResult, VisionStatusView, WorkspaceId,
+  VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelView,
+  VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionModelOptionView,
+  VisionProviderOptionView, VisionStatusResult, VisionStatusView, WorkspaceId,
 } from './types.ts'
 
 /**
@@ -91,8 +92,9 @@ interface VisionIntegrationFace {
 /** Settings keys the Vision tab may edit (everything else is read-only). */
 const VISION_CONFIG_EDITABLE_KEYS: ReadonlySet<string> = new Set([
   'enabled', 'patchAdmission', 'provider', 'model', 'prompt', 'marker',
-  'baseUrl', 'apiKey', 'endpointModel', 'anonymous', 'timeoutMs', 'maxTokens',
-  'autoLocalOllama', 'localOllamaModel', 'localOllamaUrl', 'cacheLimit', 'cooldownMs',
+  'baseUrl', 'apiKey', 'endpointModel', 'endpointModels', 'anonymous', 'timeoutMs',
+  'maxTokens', 'autoLocalOllama', 'localOllamaModel', 'localOllamaUrl',
+  'cacheLimit', 'cooldownMs',
 ])
 
 /** One fallback vision endpoint entry, as declared in plugin config. */
@@ -139,6 +141,8 @@ export interface Config {
   visionApiKey?: string
   visionApiKeyEnv?: string
   visionEndpointModel?: string
+  /** Candidate pool for the dedicated endpoint; the active model is one of them. */
+  visionEndpointModels?: string[]
   visionAnonymous?: boolean
   visionTimeoutMs?: number
   visionMaxTokens?: number
@@ -193,6 +197,7 @@ export const Config: z<Config> = z.object({
   visionApiKey: z.string().role('secret').default(''),
   visionApiKeyEnv: z.string().default('VISION_API_KEY'),
   visionEndpointModel: z.string().default(''),
+  visionEndpointModels: z.array(z.string()).default([]),
   visionAnonymous: z.boolean().default(false),
   visionTimeoutMs: z.number().default(120_000),
   visionMaxTokens: z.number().default(4_096),
@@ -245,6 +250,7 @@ export function resolveConfig(config: Config): Required<Config> {
     visionApiKey: config.visionApiKey ?? '',
     visionApiKeyEnv: config.visionApiKeyEnv ?? 'VISION_API_KEY',
     visionEndpointModel: config.visionEndpointModel ?? '',
+    visionEndpointModels: config.visionEndpointModels ?? [],
     visionAnonymous: config.visionAnonymous ?? false,
     visionTimeoutMs: config.visionTimeoutMs ?? 120_000,
     visionMaxTokens: config.visionMaxTokens ?? 4_096,
@@ -413,6 +419,7 @@ export class WebEnhancedGateway extends TypertRemoteService {
         apiKeySet: raw.apiKey !== '',
         apiKeyEnv: raw.apiKeyEnv,
         endpointModel: raw.endpointModel,
+        endpointModels: raw.endpointModels,
         anonymous: raw.anonymous,
         timeoutMs: raw.timeoutMs,
         maxTokens: raw.maxTokens,
@@ -462,6 +469,80 @@ export class WebEnhancedGateway extends TypertRemoteService {
     } catch (error) {
       const conflict = (error as { code?: unknown }).code === 'SETTINGS_CONFLICT'
       return { error: this.errorOf(error, conflict ? 'vision-config-conflict' : 'vision-config-save') }
+    }
+  }
+
+  /**
+   * Fetch the dedicated endpoint's `/models` listing. A typed key is one-shot
+   * for this call; otherwise the SAVED key (or its env fallback) is used. The
+   * key is never stored, logged, or returned.
+   */
+  @Remote('visionEndpointModels')
+  async visionEndpointModels(request: VisionEndpointModelsRequest): Promise<VisionEndpointModelsResult> {
+    try {
+      const saved = this.visionSettings()?.get(VISION_SETTINGS_NS as never) as VisionSettingsValue | undefined
+      const baseUrl = (request.baseUrl?.trim() ?? saved?.baseUrl ?? '').trim()
+      if (baseUrl === '') {
+        return {
+          error: {
+            code: 'vision-endpoint-missing',
+            message: 'set the dedicated API base URL first (in the form or in the saved settings)',
+          },
+        }
+      }
+      const attempt = {
+        apiKey: request.apiKey !== undefined && request.apiKey !== '' ? request.apiKey : saved?.apiKey ?? '',
+        anonymous: request.anonymous ?? saved?.anonymous ?? false,
+      }
+      const apiKey = resolveVisionApiKey(attempt, baseUrl, saved?.apiKeyEnv ?? 'VISION_API_KEY')
+      const timeoutMs = Math.min(saved?.timeoutMs ?? 120_000, 15_000)
+      const response = await fetch(`${baseUrl.replace(/\/+$/u, '')}/models`, {
+        headers: { ...(apiKey === '' ? {} : { authorization: `Bearer ${apiKey}` }) },
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+      if (!response.ok) {
+        const body = await response.text()
+        const { kind, hint } = classifyVisionHttpError(response.status, body)
+        return {
+          error: {
+            code: `vision-endpoint-${kind}`,
+            message: `model listing failed at ${baseUrl}: ${body.slice(0, 200)} — ${hint}`,
+          },
+        }
+      }
+      let payload: unknown
+      try {
+        payload = JSON.parse(await response.text())
+      } catch {
+        return { error: { code: 'vision-endpoint-parse', message: 'the endpoint returned a non-JSON model listing' } }
+      }
+      const listed = Array.isArray(payload)
+        ? payload
+        : Array.isArray((payload as { data?: unknown })?.data)
+          ? (payload as { data: readonly unknown[] }).data
+          : []
+      const models: VisionEndpointModelView[] = []
+      let truncated = false
+      for (const entry of listed) {
+        const id = (entry as { id?: unknown })?.id
+        if (typeof id !== 'string' || id.trim() === '') continue
+        const name = (entry as { name?: unknown })?.name
+        models.push({ id: id.trim(), name: typeof name === 'string' && name.trim() !== '' ? name.trim() : id.trim() })
+        if (models.length >= 200) {
+          truncated = listed.length > 200
+          break
+        }
+      }
+      return { baseUrl, models, truncated }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const aborted = error instanceof Error && error.name === 'TimeoutError' || /aborted due to timeout|timed out/iu.test(message)
+      return {
+        error: this.errorOf(
+          error,
+          aborted ? 'vision-endpoint-timeout' : 'vision-endpoint-fetch',
+        ),
+      }
     }
   }
 

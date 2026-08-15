@@ -104,6 +104,47 @@
   gap: 10px;
 }
 
+.poolBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid rgb(128 128 128 / 14%);
+  padding-top: 10px;
+}
+
+.poolToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.poolList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 4px 12px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid rgb(128 128 128 / 14%);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.poolRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.poolName {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .save {
   border: none;
   border-radius: 6px;

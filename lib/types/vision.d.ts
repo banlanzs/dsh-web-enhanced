@@ -126,6 +126,8 @@ export interface VisionSettings {
     readonly apiKey: string;
     readonly apiKeyEnv: string;
     readonly endpointModel: string;
+    /** Saved candidate pool; `endpointModel` is chosen from it in the UI. */
+    readonly endpointModels: readonly string[];
     readonly anonymous: boolean;
     readonly timeoutMs: number;
     readonly maxTokens: number;
@@ -148,6 +150,7 @@ export interface VisionConfigSource {
     readonly visionApiKey?: string;
     readonly visionApiKeyEnv?: string;
     readonly visionEndpointModel?: string;
+    readonly visionEndpointModels?: readonly string[];
     readonly visionAnonymous?: boolean;
     readonly visionTimeoutMs?: number;
     readonly visionMaxTokens?: number;
@@ -172,6 +175,7 @@ export interface VisionSettingsValue {
     readonly apiKey: string;
     readonly apiKeyEnv: string;
     readonly endpointModel: string;
+    readonly endpointModels: string[];
     readonly anonymous: boolean;
     readonly timeoutMs: number;
     readonly maxTokens: number;

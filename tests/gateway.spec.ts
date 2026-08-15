@@ -227,7 +227,7 @@ describe('WebEnhancedGateway', () => {
     expect(gateway.typertRemote).toMatchObject({ serviceKey: 'webEnhanced', namespace: 'webEnhanced' })
     expect(remoteMethods(gateway).map(entry => entry.method)).toEqual([
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet', 'pricingGet',
-      'visionStatus', 'visionConfigGet', 'visionConfigSet',
+      'visionStatus', 'visionConfigGet', 'visionConfigSet', 'visionEndpointModels',
       'gitBranches', 'gitLog', 'gitCommit', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',
@@ -663,8 +663,8 @@ describe('WebEnhancedGateway', () => {
       const section = {
         enabled: true, patchAdmission: true, provider: '', model: '', prompt: 'p', marker: 'm',
         baseUrl: '', apiKey: 'sk-secret', apiKeyEnv: 'VISION_API_KEY', endpointModel: '',
-        anonymous: false, timeoutMs: 120000, maxTokens: 4096, autoLocalOllama: true,
-        localOllamaModel: '', localOllamaUrl: 'http://localhost:11434/v1',
+        endpointModels: ['qwen-vl'], anonymous: false, timeoutMs: 120000, maxTokens: 4096,
+        autoLocalOllama: true, localOllamaModel: '', localOllamaUrl: 'http://localhost:11434/v1',
         fallbackModels: [], cacheLimit: 200, cooldownMs: 60000,
       }
       const sections: Record<string, Record<string, unknown>> = { 'dsh-web-enhanced-vision': { ...section } }
@@ -690,6 +690,7 @@ describe('WebEnhancedGateway', () => {
       expect(view).toMatchObject({
         managed: true, writable: true, revision: 7, enabled: true,
         apiKeySet: true, fallbackCount: 0, endpointModel: '',
+        endpointModels: ['qwen-vl'],
         providers: [{
           provider: 'deepseek-official', name: 'DeepSeek',
           models: [
@@ -706,6 +707,7 @@ describe('WebEnhancedGateway', () => {
         patch: {
           baseUrl: 'https://vlm.example/v1',
           endpointModel: 'qwen-vl',
+          endpointModels: ['qwen-vl', 'backup-vl'],
           unknownField: true,
         } as unknown as VisionConfigPatch,
         expectedRevision: 7,
@@ -714,6 +716,7 @@ describe('WebEnhancedGateway', () => {
       expect(update).toHaveBeenCalledWith('dsh-web-enhanced-vision', {
         baseUrl: 'https://vlm.example/v1',
         endpointModel: 'qwen-vl',
+        endpointModels: ['qwen-vl', 'backup-vl'],
       }, 7)
       expect(sections['dsh-web-enhanced-vision']).toMatchObject({
         baseUrl: 'https://vlm.example/v1', apiKey: 'sk-secret',
@@ -734,6 +737,75 @@ describe('WebEnhancedGateway', () => {
       } as never)
       expect(await gateway.visionConfigSet({ patch: { enabled: false }, expectedRevision: 3 }))
         .toMatchObject({ error: { code: 'vision-config-conflict' } })
+    })
+
+    it('fetches the dedicated endpoint model list with the saved key', async () => {
+      const { ctx, gateway } = await harness()
+      ctx.provide('settings' as never, {
+        get: () => ({
+          enabled: true, patchAdmission: true, fallbackModels: [],
+          baseUrl: 'https://vlm.example/v1', apiKey: 'sk-saved', apiKeyEnv: 'MISSING',
+          endpointModels: [], anonymous: false, timeoutMs: 120000,
+        }),
+        describe: () => [{ ns: 'dsh-web-enhanced-vision', revision: 1 }],
+        update: async () => {},
+        writable: true,
+      } as never)
+      const fetched = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => ({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          object: 'list',
+          data: [
+            { id: 'qwen3.7-flash', name: 'Qwen3.7 Flash' },
+            { id: '', name: 'empty' },
+            { id: 'qwen3-vl-flash' },
+          ],
+        }),
+      }))
+      vi.stubGlobal('fetch', fetched)
+      const result = await gateway.visionEndpointModels({})
+      if ('error' in result) throw new Error(result.error.message)
+      expect(result).toEqual({
+        baseUrl: 'https://vlm.example/v1',
+        models: [
+          { id: 'qwen3.7-flash', name: 'Qwen3.7 Flash' },
+          { id: 'qwen3-vl-flash', name: 'qwen3-vl-flash' },
+        ],
+        truncated: false,
+      })
+      expect(fetched).toHaveBeenCalledWith(
+        'https://vlm.example/v1/models',
+        expect.objectContaining({ headers: { authorization: 'Bearer sk-saved' } }),
+      )
+    })
+
+    it('uses a one-shot key override and classifies a refused model listing', async () => {
+      const { ctx, gateway } = await harness()
+      ctx.provide('settings' as never, {
+        get: () => ({ enabled: true, patchAdmission: true, fallbackModels: [], baseUrl: '', apiKey: '', apiKeyEnv: 'MISSING' }),
+        describe: () => [],
+        update: async () => {},
+        writable: true,
+      } as never)
+      const fetched = vi.fn(async () => ({
+        ok: false,
+        status: 401,
+        text: async () => 'bad key',
+      }))
+      vi.stubGlobal('fetch', fetched)
+      const denied = await gateway.visionEndpointModels({
+        baseUrl: 'https://vlm.example/v1',
+        apiKey: 'sk-one-shot',
+      })
+      expect(denied).toMatchObject({ error: { code: 'vision-endpoint-auth' } })
+      expect(fetched).toHaveBeenCalledWith(
+        'https://vlm.example/v1/models',
+        expect.objectContaining({ headers: { authorization: 'Bearer sk-one-shot' } }),
+      )
+
+      vi.unstubAllGlobals()
+      expect(await gateway.visionEndpointModels({})).toMatchObject({ error: { code: 'vision-endpoint-missing' } })
     })
   })
 

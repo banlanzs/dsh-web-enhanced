@@ -21,7 +21,7 @@
 | **工作区视图** | 会话顶部视图栏中的「工作区」标签页，与「对话」「轨迹」并列，内含文件 / 预览 / 变更 / **任务看板** / **Git 图谱**五个面板。文件树支持整行展开、文件名搜索、点击打开预览；预览支持 markdown（含 GFM 表格、HTML 表格与行内 HTML）/ HTML（sandbox iframe）/ 代码 / **diff**（行级高亮 unified diff）/ CSV / 图片 / PDF / 文本 / **Office（docx/xlsx，宿主侧结构化转换）**，且支持**源码 / 分屏 / 预览**三态与保存；变更页基于真实 git status，支持 stage / unstage / discard 与逐文件 diff。当前面板与展开的目录按工作区持久化。 |
 | **文件 mention** | 输入框 `+` 菜单里的「引用文件」「引用文件夹」两项：项目内条目以**缩进目录视图**呈现（文件夹与文件都有，可本地过滤），文件选择器里点击文件夹行即**进入该文件夹**——打开插件自带的文件浏览器并定位到该目录；浏览器按文件资源管理器方式工作（面包屑 / 上一级 / 主目录 / 逐层列表 / 按名过滤，点文件夹进入、点文件选中）。第一行在项目根目录打开同一个浏览器，也可以走到**项目外**。选中文件后把 `@路径` 插入草稿，含空格的路径自动加引号。 |
 | **余额显示** | 输入框下方显示 DeepSeek API 余额（`GET /user/balance`），带刷新、弱化错误态，以及**当前会话已计费 token 的估算花费**（价格从 models.dev 拉取，USD / 百万 token）。**余额仅在当前会话的模型路由确实指向该余额所属账户时显示**——切到别家渠道（或把 deepseek-official 改指到自建网关）后余额部分隐藏，因为那时的数字说的是另一个账户；花费部分只在 models.dev 有对应 provider/model 的价格时显示。 |
-| **识图（图片理解）** | 内置、透明的纯文本模型识图能力（取代 `DSH-vision`）。纯文本模型直接发图：绕过「当前模型不支持图片」的发送门禁与 `read_image` 工具门禁；对话记录照常保留图片（UI 与多模态模型一致），模型实际看到的是 `[图片内容描述]` 文本转写；多模态模型用**打补丁前的真实 resolver** 判定、原样放行，不为它们浪费识别 token。转写源优先级：DSH 已配置的多模态模型（设置页可手动选择渠道/模型，或自动探测）→ 本地 Ollama（自动探测）→ 设置页里单独配置的**独立识图 API**（OpenAI 兼容，不注册进 DSH 渠道）+ `visionFallbackModels` 有序回退链，带内容哈希缓存、分类错误、匿名端点硬超时与冷却。**设置 → Web 增强 → 识图是完整配置表单**（开关、按图片能力筛选的 DSH 渠道/模型选择器、独立端点与密钥、Ollama、提示词/标记），保存立即生效并持久化到 DSH settings；`cordis.patch.yml` 里的 `vision*` 静态配置作为底值保留。 |
+| **识图（图片理解）** | 内置、透明的纯文本模型识图能力（取代 `DSH-vision`）。纯文本模型直接发图：绕过「当前模型不支持图片」的发送门禁与 `read_image` 工具门禁；对话记录照常保留图片（UI 与多模态模型一致），模型实际看到的是 `[图片内容描述]` 文本转写；多模态模型用**打补丁前的真实 resolver** 判定、原样放行，不为它们浪费识别 token。转写源优先级：DSH 已配置的多模态模型（设置页可手动选择渠道/模型，或自动探测）→ 本地 Ollama（自动探测）→ 设置页里单独配置的**独立识图 API**（OpenAI 兼容，不注册进 DSH 渠道）+ `visionFallbackModels` 有序回退链，带内容哈希缓存、分类错误、匿名端点硬超时与冷却。**设置 → Web 增强 → 识图是完整配置表单**（开关、按图片能力筛选的 DSH 渠道/模型选择器、独立端点与密钥、Ollama、提示词/标记），保存立即生效并持久化到 DSH settings；`cordis.patch.yml` 里的 `vision*` 静态配置作为底值保留。独立 API 支持**拉取 `/models` 模型列表、多选一批候选存为模型池（`visionEndpointModels`），再从池里选一个作为当前使用**（`visionEndpointModels` 远程）——是否支持识图由用户自己判断，选错只会在转写时失败。 |
 | **设置页 + 插件管理** | 设置面板左侧多一行「Web 增强」（注册到 `settings.section`）。页内的**插件管理**列出当前 profile 装了哪些插件（名称、版本、依赖 spec、是否已启用为层），可**更新**或**移除**。列的是 profile `package.json` 的 `dependencies`——那才是 pnpm 能操作的集合；模板层（`@deepseek-ai/dsh-base` 等）单独列出且不给按钮，因为没有任何依赖提供它们。**只看得到启动时所用的那个 profile**（`dsh --profile web` 就只列 web 的依赖），profile 名与路径印在标题下。**所有操作都在下次启动才生效**（层栈在启动时组合），界面照直说明；移除本插件自己不被阻止，但确认框会说清代价。 |
 
 ## 截图
@@ -43,7 +43,7 @@
 ```sh
 dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # 推荐
 # 或：
-# dsh plugin --profile web add ./dsh-web-enhanced-0.10.0.tgz
+# dsh plugin --profile web add ./dsh-web-enhanced-0.11.0.tgz
 # dsh plugin --profile web add dsh-web-enhanced
 ```
 
@@ -112,7 +112,7 @@ host 能力失效）。改用打包重装来迭代：
 cd dsh-web-enhanced
 pnpm install && pnpm run check && npm pack
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.10.0.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-0.11.0.tgz
 ```
 
 Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPackage` 步骤）。
@@ -150,6 +150,7 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 | `visionProvider` / `visionModel` | 空 | 指定用于转写的 DSH 模型渠道/模型；留空则从所有已配置渠道自动探测支持图片的模型 |
 | `visionPrompt` / `visionMarker` | 中文详尽描述提示词 / `[图片内容描述]` | 转写提示词，以及模型看到的图片替代标记 |
 | `visionBaseUrl` / `visionApiKey` / `visionEndpointModel` | 空 | OpenAI 兼容 VLM 端点（如 DashScope 兼容模式）；key 依次回退 `visionApiKeyEnv` → `VISION_API_KEY` → `DASHSCOPE_API_KEY`。base URL 或模型任一为空则不启用该来源 |
+| `visionEndpointModels` | `[]` | 独立端点的候选模型池；设置页拉取 `/models` 后多选保存，`visionEndpointModel` 从池里选 |
 | `visionApiKeyEnv` / `visionAnonymous` | `VISION_API_KEY` / false | 端点密钥环境变量；true 时不带 Authorization 头（匿名/免费端点强制 20s 硬超时） |
 | `visionTimeoutMs` / `visionMaxTokens` | 120000 / 4096 | VLM 请求超时与输出上限 |
 | `visionAutoLocalOllama` | true | 启动时探测 `visionLocalOllamaUrl`；检测到本地 Ollama 后把它的第一个视觉模型加进转写链最前（图片不出本机） |
@@ -175,11 +176,11 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + 全部测试 + 构建（293 个测试）
+pnpm run check   # typecheck + 全部测试 + 构建（295 个测试）
 ```
 
 构建产物：
-- `lib/index.js` — node half：`web-enhanced` 函数插件（挂载 `WebEnhancedGateway` Typert 服务：task*/git*/fs*/balanceGet/pricingGet/visionStatus/visionConfigGet/visionConfigSet + cron 调度器 + 重启恢复，以及带 settings 命名空间的 `VisionInterceptor` 识图服务）
+- `lib/index.js` — node half：`web-enhanced` 函数插件（挂载 `WebEnhancedGateway` Typert 服务：task*/git*/fs*/balanceGet/pricingGet/visionStatus/visionConfigGet/visionConfigSet/visionEndpointModels + cron 调度器 + 重启恢复，以及带 settings 命名空间的 `VisionInterceptor` 识图服务）
 - `lib/client.js` — 浏览器 half：模块加载器闭包格式（`window.__ModuleLoader__.load`），由 `dsh.client` manifest 声明
 - `cordis.patch.yml` — bundle 补丁：插入 `web-enhanced` 行（一个行同时承载 node 与 browser 两个 half）
 

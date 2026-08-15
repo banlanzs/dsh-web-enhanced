@@ -132,6 +132,14 @@ export declare const zh: {
     readonly 'vision.form.endpointHint': "只用于本插件的图片转写，不会注册进 DSH 的模型选择器；Base URL 或模型留空则不启用。任何 OpenAI 兼容 /chat/completions 端点都行。";
     readonly 'vision.form.baseUrl': "Base URL";
     readonly 'vision.form.endpointModel': "模型";
+    readonly 'vision.form.endpointModelHint': "从下面保存的模型池里选；池为空时也可以直接手填";
+    readonly 'vision.form.fetchModels': "拉取模型列表";
+    readonly 'vision.form.fetchingModels': "拉取中…";
+    readonly 'vision.form.fetchedCount': "共 {count} 个模型";
+    readonly 'vision.form.fetchedTruncated': "列表已截断";
+    readonly 'vision.form.fetchError': "拉取失败：{message}";
+    readonly 'vision.form.noFetchedModels': "该端点没有返回模型";
+    readonly 'vision.form.poolHint': "点「拉取模型列表」后勾选一批候选模型，保存即成为模型池；再从上面选一个作为当前使用。";
     readonly 'vision.form.apiKey': "API Key";
     readonly 'vision.form.apiKeyPlaceholder': "已设置密钥时显示为已保存";
     readonly 'vision.form.apiKeyHint': "留空保持不变；点「清除密钥」删除已保存的密钥";

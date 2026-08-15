@@ -158,6 +158,8 @@ export interface VisionSettings {
   readonly apiKey: string
   readonly apiKeyEnv: string
   readonly endpointModel: string
+  /** Saved candidate pool; `endpointModel` is chosen from it in the UI. */
+  readonly endpointModels: readonly string[]
   readonly anonymous: boolean
   readonly timeoutMs: number
   readonly maxTokens: number
@@ -181,6 +183,7 @@ export interface VisionConfigSource {
   readonly visionApiKey?: string
   readonly visionApiKeyEnv?: string
   readonly visionEndpointModel?: string
+  readonly visionEndpointModels?: readonly string[]
   readonly visionAnonymous?: boolean
   readonly visionTimeoutMs?: number
   readonly visionMaxTokens?: number
@@ -205,6 +208,7 @@ export function resolveVisionSettings(config: VisionConfigSource): VisionSetting
     apiKey: config.visionApiKey ?? '',
     apiKeyEnv: config.visionApiKeyEnv ?? 'VISION_API_KEY',
     endpointModel: config.visionEndpointModel ?? '',
+    endpointModels: config.visionEndpointModels ?? [],
     anonymous: config.visionAnonymous ?? false,
     timeoutMs: config.visionTimeoutMs ?? 120_000,
     maxTokens: config.visionMaxTokens ?? 4_096,
@@ -235,6 +239,7 @@ export interface VisionSettingsValue {
   readonly apiKey: string
   readonly apiKeyEnv: string
   readonly endpointModel: string
+  readonly endpointModels: string[]
   readonly anonymous: boolean
   readonly timeoutMs: number
   readonly maxTokens: number
@@ -258,6 +263,7 @@ export const VisionSettingsSchema: z<VisionSettingsValue> = z.object({
   apiKey: z.string().role('secret').default(''),
   apiKeyEnv: z.string().default('VISION_API_KEY'),
   endpointModel: z.string().default(''),
+  endpointModels: z.array(z.string()).default([]),
   anonymous: z.boolean().default(false),
   timeoutMs: z.number().default(120_000),
   maxTokens: z.number().default(4_096),
@@ -291,6 +297,7 @@ export function staticVisionSettingsBase(config: VisionConfigSource): Partial<Vi
   if (config.visionApiKey !== undefined) base['apiKey'] = config.visionApiKey
   if (config.visionApiKeyEnv !== undefined) base['apiKeyEnv'] = config.visionApiKeyEnv
   if (config.visionEndpointModel !== undefined) base['endpointModel'] = config.visionEndpointModel
+  if (config.visionEndpointModels !== undefined) base['endpointModels'] = config.visionEndpointModels
   if (config.visionAnonymous !== undefined) base['anonymous'] = config.visionAnonymous
   if (config.visionTimeoutMs !== undefined) base['timeoutMs'] = config.visionTimeoutMs
   if (config.visionMaxTokens !== undefined) base['maxTokens'] = config.visionMaxTokens
@@ -316,6 +323,7 @@ export function visionConfigSourceOf(value: VisionSettingsValue): VisionConfigSo
     visionApiKey: value.apiKey,
     visionApiKeyEnv: value.apiKeyEnv,
     visionEndpointModel: value.endpointModel,
+    visionEndpointModels: value.endpointModels,
     visionAnonymous: value.anonymous,
     visionTimeoutMs: value.timeoutMs,
     visionMaxTokens: value.maxTokens,
