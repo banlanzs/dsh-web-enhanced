@@ -469,7 +469,11 @@ export function parseMarkdown(source: string): MdBlock[] {
         blocks.push(table)
         continue
       }
-      index = start
+      blocks.push({
+        type: 'paragraph',
+        spans: parseInline(lines.slice(start, index).map(part => part.trim()).join(' ')),
+      })
+      continue
     }
     if (/^\s*[-*+]\s+/u.test(line)) {
       blocks.push(takeList(false))

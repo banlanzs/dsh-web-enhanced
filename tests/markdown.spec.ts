@@ -197,7 +197,10 @@ describe('parseMarkdown', () => {
   })
 
   it('treats a rowless table element as ordinary content', () => {
-    expect(parseMarkdown('<table></table>').map(block => block.type)).toEqual(['paragraph'])
+    expect(parseMarkdown('<table>caption</table>')).toEqual([{
+      type: 'paragraph',
+      spans: [{ type: 'text', text: 'caption' }],
+    }])
   })
 })
 
