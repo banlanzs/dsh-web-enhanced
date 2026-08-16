@@ -52,6 +52,7 @@ export type DraftApplyResult = {
 } | {
     ok: false;
     failure: string;
+    conflicted: boolean;
 };
 /** Facts a settings draft apply needs. */
 export interface ApplyDraftArgs {

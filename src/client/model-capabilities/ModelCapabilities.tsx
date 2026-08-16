@@ -14,7 +14,7 @@
  * @module dsh-web-enhanced/src/client/model-capabilities/ModelCapabilities
  */
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
   ConfigurableProviderView, IApiClient, SettingsNamespaceView,
@@ -84,6 +84,31 @@ export function ModelCapabilitiesSection(props: ModelCapabilitiesProps): ReactNo
 
 function Loaded({ controller, useSnapshot, api, t }: ModelCapabilitiesProps): ReactNode {
   const state = useSnapshot(snapshot => snapshot)
+  // Revisions successfully written by one card are shared with every other
+  // mounted card of the same namespace: they all edit one settings section,
+  // so the first save invalidates the revision every sibling captured.
+  // External changes are deliberately NOT shared — those must keep surfacing
+  // the settings-conflict error instead of silently rebasing a stale draft.
+  const [coordinatedRevisions, setCoordinatedRevisions] = useState<ReadonlyMap<string, number>>(() => new Map())
+  const noteApplied = (ns: string, revision: number): void => {
+    setCoordinatedRevisions((previous) => {
+      const next = new Map(previous)
+      next.set(ns, revision)
+      return next
+    })
+  }
+  const reload = async (ns: string): Promise<void> => {
+    await controller.load()
+    // A reload after a conflict is the user re-anchoring on the CURRENT
+    // revision; any older revision this page itself wrote must stop being
+    // pushed into the remounted card.
+    setCoordinatedRevisions((previous) => {
+      if (!previous.has(ns)) return previous
+      const next = new Map(previous)
+      next.delete(ns)
+      return next
+    })
+  }
   if (state.status === 'idle') void controller.load()
   if (state.status === 'error') {
     const errorText = state.error ?? ''
@@ -124,6 +149,9 @@ function Loaded({ controller, useSnapshot, api, t }: ModelCapabilitiesProps): Re
             api={api}
             t={t}
             readOnly={!state.writable}
+            coordinatedRevision={coordinatedRevisions.get(DEEPSEEK_NS)}
+            onApplied={noteApplied}
+            reload={reload}
           />
         )
         : null}
@@ -140,6 +168,9 @@ function Loaded({ controller, useSnapshot, api, t }: ModelCapabilitiesProps): Re
             api={api}
             t={t}
             readOnly={!state.writable}
+            coordinatedRevision={coordinatedRevisions.get(PI_AI_NS)}
+            onApplied={noteApplied}
+            reload={reload}
           />
         )
       })}
@@ -156,12 +187,14 @@ interface CardActionsProps {
   disabled: boolean
   saved: boolean
   failure: string | undefined
+  conflicted: boolean
   t: T
+  onReload: () => void
   onReset: () => void
   onApply: () => void
 }
 
-function CardActions({ busy, disabled, saved, failure, t, onReset, onApply }: CardActionsProps): ReactNode {
+function CardActions({ busy, disabled, saved, failure, conflicted, t, onReload, onReset, onApply }: CardActionsProps): ReactNode {
   return (
     <>
       {saved && failure === undefined
@@ -169,6 +202,13 @@ function CardActions({ busy, disabled, saved, failure, t, onReset, onApply }: Ca
         : null}
       {failure !== undefined ? <p className={css.error}>{failure}</p> : null}
       <div className={css.actions}>
+        {conflicted
+          ? (
+            <button type="button" className={css.button} disabled={busy} onClick={onReload}>
+              {t('modelCapabilities.reload')}
+            </button>
+          )
+          : null}
         <button type="button" className={css.button} disabled={disabled} onClick={onReset}>
           {t('modelCapabilities.reset')}
         </button>
@@ -314,6 +354,23 @@ function ReasoningEditor({ value, onChange, disabled, t }: ReasoningEditorProps)
   )
 }
 
+/** What inheriting reasoning means for one exact model, read from llm.models. */
+function InheritedReasoningHint({ model, t }: { model: CatalogModel | undefined; t: T }): ReactNode {
+  const reasoning = model?.reasoning
+  if (reasoning === undefined || reasoning.efforts.length === 0) {
+    return <p className={css.fieldHint}>{t('modelCapabilities.reasoningInheritedNone')}</p>
+  }
+  const levels = reasoning.efforts.map(effort => effort.name).join(' / ')
+  const defaultName = reasoning.efforts.find(effort => effort.id === reasoning.defaultEffort)?.name ?? '—'
+  return (
+    <p className={css.fieldHint}>
+      {t('modelCapabilities.reasoningInherited')
+        .replace('{levels}', levels)
+        .replace('{default}', defaultName)}
+    </p>
+  )
+}
+
 /** The DeepSeek route-level card (whole `llm-deepseek` user section). */
 interface DeepSeekCardProps {
   entry: ConfigurableProviderView
@@ -321,16 +378,43 @@ interface DeepSeekCardProps {
   api: Pick<IApiClient, 'settings' | 'llm'>
   t: T
   readOnly: boolean
+  /** Revision written by a sibling card, when one has applied in this namespace. */
+  coordinatedRevision: number | undefined
+  /** Report one successful apply so sibling cards move to the new revision. */
+  onApplied: (ns: string, revision: number) => void
+  /** Refetch the page snapshot before remounting the card's draft. */
+  reload: (ns: string) => Promise<void>
 }
 
-function DeepSeekCapabilitiesCard({ namespace, api, t, readOnly }: DeepSeekCardProps): ReactNode {
+function DeepSeekCapabilitiesCard(props: DeepSeekCardProps): ReactNode {
+  const [epoch, setEpoch] = useState(0)
+  const requestReload = (): void => {
+    void props.reload(props.namespace.ns).then(() => { setEpoch(current => current + 1) })
+  }
+  return <DeepSeekCapabilitiesCardBody key={epoch} {...props} onReloadRequested={requestReload} />
+}
+
+interface DeepSeekCardBodyProps extends DeepSeekCardProps {
+  onReloadRequested: () => void
+}
+
+function DeepSeekCapabilitiesCardBody({
+  namespace, api, t, readOnly, coordinatedRevision, onApplied, onReloadRequested,
+}: DeepSeekCardBodyProps): ReactNode {
   const [draft, setDraft] = useState<JsonRecord>(() => draftAt(namespace, []))
   const [committedOriginal, setCommittedOriginal] = useState<unknown>(() => getPath(namespace.user, []))
   const [expectedRevision, setExpectedRevision] = useState(() => namespace.revision)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | undefined>(undefined)
+  const [conflicted, setConflicted] = useState(false)
   const [saved, setSaved] = useState(false)
   const disabled = readOnly || busy
+
+  // Only this page's own successful writes advance a sibling card's revision;
+  // external settings changes deliberately keep the conflict path.
+  useEffect(() => {
+    if (coordinatedRevision !== undefined) setExpectedRevision(coordinatedRevision)
+  }, [coordinatedRevision])
 
   const stringAt = (key: string): string | undefined => {
     const value = draft[key]
@@ -339,18 +423,21 @@ function DeepSeekCapabilitiesCard({ namespace, api, t, readOnly }: DeepSeekCardP
   const setField = (key: string, next: string | undefined): void => {
     setSaved(false)
     setFailure(undefined)
+    setConflicted(false)
     setDraft(current => next === undefined
       ? deletePath(current, [key])
       : setPath(current, [key], next))
   }
   const reset = (): void => {
     setFailure(undefined)
+    setConflicted(false)
     setSaved(false)
     setDraft(cloneRecord(committedOriginal))
   }
   const apply = async (): Promise<void> => {
     setBusy(true)
     setFailure(undefined)
+    setConflicted(false)
     setSaved(false)
     const validation = validateDeepSeekDraft(draft)
     if (validation !== undefined) {
@@ -369,6 +456,7 @@ function DeepSeekCapabilitiesCard({ namespace, api, t, readOnly }: DeepSeekCardP
     })
     if (!result.ok) {
       setFailure(t('modelCapabilities.saveError').replace('{message}', result.failure))
+      setConflicted(result.conflicted)
       setBusy(false)
       return
     }
@@ -377,6 +465,7 @@ function DeepSeekCapabilitiesCard({ namespace, api, t, readOnly }: DeepSeekCardP
     setDraft(cloneRecord(result.committed))
     setSaved(true)
     setBusy(false)
+    onApplied(namespace.ns, result.revision)
   }
 
   return (
@@ -419,7 +508,9 @@ function DeepSeekCapabilitiesCard({ namespace, api, t, readOnly }: DeepSeekCardP
           disabled={disabled}
           saved={saved}
           failure={failure}
+          conflicted={conflicted}
           t={t}
+          onReload={onReloadRequested}
           onReset={reset}
           onApply={() => { void apply() }}
         />
@@ -436,19 +527,47 @@ interface PiAiCardProps {
   api: Pick<IApiClient, 'settings' | 'llm'>
   t: T
   readOnly: boolean
+  /** Revision written by a sibling card, when one has applied in this namespace. */
+  coordinatedRevision: number | undefined
+  /** Report one successful apply so sibling cards move to the new revision. */
+  onApplied: (ns: string, revision: number) => void
+  /** Refetch the page snapshot before remounting the card's draft. */
+  reload: (ns: string) => Promise<void>
 }
 
-function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: PiAiCardProps): ReactNode {
+function PiAiCapabilitiesCard(props: PiAiCardProps): ReactNode {
+  const [epoch, setEpoch] = useState(0)
+  const requestReload = (): void => {
+    void props.reload(props.namespace.ns).then(() => { setEpoch(current => current + 1) })
+  }
+  return <PiAiCapabilitiesCardBody key={epoch} {...props} onReloadRequested={requestReload} />
+}
+
+interface PiAiCardBodyProps extends PiAiCardProps {
+  onReloadRequested: () => void
+}
+
+function PiAiCapabilitiesCardBody({
+  entry, namespace, catalog, api, t, readOnly, coordinatedRevision, onApplied, onReloadRequested,
+}: PiAiCardBodyProps): ReactNode {
   const path = entry.settingsPath
   const [draft, setDraft] = useState<JsonRecord>(() => draftAt(namespace, path))
   const [committedOriginal, setCommittedOriginal] = useState<unknown>(() => getPath(namespace.user, path))
   const [expectedRevision, setExpectedRevision] = useState(() => namespace.revision)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | undefined>(undefined)
+  const [conflicted, setConflicted] = useState(false)
   const [saved, setSaved] = useState(false)
   const [addingId, setAddingId] = useState('')
   const disabled = readOnly || busy
   const configured = getPath(namespace.user, path) !== undefined
+  const catalogById = useMemo(() => new Map(catalog.map(model => [model.id, model])), [catalog])
+
+  // Only this page's own successful writes advance a sibling card's revision;
+  // external settings changes deliberately keep the conflict path.
+  useEffect(() => {
+    if (coordinatedRevision !== undefined) setExpectedRevision(coordinatedRevision)
+  }, [coordinatedRevision])
 
   const stringAt = (key: string): string | undefined => {
     const value = draft[key]
@@ -457,6 +576,7 @@ function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: P
   const setField = (key: string, next: unknown): void => {
     setSaved(false)
     setFailure(undefined)
+    setConflicted(false)
     setDraft(current => next === undefined
       ? deletePath(current, [key])
       : setPath(current, [key], next))
@@ -464,6 +584,7 @@ function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: P
   const patchListEntry = (index: number, key: string, value: unknown): void => {
     setSaved(false)
     setFailure(undefined)
+    setConflicted(false)
     setDraft((current) => {
       const models = Array.isArray(current['models']) ? [...current['models']] : []
       const previous = recordOf(models[index])
@@ -477,6 +598,7 @@ function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: P
   const patchOverride = (id: string, key: string, value: unknown): void => {
     setSaved(false)
     setFailure(undefined)
+    setConflicted(false)
     setDraft((current) => {
       const overrides = recordOf(current['modelOverrides'])
       const previous = recordOf(overrides[id])
@@ -489,6 +611,7 @@ function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: P
   const removeOverride = (id: string): void => {
     setSaved(false)
     setFailure(undefined)
+    setConflicted(false)
     setDraft((current) => {
       const overrides = recordOf(current['modelOverrides'])
       const next = { ...overrides }
@@ -504,16 +627,19 @@ function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: P
     setAddingId('')
     setSaved(false)
     setFailure(undefined)
+    setConflicted(false)
     setDraft(current => setPath(current, ['modelOverrides', id], { input: ['text'] }))
   }
   const reset = (): void => {
     setFailure(undefined)
+    setConflicted(false)
     setSaved(false)
     setDraft(cloneRecord(committedOriginal))
   }
   const apply = async (): Promise<void> => {
     setBusy(true)
     setFailure(undefined)
+    setConflicted(false)
     setSaved(false)
     const normalized = normalizePiAiDraft(draft)
     const validation = validatePiAiDraft(normalized)
@@ -533,6 +659,7 @@ function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: P
     })
     if (!result.ok) {
       setFailure(t('modelCapabilities.saveError').replace('{message}', result.failure))
+      setConflicted(result.conflicted)
       setBusy(false)
       return
     }
@@ -541,6 +668,7 @@ function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: P
     setDraft(cloneRecord(result.committed))
     setSaved(true)
     setBusy(false)
+    onApplied(namespace.ns, result.revision)
   }
 
   const listMode = hasPath(draft, ['models'])
@@ -585,6 +713,7 @@ function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: P
                 <option key={level} value={level}>{t(LEVEL_KEYS[level])}</option>
               ))}
             </select>
+            <p className={css.fieldHint}>{t('modelCapabilities.routeReasoningHint')}</p>
           </label>
         </section>
 
@@ -628,6 +757,9 @@ function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: P
                           disabled={disabled}
                           t={t}
                         />
+                        {reasoningModeOf(entry['reasoningEfforts']) === 'inherit'
+                          ? <InheritedReasoningHint model={catalogById.get(id)} t={t} />
+                          : null}
                       </label>
                     </div>
                   )
@@ -696,6 +828,9 @@ function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: P
                                 disabled={disabled}
                                 t={t}
                               />
+                              {reasoningModeOf(entry['reasoningEfforts']) === 'inherit'
+                                ? <InheritedReasoningHint model={catalogById.get(id)} t={t} />
+                                : null}
                             </label>
                           </div>
                         )
@@ -711,7 +846,9 @@ function PiAiCapabilitiesCard({ entry, namespace, catalog, api, t, readOnly }: P
           disabled={disabled}
           saved={saved}
           failure={failure}
+          conflicted={conflicted}
           t={t}
+          onReload={onReloadRequested}
           onReset={reset}
           onApply={() => { void apply() }}
         />

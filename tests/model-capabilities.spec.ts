@@ -149,7 +149,7 @@ describe('applyDraft', () => {
       after: { input: ['text'] },
       expectedRevision: 1,
       conflictText: 'changed elsewhere',
-    })).resolves.toEqual({ ok: false, failure: 'changed elsewhere' })
+    })).resolves.toEqual({ ok: false, failure: 'changed elsewhere', conflicted: true })
   })
 })
 

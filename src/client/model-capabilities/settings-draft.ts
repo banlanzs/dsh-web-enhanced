@@ -86,7 +86,7 @@ export function messageOf(error: unknown): string {
 /** One apply result: the committed subtree and revision, or a failure text. */
 export type DraftApplyResult =
   | { ok: true; committed: unknown; revision: number }
-  | { ok: false; failure: string }
+  | { ok: false; failure: string; conflicted: boolean }
 
 /** Facts a settings draft apply needs. */
 export interface ApplyDraftArgs {
@@ -118,10 +118,11 @@ export async function applyDraft(args: ApplyDraftArgs): Promise<DraftApplyResult
   try {
     const response = await api.settings.mutate({ ns, ops, expectedRevision })
     if (!response.result.ok) {
-      const failure = response.result.error.code === 'settings-conflict'
+      const conflicted = response.result.error.code === 'settings-conflict'
+      const failure = conflicted
         ? conflictText
         : response.result.error.message
-      return { ok: false, failure }
+      return { ok: false, failure, conflicted }
     }
     return {
       ok: true,
@@ -129,7 +130,7 @@ export async function applyDraft(args: ApplyDraftArgs): Promise<DraftApplyResult
       revision: response.result.value.revision,
     }
   } catch (error) {
-    return { ok: false, failure: messageOf(error) }
+    return { ok: false, failure: messageOf(error), conflicted: false }
   }
 }
 

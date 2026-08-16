@@ -99,7 +99,8 @@ export declare const zh: {
     readonly 'modelCapabilities.apply': "保存";
     readonly 'modelCapabilities.applying': "保存中…";
     readonly 'modelCapabilities.reset': "还原未保存的修改";
-    readonly 'modelCapabilities.conflict': "这些设置在打开期间被其他位置改动。请还原后重新编辑。";
+    readonly 'modelCapabilities.conflict': "这些设置在打开期间被其他位置改动。请点击“重新加载当前值”后再编辑。";
+    readonly 'modelCapabilities.reload': "重新加载当前值";
     readonly 'modelCapabilities.saveError': "保存失败：{message}";
     readonly 'modelCapabilities.deepseekHint': "DeepSeek 官方渠道的思考模式与推理强度是渠道级设置，对所有模型生效。";
     readonly 'modelCapabilities.thinking': "思考模式";
@@ -114,6 +115,9 @@ export declare const zh: {
     readonly 'modelCapabilities.defaultInputEmpty': "默认输入能力至少需要选择一种（text 或 image）。";
     readonly 'modelCapabilities.routeReasoning': "默认推理档位";
     readonly 'modelCapabilities.routeReasoningInherit': "使用适配器 / 目录默认";
+    readonly 'modelCapabilities.routeReasoningHint': "仅作为该渠道的请求默认档位；不会为未声明推理能力的模型新增可选档位。";
+    readonly 'modelCapabilities.reasoningInherited': "目录能力：{levels}；默认 {default}";
+    readonly 'modelCapabilities.reasoningInheritedNone': "目录未声明推理档位：渠道级默认只作为请求默认，不会在选择器里生成档位；这里选择“自定义可提供的档位”后才会显示。";
     readonly 'modelCapabilities.modelSection': "模型输入与推理强度";
     readonly 'modelCapabilities.modelsListMode': "该渠道使用自定义 models 列表";
     readonly 'modelCapabilities.modelsListModeHint': "模型增删与 ID / 名称 / 容量请在“模型”页编辑；这里只编辑每个模型的 input 与 reasoningEfforts。";
