@@ -313,6 +313,11 @@
   vertical-align: middle;
 }
 
+.inlineImageFallback {
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
+  font-style: italic;
+}
+
 .diffLine {
   display: block;
 }

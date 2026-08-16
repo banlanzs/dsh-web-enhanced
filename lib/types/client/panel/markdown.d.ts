@@ -76,6 +76,20 @@ export type MdBlock = {
     readonly rows: readonly (readonly (readonly MdSpan[])[])[];
 };
 /**
+ * Whether an image href is browser-addressable on its own: any scheme (after
+ * `safeSrc` has allowed it) or a protocol-relative URL. The browser resolves
+ * these; a workspace-relative path cannot, and must be read through `fsRead`.
+ */
+export declare function browserImageHref(href: string): string | undefined;
+/**
+ * Resolve a Markdown image href against its document to a workspace-relative
+ * path. Returns undefined for browser-addressable URLs, absolute filesystem
+ * paths, and `..` chains that would escape the workspace root.
+ * @param markdownPath - workspace-relative path of the Markdown file.
+ * @param href - the image reference from the document.
+ */
+export declare function workspaceImagePathOf(markdownPath: string, href: string): string | undefined;
+/**
  * Parse inline Markdown into spans.
  * @param text - one block's raw text.
  * @returns the spans, with unmatched text preserved verbatim.

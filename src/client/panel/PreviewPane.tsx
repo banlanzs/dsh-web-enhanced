@@ -9,13 +9,13 @@
  * @module dsh-web-enhanced/src/client/panel/PreviewPane
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
-import type { OfficeBlock, PreviewMode, PreviewTab, WebEnhancedProps } from '../contract.ts'
-import { dataUrlOf, extensionOf, hasRenderedForm, isEditable } from '../preview.ts'
+import type { OfficeBlock, PreviewMode, PreviewTab, WebEnhancedProps, WebEnhancedRemote } from '../contract.ts'
+import { dataUrlOf, extensionOf, hasRenderedForm, isEditable, mimeOfImagePath } from '../preview.ts'
 import { activeTabOf } from '../stores.ts'
-import { diffLineKind, parseDelimited, parseMarkdown } from './markdown.ts'
+import { browserImageHref, diffLineKind, parseDelimited, parseMarkdown, workspaceImagePathOf } from './markdown.ts'
 import type { MdBlock, MdSpan } from './markdown.ts'
 import css from './PreviewPane.module.css'
 
@@ -28,6 +28,13 @@ const MODES: ReadonlyArray<{ mode: PreviewMode; key: 'preview.mode.source' | 'pr
   { mode: 'split', key: 'preview.mode.split' },
   { mode: 'view', key: 'preview.mode.view' },
 ]
+
+/** What Markdown image rendering needs to resolve workspace-relative sources. */
+interface MarkdownImageContext {
+  readonly tabPath: string
+  readonly workspaceId: string
+  readonly remote: WebEnhancedRemote
+}
 
 /** The preview pane. */
 export function PreviewPane({
@@ -133,7 +140,12 @@ export function PreviewPane({
         )}
         {(active.mode === 'view' || active.mode === 'split') && (
           <div className={css.view} data-testid="preview-view">
-            <RenderedForm tab={active} text={body} unsupported={t('preview.unsupported')} />
+            <RenderedForm
+              tab={active}
+              text={body}
+              unsupported={t('preview.unsupported')}
+              image={{ tabPath: active.path, workspaceId, remote }}
+            />
           </div>
         )}
       </div>
@@ -142,10 +154,12 @@ export function PreviewPane({
 }
 
 /** The rendered (non-source) form of one tab. */
-function RenderedForm({ tab, text, unsupported }: { tab: PreviewTab; text: string; unsupported: string }) {
+function RenderedForm({
+  tab, text, unsupported, image,
+}: { tab: PreviewTab; text: string; unsupported: string; image: MarkdownImageContext }) {
   switch (tab.kind) {
     case 'markdown':
-      return <MarkdownView source={text} />
+      return <MarkdownView source={text} image={image} />
     case 'csv':
       return <TableView rows={parseDelimited(text, extensionOf(tab.path) === 'tsv' ? '\t' : ',')} />
     case 'diff':
@@ -171,8 +185,54 @@ function RenderedForm({ tab, text, unsupported }: { tab: PreviewTab; text: strin
   }
 }
 
+/**
+ * A workspace-relative Markdown image, read through the plugin's own `fsRead`
+ * and rendered as a data URL. The host's read stays workspace-scoped, so this
+ * loads exactly the same file an IDE resolves — and nothing outside the root.
+ */
+function WorkspaceImage({
+  path, alt, workspaceId, remote,
+}: { path: string; alt: string; workspaceId: string; remote: WebEnhancedRemote }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let live = true
+    setUrl(null)
+    setFailed(false)
+    void remote.fsRead({ workspaceId, path }).then(result => {
+      if (!live) return
+      if ('error' in result) {
+        setFailed(true)
+        return
+      }
+      if (result.kind === 'binary') {
+        if (result.content === '') {
+          setFailed(true)
+          return
+        }
+        setUrl(`data:${mimeOfImagePath(path)};base64,${result.content}`)
+        return
+      }
+      // SVGs are text on disk even though they render as images.
+      if (result.kind === 'text' && mimeOfImagePath(path) === 'image/svg+xml') {
+        setUrl(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(result.content)}`)
+        return
+      }
+      setFailed(true)
+    }, () => {
+      if (live) setFailed(true)
+    })
+    return () => { live = false }
+  }, [path, workspaceId, remote])
+
+  if (failed) return <span className={css.inlineImageFallback}>{alt === '' ? path : alt}</span>
+  if (url === null) return null
+  return <img className={css.inlineImage} src={url} alt={alt} />
+}
+
 /** Inline spans as React elements. */
-function Spans({ spans }: { spans: readonly MdSpan[] }): ReactNode {
+function Spans({ spans, image }: { spans: readonly MdSpan[]; image: MarkdownImageContext }): ReactNode {
   return spans.map((span, index) => {
     switch (span.type) {
       case 'code': return <code className={css.inlineCode} key={index}>{span.text}</code>
@@ -180,10 +240,25 @@ function Spans({ spans }: { spans: readonly MdSpan[] }): ReactNode {
       case 'em': return <em key={index}>{span.text}</em>
       case 'del': return <del key={index}>{span.text}</del>
       case 'break': return <br key={index} />
-      // The source may be any workspace file, so an image reference is loaded
-      // only when it already resolves on its own (an absolute URL or a data
-      // URI). A workspace-relative path has no browser-resolvable origin here.
-      case 'image': return <img className={css.inlineImage} key={index} src={span.href} alt={span.text} />
+      case 'image': {
+        const external = browserImageHref(span.href)
+        if (external !== undefined) {
+          return <img className={css.inlineImage} key={index} src={external} alt={span.text} />
+        }
+        const path = workspaceImagePathOf(image.tabPath, span.href)
+        if (path === undefined) {
+          return <span className={css.inlineImageFallback} key={index}>{span.text}</span>
+        }
+        return (
+          <WorkspaceImage
+            key={index}
+            path={path}
+            alt={span.text}
+            workspaceId={image.workspaceId}
+            remote={image.remote}
+          />
+        )
+      }
       // Previewed documents are untrusted: opening in a new context without
       // an opener keeps a link from reaching back into the app.
       case 'link': return <a key={index} href={span.href} target="_blank" rel="noreferrer noopener">{span.text}</a>
@@ -193,7 +268,9 @@ function Spans({ spans }: { spans: readonly MdSpan[] }): ReactNode {
 }
 
 /** A parsed Markdown or HTML table, with its per-column alignment. */
-function MarkdownTable({ block }: { block: Extract<MdBlock, { type: 'table' }> }) {
+function MarkdownTable({
+  block, image,
+}: { block: Extract<MdBlock, { type: 'table' }>; image: MarkdownImageContext }) {
   return (
     <table className={css.table}>
       {block.header.length > 0 && (
@@ -201,7 +278,7 @@ function MarkdownTable({ block }: { block: Extract<MdBlock, { type: 'table' }> }
           <tr>
             {block.header.map((cell, index) => (
               <th key={index} style={block.align[index] === undefined ? undefined : { textAlign: block.align[index] }}>
-                <Spans spans={cell} />
+                <Spans spans={cell} image={image} />
               </th>
             ))}
           </tr>
@@ -212,7 +289,7 @@ function MarkdownTable({ block }: { block: Extract<MdBlock, { type: 'table' }> }
           <tr key={rowIndex}>
             {row.map((cell, index) => (
               <td key={index} style={block.align[index] === undefined ? undefined : { textAlign: block.align[index] }}>
-                <Spans spans={cell} />
+                <Spans spans={cell} image={image} />
               </td>
             ))}
           </tr>
@@ -223,18 +300,18 @@ function MarkdownTable({ block }: { block: Extract<MdBlock, { type: 'table' }> }
 }
 
 /** Rendered Markdown blocks, shared by documents and nested list children. */
-function Blocks({ blocks }: { blocks: readonly MdBlock[] }) {
+function Blocks({ blocks, image }: { blocks: readonly MdBlock[]; image: MarkdownImageContext }) {
   return blocks.map((block, index) => {
     switch (block.type) {
       case 'heading': {
         const Tag = `h${String(Math.min(block.level, 6))}` as 'h1'
-        return <Tag key={index}><Spans spans={block.spans} /></Tag>
+        return <Tag key={index}><Spans spans={block.spans} image={image} /></Tag>
       }
-      case 'paragraph': return <p key={index}><Spans spans={block.spans} /></p>
+      case 'paragraph': return <p key={index}><Spans spans={block.spans} image={image} /></p>
       case 'code': return <pre className={css.codeBlock} key={index} data-lang={block.lang}><code>{block.code}</code></pre>
-      case 'quote': return <blockquote key={index}><Spans spans={block.spans} /></blockquote>
+      case 'quote': return <blockquote key={index}><Spans spans={block.spans} image={image} /></blockquote>
       case 'rule': return <hr key={index} />
-      case 'table': return <MarkdownTable block={block} key={index} />
+      case 'table': return <MarkdownTable block={block} image={image} key={index} />
       case 'list': {
         const Tag = block.ordered ? 'ol' : 'ul'
         return (
@@ -249,11 +326,11 @@ function Blocks({ blocks }: { blocks: readonly MdBlock[] }) {
                   ? (
                     <label className={css.task}>
                       <input className={css.taskBox} type="checkbox" disabled checked={item.checked} />
-                      <span className={css.taskText}><Spans spans={item.spans} /></span>
+                      <span className={css.taskText}><Spans spans={item.spans} image={image} /></span>
                     </label>
                   )
-                  : <Spans spans={item.spans} />}
-                {item.children.length > 0 && <Blocks blocks={item.children} />}
+                  : <Spans spans={item.spans} image={image} />}
+                {item.children.length > 0 && <Blocks blocks={item.children} image={image} />}
               </li>
             ))}
           </Tag>
@@ -264,10 +341,10 @@ function Blocks({ blocks }: { blocks: readonly MdBlock[] }) {
 }
 
 /** Structural Markdown rendering. */
-function MarkdownView({ source }: { source: string }) {
+function MarkdownView({ source, image }: { source: string; image: MarkdownImageContext }) {
   return (
     <div className={css.markdown}>
-      <Blocks blocks={parseMarkdown(source)} />
+      <Blocks blocks={parseMarkdown(source)} image={image} />
     </div>
   )
 }

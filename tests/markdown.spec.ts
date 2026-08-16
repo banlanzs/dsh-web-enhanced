@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { diffLineKind, parseDelimited, parseInline, parseMarkdown } from '../src/client/panel/markdown.ts'
+import { browserImageHref, diffLineKind, parseDelimited, parseInline, parseMarkdown, workspaceImagePathOf } from '../src/client/panel/markdown.ts'
 
 describe('parseInline', () => {
   it('reads code, strong, em, and links', () => {
@@ -99,6 +99,25 @@ describe('parseInline', () => {
 
   it('keeps a lone angle bracket as text', () => {
     expect(parseInline('a < b')).toEqual([{ type: 'text', text: 'a < b' }])
+  })
+})
+
+describe('workspace image hrefs', () => {
+  it('resolves a relative image against its markdown file directory', () => {
+    expect(workspaceImagePathOf('README.md', './assets/board.png')).toBe('assets/board.png')
+    expect(workspaceImagePathOf('docs/guide.md', '../assets/board.png')).toBe('assets/board.png')
+    expect(workspaceImagePathOf('docs/guide.md', 'assets\\board.png')).toBe('docs/assets/board.png')
+    expect(workspaceImagePathOf('docs/guide.md', 'my%20board.png')).toBe('docs/my board.png')
+  })
+
+  it('refuses paths that leave the workspace and browser URLs', () => {
+    expect(workspaceImagePathOf('README.md', '../secret.png')).toBeUndefined()
+    expect(workspaceImagePathOf('docs/guide.md', '../../outside.png')).toBeUndefined()
+    expect(workspaceImagePathOf('docs/guide.md', '/absolute/board.png')).toBeUndefined()
+    expect(workspaceImagePathOf('docs/guide.md', 'C:\\board.png')).toBeUndefined()
+    expect(workspaceImagePathOf('docs/guide.md', 'https://x/board.png')).toBeUndefined()
+    expect(browserImageHref('https://x/board.png')).toBe('https://x/board.png')
+    expect(browserImageHref('assets/board.png')).toBeUndefined()
   })
 })
 

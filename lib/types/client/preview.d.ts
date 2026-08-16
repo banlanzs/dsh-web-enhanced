@@ -40,6 +40,8 @@ export declare function hasRenderedForm(kind: PreviewKind): boolean;
 export declare function isEditable(kind: PreviewKind): boolean;
 /** Initial render mode of a freshly opened tab. */
 export declare function initialModeOf(kind: PreviewKind): PreviewMode;
+/** MIME type used for an image path, from its extension. */
+export declare function mimeOfImagePath(path: string): string;
 /** Base64 payload of a binary read, as a data URL for `img`/`object`. */
 export declare function dataUrlOf(tab: PreviewTab): string | undefined;
 /**

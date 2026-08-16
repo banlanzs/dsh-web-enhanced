@@ -7,7 +7,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   baseNameOf, dataUrlOf, extensionOf, hasRenderedForm, initialModeOf, isEditable,
-  loadPreviewTab, previewKindOf,
+  loadPreviewTab, mimeOfImagePath, previewKindOf,
 } from '../src/client/preview.ts'
 import type { WebEnhancedRemote } from '../src/client/contract.ts'
 
@@ -74,6 +74,13 @@ describe('dataUrlOf', () => {
     expect(dataUrlOf({ ...base, path: 'a.jpg', kind: 'image', binary: 'AA' })).toBe('data:image/jpeg;base64,AA')
     expect(dataUrlOf({ ...base, path: 'a.svg', kind: 'image', binary: 'AA' })).toBe('data:image/svg+xml;base64,AA')
     expect(dataUrlOf({ ...base, path: 'a.pdf', kind: 'pdf', binary: 'AA' })).toBe('data:application/pdf;base64,AA')
+  })
+
+  it('names the mime type for workspace image paths', () => {
+    expect(mimeOfImagePath('a.png')).toBe('image/png')
+    expect(mimeOfImagePath('a.jpeg')).toBe('image/jpeg')
+    expect(mimeOfImagePath('a.svg')).toBe('image/svg+xml')
+    expect(mimeOfImagePath('a.webp')).toBe('image/webp')
   })
 
   it('answers undefined when the payload was capped away', () => {
