@@ -52,6 +52,7 @@
   grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* Collapsed: the sidebar column shrinks to the expand rail. */
@@ -60,6 +61,7 @@
   grid-template-columns: 24px minmax(0, 1fr);
   height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -68,6 +70,7 @@
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  overflow: hidden;
   border-right: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
   background: var(--dsw-alias-bg-layer-1, transparent);
 }
