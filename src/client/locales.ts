@@ -257,6 +257,7 @@ export const zh = {
 
   'preview.empty': '在文件树中选择文件以预览',
   'preview.mode.source': '源码',
+  'preview.backToTop': '返回顶部',
   'preview.mode.split': '分屏',
   'preview.mode.view': '预览',
   'preview.save': '保存',
@@ -534,6 +535,7 @@ export const en: Record<keyof typeof zh, string> = {
 
   'preview.empty': 'Pick a file in the tree to preview it',
   'preview.mode.source': 'Source',
+  'preview.backToTop': 'Back to top',
   'preview.mode.split': 'Split',
   'preview.mode.view': 'Preview',
   'preview.save': 'Save',

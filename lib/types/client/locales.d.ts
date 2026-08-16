@@ -248,6 +248,7 @@ export declare const zh: {
     readonly 'files.error': "读取目录失败：{message}";
     readonly 'preview.empty': "在文件树中选择文件以预览";
     readonly 'preview.mode.source': "源码";
+    readonly 'preview.backToTop': "返回顶部";
     readonly 'preview.mode.split': "分屏";
     readonly 'preview.mode.view': "预览";
     readonly 'preview.save': "保存";

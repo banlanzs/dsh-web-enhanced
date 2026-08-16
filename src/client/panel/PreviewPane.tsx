@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { ReactNode, UIEvent } from 'react'
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type { OfficeBlock, PreviewMode, PreviewTab, WebEnhancedProps, WebEnhancedRemote } from '../contract.ts'
 import { dataUrlOf, extensionOf, hasRenderedForm, isEditable, mimeOfImagePath } from '../preview.ts'
@@ -21,6 +21,9 @@ import css from './PreviewPane.module.css'
 
 /** Props of the preview pane. */
 export type PreviewPaneProps = WebEnhancedProps<'conversation.view'> & { readonly workspaceId: string }
+
+/** Scroll depth past which the back-to-top button appears, px. */
+const TOP_THRESHOLD_PX = 240
 
 /** Mode buttons in display order. */
 const MODES: ReadonlyArray<{ mode: PreviewMode; key: 'preview.mode.source' | 'preview.mode.split' | 'preview.mode.view' }> = [
@@ -43,7 +46,26 @@ export function PreviewPane({
   const tabs = usePreview(state => state.tabs)
   const active = usePreview(state => activeTabOf(state))
   const [saveError, setSaveError] = useState<string | null>(null)
+  // Back-to-top: whichever scroll region is live (editor, source, diff, view)
+  // reports through one shared ref; the button appears once it leaves the top.
+  const scroller = useRef<HTMLElement | null>(null)
+  const [showTop, setShowTop] = useState(false)
   const live = useRef(true)
+
+  /** Bind the active scroll region to the back-to-top button. */
+  const bindScroller = (element: HTMLElement | null): void => {
+    scroller.current = element
+    setShowTop(element !== null && element.scrollTop > TOP_THRESHOLD_PX)
+  }
+
+  const trackScroll = (event: UIEvent<HTMLElement>): void => {
+    setShowTop(event.currentTarget.scrollTop > TOP_THRESHOLD_PX)
+  }
+
+  const backToTop = (): void => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    scroller.current?.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
+  }
 
   const save = useCallback(async (tab: PreviewTab): Promise<void> => {
     if (tab.draft === undefined) return
@@ -128,18 +150,20 @@ export function PreviewPane({
       <div className={css.body} data-mode={active.mode}>
         {(active.mode === 'source' || active.mode === 'split') && editable && (
           <textarea
+            ref={bindScroller}
             className={css.editor}
             value={body}
             spellCheck={false}
             data-testid="preview-editor"
             onChange={event => { setDraft(active.path, event.target.value) }}
+            onScroll={trackScroll}
           />
         )}
         {(active.mode === 'source' || active.mode === 'split') && !editable && (
-          <pre className={css.source}>{body}</pre>
+          <pre className={css.source} ref={bindScroller} onScroll={trackScroll}>{body}</pre>
         )}
         {(active.mode === 'view' || active.mode === 'split') && (
-          <div className={css.view} data-testid="preview-view">
+          <div className={css.view} data-testid="preview-view" ref={bindScroller} onScroll={trackScroll}>
             <RenderedForm
               tab={active}
               text={body}
@@ -149,9 +173,21 @@ export function PreviewPane({
           </div>
         )}
       </div>
+      {showTop && (
+        <button
+          type="button"
+          className={css.backToTop}
+          aria-label={t('preview.backToTop')}
+          data-testid="preview-back-to-top"
+          onClick={backToTop}
+        >
+          <span aria-hidden="true">↑</span>
+        </button>
+      )}
     </div>
   )
 }
+
 
 /** The rendered (non-source) form of one tab. */
 function RenderedForm({

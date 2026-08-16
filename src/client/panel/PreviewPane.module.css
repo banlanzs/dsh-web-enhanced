@@ -1,8 +1,41 @@
 .pane {
+  position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
+}
+
+/* Floating back-to-top control, above the content's bottom-right corner. */
+.backToTop {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-1, #fff);
+  color: var(--dsw-alias-label-primary, inherit);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 8px 24px rgb(0 0 0 / 12%);
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.backToTop:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}
+
+.backToTop:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, rgb(65 118 230));
+  outline-offset: 2px;
 }
 
 .strip {
@@ -328,6 +361,7 @@
 .diffLine[data-kind='meta'] { color: var(--dsw-alias-label-tertiary, rgb(129 133 140)); }
 
 @media (prefers-reduced-motion: reduce) {
+  .backToTop,
   .stripItem,
   .stripName,
   .stripClose,
