@@ -271,6 +271,7 @@ export declare const zh: {
     readonly 'files.collapse': "收起侧边栏";
     readonly 'navbar.pin': "精选";
     readonly 'navbar.unpin': "取消精选";
+    readonly 'navbar.olderTurn': "第 {turn} 轮（尚未加载，点击加载并跳转）";
     readonly 'files.expand': "展开侧边栏";
     readonly 'panel.noWorkspace': "当前会话未绑定项目";
     readonly 'files.search': "按文件名搜索";

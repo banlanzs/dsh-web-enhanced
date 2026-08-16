@@ -21,7 +21,7 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Translate } from '../locale-keys.ts'
 import { pinStore } from './pin-store.ts'
-import { NAV_HALF_WINDOW, NAV_WINDOW, navWindow } from './window.ts'
+import { NAV_HALF_WINDOW, NAV_WINDOW, navWindow, olderNodeCount } from './window.ts'
 
 /** Pin button component props (messageId arrives as the slot's owner prop). */
 interface PinActionProps {
@@ -39,6 +39,26 @@ interface PinnedHit {
   readonly text: string
 }
 
+/** Session runtime faces the navbar reads for whole-log counts and paging. */
+interface SessionStatsNav {
+  readonly turns?: number
+}
+
+interface SessionProjectionNavFace {
+  faceOf(key: string): { getSnapshot(): unknown; subscribe(listener: () => void): () => void }
+}
+
+interface SessionNavFace {
+  getSnapshot(): { readonly hasMore: boolean; readonly loadingOlder: boolean }
+  loadOlder(): Promise<void>
+  readonly projections: SessionProjectionNavFace
+}
+
+interface SessionsNavFace {
+  readonly list: { getSnapshot(): { readonly current?: unknown } }
+  binding(id: string): { readonly session: SessionNavFace } | undefined
+}
+
 /**
  * Mount the navbar for this page.
  * @param ctx - client root context (slots for the pin action).
@@ -48,6 +68,8 @@ export function applyNavbar(ctx: ClientContext): () => void {
   if (typeof document === 'undefined') return () => {}
   const body = document.body
   if (body === null) return () => {}
+  const sessions = ctx.sessions as unknown as SessionsNavFace
+  const t = ctx.locale.bind('webEnhanced')
 
   const STYLE_ID = 'dsh-web-enhanced-navbar-style'
   if (document.getElementById(STYLE_ID) === null) {
@@ -74,6 +96,13 @@ export function applyNavbar(ctx: ClientContext): () => void {
   content: ''; position: absolute; inset: -3px; border-radius: 999px;
 }
 [data-we-nav-dot]:hover { }
+[data-we-nav-dot][data-virtual-turn] {
+  width: 5px; height: 5px; background: rgba(128, 128, 140, .28);
+}
+[data-we-nav-dot][data-virtual-turn].hover,
+[data-we-nav-dot][data-virtual-turn]:hover {
+  width: 14px; background: rgba(128, 128, 140, .6);
+}
 [data-we-nav-dot].active, [data-we-nav-dot].hover, [data-we-nav-dot].pinned {
   transition: width .22s ease, height .22s ease, background .22s ease, transform .22s ease;
 }
@@ -163,6 +192,30 @@ export function applyNavbar(ctx: ClientContext): () => void {
       !row.hasAttribute('data-turn-tail')
       && row.querySelector('[class*="bubble"]') !== null)
 
+  /** Turn number owning user row i, read from the turn-tail row in its range. */
+  const turnOfUserIndex = (all: readonly HTMLElement[], rows: readonly HTMLElement[], i: number): number | null => {
+    const row = rows[i]
+    if (row === undefined) return null
+    const start = all.indexOf(row)
+    if (start < 0) return null
+    const end = i + 1 < rows.length ? all.indexOf(rows[i + 1] ?? row) : all.length
+    for (let k = start; k < end; k++) {
+      const turn = Number(all[k]?.getAttribute('data-turn-tail') ?? NaN)
+      if (Number.isFinite(turn)) return turn
+    }
+    return null
+  }
+
+  /** The currently rendered user row owning a turn number, if any. */
+  const rowOfTurn = (turn: number): HTMLElement | null => {
+    const rows = userRows()
+    const all = allRows()
+    for (let i = 0; i < rows.length; i++) {
+      if (turnOfUserIndex(all, rows, i) === turn) return rows[i] ?? null
+    }
+    return null
+  }
+
   // ── positioning ──────────────────────────────────────────────────────────
   const position = (): void => {
     const flow = flowOf()
@@ -198,8 +251,32 @@ export function applyNavbar(ctx: ClientContext): () => void {
   // ── pins (rows carry the projection; storage is the source of truth) ─────
   let currentSessionId: string | null = null
   const syncSessionId = (): void => {
+    const selected = sessions.list.getSnapshot().current
+    if (selected !== undefined && String(selected) !== '') {
+      currentSessionId = String(selected)
+      return
+    }
     const button = document.querySelector<HTMLElement>('[data-we-nav-pin-button][data-session-id]')
     if (button !== null) currentSessionId = button.getAttribute('data-session-id') ?? currentSessionId
+  }
+
+  // Whole-log turn count (the projection survives paging/compaction). The
+  // subscription is rebuilt when the current session changes.
+  let statsFace: { getSnapshot(): unknown; subscribe(listener: () => void): () => void } | undefined
+  let disposeStats = (): void => {}
+  const statsOf = (): number => {
+    const raw = statsFace?.getSnapshot() as SessionStatsNav | undefined
+    const turns = raw?.turns
+    return Number.isSafeInteger(turns) && (turns as number) >= 0 ? turns as number : 0
+  }
+  const syncStatsFace = (): void => {
+    const id = currentSessionId
+    const binding = id === null ? undefined : sessions.binding(id)
+    const next = binding?.session.projections.faceOf('sessionStats')
+    if (next === statsFace) return
+    disposeStats()
+    statsFace = next
+    disposeStats = next === undefined ? () => {} : next.subscribe(scheduleRender)
   }
 
   /** The pinned row inside user row i's turn, when that turn is curated. */
@@ -252,6 +329,7 @@ export function applyNavbar(ctx: ClientContext): () => void {
   // ── rendering ────────────────────────────────────────────────────────────
   let lo = 0
   let builtRows: HTMLElement[] = []
+  let scheduleRender = (): void => {}
 
   const jumpToRow = (row: HTMLElement): void => {
     const scroller = scrollerOf()
@@ -263,13 +341,45 @@ export function applyNavbar(ctx: ClientContext): () => void {
     scroller.scrollTop = target
   }
 
+  /** Load older pages until a turn materializes, then jump to it. */
+  const jumpToTurn = async (turn: number): Promise<void> => {
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const row = rowOfTurn(turn)
+      if (row !== null) {
+        jumpToRow(row)
+        return
+      }
+      const id = currentSessionId
+      if (id === null) return
+      const binding = sessions.binding(id)
+      if (binding === undefined) return
+      const snapshot = binding.session.getSnapshot()
+      if (snapshot.loadingOlder) {
+        await new Promise<void>(resolve => setTimeout(resolve, 120))
+        continue
+      }
+      if (!snapshot.hasMore) return
+      try {
+        await binding.session.loadOlder()
+      } catch {
+        return
+      }
+      await new Promise<void>(resolve => setTimeout(resolve, 60))
+    }
+  }
+
   const dotsOf = (): HTMLElement[] =>
     [...bar.querySelectorAll<HTMLElement>('[data-we-nav-dot]')]
 
   const updateActiveClass = (active: number): void => {
-    dotsOf().forEach((dot, i) => {
-      if (i + lo === active) dot.classList.add('active')
+    let cursor = 0
+    dotsOf().forEach((dot) => {
+      // Virtual older dots sit before the materialized window and never own
+      // the reading head.
+      if (dot.hasAttribute('data-virtual-turn')) return
+      if (cursor + lo === active) dot.classList.add('active')
       else dot.classList.remove('active')
+      cursor += 1
     })
   }
 
@@ -286,6 +396,7 @@ export function applyNavbar(ctx: ClientContext): () => void {
     activeIndex = active
     const all = allRows()
     syncSessionId()
+    syncStatsFace()
     const pinnedTurns = currentSessionId !== null ? pinStore.turnsOf(currentSessionId) : new Set<number>()
     const pinnedOf = (i: number): PinnedHit | null => pinnedRowOf(all, rows, i, pinnedTurns)
     const pinnedIndexes: number[] = []
@@ -293,16 +404,20 @@ export function applyNavbar(ctx: ClientContext): () => void {
     const range = navWindow(rows.length, active, pinnedIndexes, NAV_WINDOW, NAV_HALF_WINDOW)
     lo = range.lo
     const hi = range.hi
+    const older = olderNodeCount(turnOfUserIndex(all, rows, 0), statsOf(), rows.length)
     // Rebuild only when row identity or structure changed; scrolling moves
     // the active class alone.
-    const expectedCount = hi - lo + 1 + (lo > 0 ? 1 : 0) + (hi < rows.length - 1 ? 1 : 0)
+    const expectedCount = older + (lo > 0 ? 1 : 0) + (hi - lo + 1) + (hi < rows.length - 1 ? 1 : 0)
     const sameRows = rows.length === builtRows.length && rows.every((row, i) => row === builtRows[i])
     if (sameRows && bar.childElementCount === expectedCount) {
       updateActiveClass(active)
-      dotsOf().forEach((dot, i) => {
-        const pinned = pinnedOf(i + lo)
+      let cursor = 0
+      dotsOf().forEach((dot) => {
+        if (dot.hasAttribute('data-virtual-turn')) return
+        const pinned = pinnedOf(cursor + lo)
         if (pinned !== null) dot.classList.add('pinned')
         else dot.classList.remove('pinned')
+        cursor += 1
       })
       return
     }
@@ -311,6 +426,24 @@ export function applyNavbar(ctx: ClientContext): () => void {
       const more = document.createElement('span')
       more.setAttribute('data-we-nav-more', '')
       bar.appendChild(more)
+    }
+    // Unrendered earlier turns stay navigable: dim virtual dots stand in for
+    // them, and a click pages backwards until the turn is materialized.
+    for (let turn = 1; turn <= older; turn++) {
+      const dot = document.createElement('button')
+      dot.type = 'button'
+      dot.setAttribute('data-we-nav-dot', '')
+      dot.setAttribute('data-virtual-turn', String(turn))
+      dot.setAttribute('aria-label', t('navbar.olderTurn', { turn: String(turn) }))
+      if (pinnedTurns.has(turn)) dot.classList.add('pinned')
+      dot.addEventListener('focus', () => {
+        preview.textContent = t('navbar.olderTurn', { turn: String(turn) })
+        preview.style.display = 'block'
+        positionPreview(dot)
+      })
+      dot.addEventListener('blur', hidePreview)
+      dot.addEventListener('click', () => { void jumpToTurn(turn) })
+      bar.appendChild(dot)
     }
     if (lo > 0) appendMore()
     for (let i = lo; i <= hi; i++) {
@@ -394,7 +527,7 @@ export function applyNavbar(ctx: ClientContext): () => void {
   render()
 
   let renderScheduled = false
-  const scheduleRender = (): void => {
+  scheduleRender = (): void => {
     if (renderScheduled) return
     renderScheduled = true
     requestAnimationFrame(() => { renderScheduled = false; render() })
@@ -418,23 +551,41 @@ export function applyNavbar(ctx: ClientContext): () => void {
   observer.observe(body, { childList: true, subtree: true })
 
   // ── hover: nearest pill by pointer Y (no dead zones between pills) ───────
-  const nearestDot = (y: number): { dot: HTMLElement; row: HTMLElement; slot: number } | null => {
+  interface DotHit {
+    readonly dot: HTMLElement
+    readonly row: HTMLElement | null
+    readonly slot: number
+    readonly virtualTurn: number | null
+  }
+  const nearestDot = (y: number): DotHit | null => {
     const dots = dotsOf()
     if (dots.length === 0) return null
     let best: HTMLElement | null = null
+    let bestSlot = -1
+    let bestVirtual: number | null = null
     let bestDist = Number.POSITIVE_INFINITY
+    let cursor = 0
     for (const dot of dots) {
       const rect = dot.getBoundingClientRect()
       const distance = Math.abs(rect.top + rect.height / 2 - y)
-      if (distance < bestDist) { bestDist = distance; best = dot }
+      if (distance < bestDist) {
+        bestDist = distance
+        best = dot
+        bestSlot = cursor
+        const virtual = dot.getAttribute('data-virtual-turn')
+        bestVirtual = virtual === null ? null : Number(virtual)
+      }
+      if (!dot.hasAttribute('data-virtual-turn')) cursor += 1
     }
     if (best === null) return null
-    const slot = dots.indexOf(best)
-    const row = userRows()[lo + slot]
-    if (row === undefined) return null
-    return { dot: best, row, slot }
+    return {
+      dot: best,
+      row: bestVirtual === null ? userRows()[lo + bestSlot] ?? null : null,
+      slot: bestSlot,
+      virtualTurn: bestVirtual,
+    }
   }
-  const hoverableDot = (y: number): { dot: HTMLElement; row: HTMLElement; slot: number } | null => {
+  const hoverableDot = (y: number): DotHit | null => {
     const dots = dotsOf()
     if (dots.length === 0) return null
     const first = dots[0]?.getBoundingClientRect()
@@ -461,6 +612,18 @@ export function applyNavbar(ctx: ClientContext): () => void {
     if (hit === null) {
       hoverRow = null
       hoverAnchor = null
+      hidePreview()
+      return
+    }
+    if (hit.virtualTurn !== null) {
+      hoverRow = null
+      hoverAnchor = hit.dot
+      preview.textContent = t('navbar.olderTurn', { turn: String(hit.virtualTurn) })
+      preview.style.display = 'block'
+      positionPreview(hit.dot)
+      return
+    }
+    if (hit.row === null) {
       hidePreview()
       return
     }
@@ -496,6 +659,11 @@ export function applyNavbar(ctx: ClientContext): () => void {
     if (target !== null && target.closest('[data-we-nav-dot]') !== null) return
     const hit = nearestDot(event.clientY)
     if (hit === null) return
+    if (hit.virtualTurn !== null) {
+      void jumpToTurn(hit.virtualTurn)
+      return
+    }
+    if (hit.row === null) return
     const turns = currentSessionId !== null ? pinStore.turnsOf(currentSessionId) : new Set<number>()
     const pinned = pinnedRowOf(allRows(), userRows(), lo + hit.slot, turns)
     if (pinned !== null) jumpToRow(pinned.row)
@@ -599,6 +767,7 @@ export function applyNavbar(ctx: ClientContext): () => void {
 
   return () => {
     disposePin()
+    disposeStats()
     observer.disconnect()
     sizeObserver?.disconnect()
     intersection?.disconnect()

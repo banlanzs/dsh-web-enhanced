@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { createPinStore } from '../src/client/navbar/pin-store.ts'
-import { NAV_HALF_WINDOW, NAV_WINDOW, navWindow } from '../src/client/navbar/window.ts'
+import { NAV_HALF_WINDOW, NAV_WINDOW, navWindow, olderNodeCount } from '../src/client/navbar/window.ts'
 
 /** In-memory storage double. */
 function memoryStorage(): { store: Map<string, string>; seam: { getItem(k: string): string | null; setItem(k: string, v: string): void } } {
@@ -51,6 +51,20 @@ describe('pin store', () => {
     expect(pins.load('s')).toEqual([])
     store.set('dsh.web-enhanced.navbar.pins:s', JSON.stringify([{ messageId: 'ok', text: 't', ts: 1 }, { nope: true }, 'str']))
     expect(pins.load('s')).toEqual([{ messageId: 'ok', text: 't', ts: 1 }])
+  })
+})
+
+describe('olderNodeCount', () => {
+  it('derives older turns from the first rendered turn number', () => {
+    expect(olderNodeCount(1, 12, 10)).toBe(0)
+    expect(olderNodeCount(6, 30, 10)).toBe(5)
+    expect(olderNodeCount(50, 80, 10)).toBe(49)
+  })
+
+  it('falls back to the whole-log projection when the first turn is unknown', () => {
+    expect(olderNodeCount(null, 30, 10)).toBe(20)
+    expect(olderNodeCount(null, 3, 10)).toBe(0)
+    expect(olderNodeCount(null, 12, 0)).toBe(0)
   })
 })
 

@@ -278,6 +278,7 @@ export const zh = {
   'files.collapse': '收起侧边栏',
   'navbar.pin': '精选',
   'navbar.unpin': '取消精选',
+  'navbar.olderTurn': '第 {turn} 轮（尚未加载，点击加载并跳转）',
   'files.expand': '展开侧边栏',
   'panel.noWorkspace': '当前会话未绑定项目',
 
@@ -587,6 +588,7 @@ export const en: Record<keyof typeof zh, string> = {
   'files.collapse': 'Collapse sidebar',
   'navbar.pin': 'Pin',
   'navbar.unpin': 'Unpin',
+  'navbar.olderTurn': 'Turn {turn} (not loaded; click to load and jump)',
   'files.expand': 'Expand sidebar',
   'panel.noWorkspace': 'The current session has no project',
 
