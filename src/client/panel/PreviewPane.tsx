@@ -9,11 +9,12 @@
  * @module dsh-web-enhanced/src/client/panel/PreviewPane
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode, UIEvent } from 'react'
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type { OfficeBlock, PreviewMode, PreviewTab, WebEnhancedProps, WebEnhancedRemote } from '../contract.ts'
-import { dataUrlOf, extensionOf, hasRenderedForm, isEditable, mimeOfImagePath } from '../preview.ts'
+import { binaryObjectUrl, contentKey, workspaceImageUrl } from '../media.ts'
+import { extensionOf, hasRenderedForm, isEditable, mimeOfImagePath } from '../preview.ts'
 import { activeTabOf } from '../stores.ts'
 import { browserImageHref, diffLineKind, parseDelimited, parseMarkdown, workspaceImagePathOf } from './markdown.ts'
 import type { MdBlock, MdSpan } from './markdown.ts'
@@ -24,6 +25,9 @@ export type PreviewPaneProps = WebEnhancedProps<'conversation.view'> & { readonl
 
 /** Scroll depth past which the back-to-top button appears, px. */
 const TOP_THRESHOLD_PX = 240
+
+/** Shared empty row set for the non-CSV kinds (stable reference for useMemo). */
+const EMPTY_ROWS: readonly (readonly string[])[] = []
 
 /** Mode buttons in display order. */
 const MODES: ReadonlyArray<{ mode: PreviewMode; key: 'preview.mode.source' | 'preview.mode.split' | 'preview.mode.view' }> = [
@@ -45,6 +49,13 @@ export function PreviewPane({
 }: PreviewPaneProps) {
   const tabs = usePreview(state => state.tabs)
   const active = usePreview(state => activeTabOf(state))
+  // Reference-stable markdown image context: memoized children (RenderedForm)
+  // only skip re-render when this keeps its identity across pane renders.
+  const activePath = active?.path
+  const markdownImage = useMemo(
+    (): MarkdownImageContext => ({ tabPath: activePath ?? '', workspaceId, remote }),
+    [activePath, workspaceId, remote],
+  )
   const [saveError, setSaveError] = useState<string | null>(null)
   // Back-to-top: whichever scroll region is live (editor, source, diff, view)
   // reports through one shared ref; the button appears once it leaves the top.
@@ -168,7 +179,7 @@ export function PreviewPane({
               tab={active}
               text={body}
               unsupported={t('preview.unsupported')}
-              image={{ tabPath: active.path, workspaceId, remote }}
+              image={markdownImage}
             />
           </div>
         )}
@@ -189,28 +200,41 @@ export function PreviewPane({
 }
 
 
-/** The rendered (non-source) form of one tab. */
-function RenderedForm({
+/**
+ * The rendered (non-source) form of one tab. Memoized with the heavy parse
+ * and data-URL work hoisted into `useMemo`: the pane re-renders on
+ * scroll-position flips and save errors, and re-parsing the document or
+ * re-concatenating a multi-megabyte base64 string for those would be pure
+ * waste.
+ */
+const RenderedForm = memo(function RenderedForm({
   tab, text, unsupported, image,
 }: { tab: PreviewTab; text: string; unsupported: string; image: MarkdownImageContext }) {
+  const csvRows = useMemo(
+    () => tab.kind === 'csv'
+      ? parseDelimited(text, extensionOf(tab.path) === 'tsv' ? '\t' : ',')
+      : EMPTY_ROWS,
+    [tab, text],
+  )
+  const dataSrc = useMemo(() => {
+    if (tab.binary === undefined || tab.binary === '') return undefined
+    const mime = tab.kind === 'pdf' ? 'application/pdf' : mimeOfImagePath(tab.path)
+    return binaryObjectUrl(contentKey('preview', tab.binary), tab.binary, mime)
+  }, [tab])
   switch (tab.kind) {
     case 'markdown':
       return <MarkdownView source={text} image={image} />
     case 'csv':
-      return <TableView rows={parseDelimited(text, extensionOf(tab.path) === 'tsv' ? '\t' : ',')} />
+      return <TableView rows={csvRows} />
     case 'diff':
       return <DiffView source={text} />
     case 'html':
       // No scripts, no same-origin: a previewed page cannot reach the app.
       return <iframe className={css.frame} sandbox="" srcDoc={text} title={tab.name} />
-    case 'image': {
-      const src = dataUrlOf(tab)
-      return src === undefined ? <p className={css.empty}>{unsupported}</p> : <img className={css.image} src={src} alt={tab.name} />
-    }
-    case 'pdf': {
-      const src = dataUrlOf(tab)
-      return src === undefined ? <p className={css.empty}>{unsupported}</p> : <object className={css.frame} data={src} type="application/pdf" aria-label={tab.name} />
-    }
+    case 'image':
+      return dataSrc === undefined ? <p className={css.empty}>{unsupported}</p> : <img className={css.image} src={dataSrc} alt={tab.name} />
+    case 'pdf':
+      return dataSrc === undefined ? <p className={css.empty}>{unsupported}</p> : <object className={css.frame} data={dataSrc} type="application/pdf" aria-label={tab.name} />
     case 'office':
       return tab.office === undefined
         ? <p className={css.empty}>{unsupported}</p>
@@ -219,7 +243,7 @@ function RenderedForm({
     case 'text':
       return <pre className={css.source}>{text}</pre>
   }
-}
+})
 
 /**
  * A workspace-relative Markdown image, read through the plugin's own `fsRead`
@@ -236,29 +260,13 @@ function WorkspaceImage({
     let live = true
     setUrl(null)
     setFailed(false)
-    void remote.fsRead({ workspaceId, path }).then(result => {
-      if (!live) return
-      if ('error' in result) {
-        setFailed(true)
-        return
-      }
-      if (result.kind === 'binary') {
-        if (result.content === '') {
-          setFailed(true)
-          return
-        }
-        setUrl(`data:${mimeOfImagePath(path)};base64,${result.content}`)
-        return
-      }
-      // SVGs are text on disk even though they render as images.
-      if (result.kind === 'text' && mimeOfImagePath(path) === 'image/svg+xml') {
-        setUrl(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(result.content)}`)
-        return
-      }
-      setFailed(true)
-    }, () => {
-      if (live) setFailed(true)
-    })
+    // One shared read + one shared object URL per image: N references in one
+    // document (or N mounted components) no longer mean N reads and N base64
+    // copies. Failures drop out of the cache; the next mount retries.
+    void workspaceImageUrl(remote, workspaceId, path, mimeOfImagePath).then(
+      (next) => { if (live) setUrl(next) },
+      () => { if (live) setFailed(true) },
+    )
     return () => { live = false }
   }, [path, workspaceId, remote])
 
@@ -378,9 +386,12 @@ function Blocks({ blocks, image }: { blocks: readonly MdBlock[]; image: Markdown
 
 /** Structural Markdown rendering. */
 function MarkdownView({ source, image }: { source: string; image: MarkdownImageContext }) {
+  // Parsing is O(document); memoized so parent re-renders (and split-mode
+  // keystrokes on the editor half) do not re-walk the text.
+  const blocks = useMemo(() => parseMarkdown(source), [source])
   return (
     <div className={css.markdown}>
-      <Blocks blocks={parseMarkdown(source)} image={image} />
+      <Blocks blocks={blocks} image={image} />
     </div>
   )
 }
@@ -405,9 +416,10 @@ function TableView({ rows }: { rows: readonly (readonly string[])[] }) {
 
 /** Unified diff with per-line classes. */
 function DiffView({ source }: { source: string }) {
+  const lines = useMemo(() => source.split(/\r?\n/u), [source])
   return (
     <pre className={css.diff}>
-      {source.split(/\r?\n/u).map((line, index) => (
+      {lines.map((line, index) => (
         <span className={css.diffLine} data-kind={diffLineKind(line)} key={index}>{line === '' ? ' ' : line}</span>
       ))}
     </pre>

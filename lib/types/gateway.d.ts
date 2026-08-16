@@ -86,6 +86,12 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     /** Built on first mutation, so a deployment outside a profile never makes one. */
     private pnpm;
     /**
+     * Empty-query fsSearch results by `${workspaceId}:${path}`. The `+` mention
+     * picker opens with no query and would otherwise rewalk the workspace on
+     * every open; non-empty queries bypass this cache entirely.
+     */
+    private readonly emptySearchCache;
+    /**
      * Register the gateway, mount the task board (recovering interrupted
      * runs), and start the scheduler.
      * @param ctx - owning context with the injected core services.
@@ -164,7 +170,11 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     gitDiscard(request: GitMutateRequest): Promise<GitMutateResult>;
     /** List one directory (skips .git and configured skip dirs). */
     fsList(request: FsListRequest): Promise<FsListResult>;
-    /** Recursive basename search (bounded). */
+    /**
+     * Recursive basename search (bounded). An empty query — the mention picker's
+     * open state — is served from a short-lived per-workspace-path cache; every
+     * non-empty query bypasses it.
+     */
     fsSearch(request: FsSearchRequest): Promise<FsSearchResult>;
     /** Read one file (text capped / binary base64 preview). */
     fsRead(request: FsReadRequest): Promise<FsReadResult>;
@@ -214,6 +224,18 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     private balanceApplies;
     /** Configured endpoint of one provider route, when its settings declare one. */
     private providerBaseUrl;
+    /**
+     * Store one empty-query result, keeping at most {@link FS_SEARCH_CACHE_LIMIT}
+     * keys: a re-set refreshes recency, and the oldest key is evicted past the
+     * limit (Map insertion order).
+     */
+    private storeEmptySearch;
+    /**
+     * Drop every cached empty-query result of one workspace. A write or delete
+     * changes what an unfiltered listing returns; dropping the whole workspace's
+     * entries is cheap correctness over per-path tracking.
+     */
+    private invalidateSearchCache;
     private get fsLimits();
     private get gitLimits();
     private get officeLimits();

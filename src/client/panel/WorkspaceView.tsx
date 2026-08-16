@@ -17,6 +17,7 @@ import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { PanelTab, WebEnhancedProps } from '../contract.ts'
 import { workspaceOfSessionId } from '../workspace.ts'
+import { releaseAllObjectUrls } from '../media.ts'
 import { BoardPanel } from '../board/BoardOverlay.tsx'
 import { GraphPanel } from '../git/GraphOverlay.tsx'
 import { FileTree } from './FileTree.tsx'
@@ -55,6 +56,8 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   useEffect(() => {
     if (lastWorkspace.current === workspaceId) return
     lastWorkspace.current = workspaceId
+    // Preview tabs address paths inside one root; their object URLs do too.
+    releaseAllObjectUrls()
     clearTabs()
   }, [clearTabs, workspaceId])
 

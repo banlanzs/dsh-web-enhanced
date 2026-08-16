@@ -41,6 +41,13 @@ const taskDomainSpec = defineDomain({
 
 /** Board configuration (deployment config, not tunables). */
 export interface BoardConfig {
+  /**
+   * Floor on the scheduler's armed delay. The scheduler arms one one-shot
+   * timer at the earliest pending next run; this knob keeps that delay at
+   * least one interval, so a due task starts within one interval of its time
+   * (the fixed interval's own worst case) and a board with nothing scheduled
+   * arms no timer at all.
+   */
   readonly cronIntervalMs: number
 }
 
@@ -57,12 +64,16 @@ export interface BoardDeps extends RunDeps {
 /**
  * The task board: durable CRUD, the cron scheduler, and run settlement.
  * One instance per gateway; the storage domain opens once (recovering
- * interrupted runs) and the scheduler ticks on the configured interval.
+ * interrupted runs) and the scheduler arms a one-shot timer at the earliest
+ * pending next run, re-armed after every pass and task mutation.
  */
 export class TaskBoard {
   private readonly ready: Promise<Domain<typeof taskDomainSpec>>
   /** In-flight run guard (the durable status is authoritative; this is the admission lock). */
   private readonly runs = new Set<string>()
+  /** Pending one-shot scheduler timer; undefined while nothing is scheduled. */
+  private schedulerTimer: ReturnType<typeof setTimeout> | undefined
+  private readonly cronIntervalMs: number
 
   /**
    * @param ctx - owning context with the injected storageDomain service.
@@ -70,11 +81,12 @@ export class TaskBoard {
    * @param config - board configuration.
    */
   constructor(ctx: Context, private readonly deps: BoardDeps, config: BoardConfig) {
+    this.cronIntervalMs = config.cronIntervalMs
     this.ready = this.openDomain(ctx)
     ctx.effect(() => {
-      const timer = setInterval(() => { void this.schedulerTick() }, config.cronIntervalMs)
+      // The boot pass starts everything already due; its re-arm covers the rest.
       void this.schedulerTick()
-      return () => clearInterval(timer)
+      return () => this.disarmScheduler()
     })
   }
 
@@ -126,6 +138,7 @@ export class TaskBoard {
         lastRunAt: null,
       }
       await domain.table('tasks').put(task.id, task)
+      this.armScheduler(domain)
       return { task }
     } catch (error) {
       return { error: this.errorOf(error, 'task-create') }
@@ -191,6 +204,7 @@ export class TaskBoard {
           updatedAt: now,
         }
       })
+      this.armScheduler(domain)
       return { task }
     } catch (error) {
       return { error: this.errorOf(error, 'task-update') }
@@ -204,6 +218,7 @@ export class TaskBoard {
       if (id === '') return { error: { code: 'invalid-id', message: 'task id must not be empty' } }
       const domain = await this.ready
       const removed = await domain.table('tasks').delete(id as TaskId)
+      this.armScheduler(domain)
       return { removed }
     } catch (error) {
       /* v8 ignore next -- the in-memory domain delete never rejects */
@@ -273,7 +288,7 @@ export class TaskBoard {
     return domain
   }
 
-  /** One scheduler pass: start every due task. */
+  /** One scheduler pass: start every due task, then re-arm at the earliest pending run. */
   private async schedulerTick(): Promise<void> {
     try {
       const domain = await this.ready
@@ -283,10 +298,43 @@ export class TaskBoard {
         if (task.cron === null || task.nextRunAt === null || task.nextRunAt > now) continue
         await this.runScheduled(id)
       }
+      this.armScheduler(domain)
     } catch (error) {
       /* v8 ignore next -- the missing-domain TypeError is the only reachable tick failure */
       this.deps.logger.warn(`web-enhanced scheduler tick failed: ${error instanceof Error ? error.message : String(error)}`)
     }
+  }
+
+  /**
+   * (Re)arm the one-shot scheduler timer at the earliest pending next run.
+   *
+   * Clearing any pending timer first makes re-arming idempotent. Running
+   * tasks are skipped: their next run is recomputed when the run settles, and
+   * their stale past nextRunAt would otherwise re-arm a no-op pass every
+   * interval. No pending next run disarms instead of scheduling a pass that
+   * cannot start anything.
+   * @param domain - the opened task domain.
+   */
+  private armScheduler(domain: Domain<typeof taskDomainSpec>): void {
+    this.disarmScheduler()
+    let earliest: number | undefined
+    for (const [, task] of domain.table('tasks').entries()) {
+      if (task.status === 'running' || this.runs.has(task.id)) continue
+      if (task.nextRunAt === null) continue
+      if (earliest === undefined || task.nextRunAt < earliest) earliest = task.nextRunAt
+    }
+    if (earliest === undefined) return
+    this.schedulerTimer = setTimeout(() => {
+      this.schedulerTimer = undefined
+      void this.schedulerTick()
+    }, Math.max(earliest - Date.now(), this.cronIntervalMs))
+  }
+
+  /** Drop the pending scheduler timer, if any. */
+  private disarmScheduler(): void {
+    if (this.schedulerTimer === undefined) return
+    clearTimeout(this.schedulerTimer)
+    this.schedulerTimer = undefined
   }
 
   private async runScheduled(id: TaskId): Promise<void> {
@@ -332,6 +380,7 @@ export class TaskBoard {
         }
         return { ...current, status, result, nextRunAt, updatedAt: now }
       })
+      this.armScheduler(domain)
     } catch (error) {
       try {
         const domain = await this.ready
@@ -346,6 +395,7 @@ export class TaskBoard {
           },
           updatedAt: now,
         }))
+        this.armScheduler(domain)
       } catch (settleError) {
         /* v8 ignore next -- domain and backend failures are always Error instances */
         this.deps.logger.warn(`web-enhanced run settlement failed for '${id}': ${settleError instanceof Error ? settleError.message : String(settleError)}`)

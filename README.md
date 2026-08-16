@@ -127,7 +127,7 @@ Plugin-row `config` fields (all have defaults; the `vision*` ones can also be ed
 
 | key | default | meaning |
 |---|---|---|
-| `cronIntervalMs` | 30000 | Scheduler tick interval |
+| `cronIntervalMs` | 30000 | Minimum delay before the cron scheduler fires; it arms one timer at the earliest pending run and no timer exists while nothing is scheduled |
 | `balanceApiKeyEnv` | `DEEPSEEK_API_KEY` | Env var for the balance query API key |
 | `balanceCacheTtlMs` | 60000 | Balance view cache duration |
 | `balanceBaseUrl` | `https://api.deepseek.com` | Balance endpoint base URL |

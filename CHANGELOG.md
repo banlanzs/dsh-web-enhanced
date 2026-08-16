@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.18.0] - 2026-08-16
+
+### 性能优化：降低浏览器内存与卡顿，减少宿主空闲唤醒
+
+**交互卡顿（主线程）**
+- 预览渲染记忆化：Markdown/CSV/diff 解析与图片/PDF data URL 全部 `useMemo`，`RenderedForm`/`TaskCard` `React.memo`，markdown 图片上下文引用稳定——分屏编辑每键不再全量重解析整篇文档，滚动/保存等重渲染不再重建兆级字符串。
+- store 持久化去抖（300ms trailing + `pagehide` flush + 同串跳写），`query` 从持久化投影剔除：文件树搜索每键的同步 `JSON.stringify` + `localStorage` 阻塞写消失。
+- 任务看板轮询：后台标签页跳过 2s tick（恢复可见立即补拉）；轮询结果浅比较（id/状态/updatedAt 未变则保持引用，全列零重渲染）；卡片回调引用稳定。
+- Git 图谱：泳道布局 `layoutLanes`/`placeWorking` `useMemo`，展开提交不再全图重排。
+
+**内存（browser RAM）**
+- 新增媒体注册表（`media.ts`）：二进制预览（图片/PDF）base64 一次性解码为 Blob → object URL，LRU 16 项、越限自动 revoke；`RenderedForm` 不再每渲染重建 ~7MB data URL。
+- Markdown 内嵌工作区图片单飞共享：同图 N 处引用共享一次 fsRead 与一个 object URL，失败不缓存；切工作区全量释放。
+- 皮肤背景图迁 IndexedDB Blob + object URL（localStorage 旧值自动迁移后删除），不再长期持有双份 ~9MB UTF-16 字符串。
+- 文件树：空展开集选择器引用稳定（任何面板写入不再整树重渲染）；目录列表缓存上限 50（LRU）。
+
+**宿主侧与网络**
+- cron 调度器改一次性定时：按最近 `nextRunAt` 布防（`cronIntervalMs` 作为延迟下限），无 cron 任务零唤醒；任务增删改/结算后自动重布防。
+- 分支列表按 workspace 缓存（5s TTL，单飞共享，checkout 后失效，错误不缓存）：N 个会话头不再 N 次 spawn `git branch`。
+- mention 选择器空查询的全工作区遍历加 30s TTL 缓存（仅空查询，写/删失效，上限 4 键）。
+
+- 测试 318 → 350（新增媒体注册表 8、看板浅比较 1、cron 单次定时 5、分支缓存与空查询缓存 10 等）；tsc 零错误。
+
 ## [0.17.2] - 2026-08-16
 
 ### 调整：自定义背景超限自动压缩，不再直接拒绝

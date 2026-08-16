@@ -11,7 +11,7 @@
  * @module dsh-web-enhanced/src/client/git/GraphOverlay
  */
 
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {
@@ -192,10 +192,12 @@ function hasChanges(working: GitWorkingView | null): working is GitWorkingView {
 function GraphBody({
   commits, working, empty, expanded, workingOpen, workspaceId, remote, onToggle, onToggleWorking, t,
 }: GraphBodyProps) {
-  const layout = layoutLanes(commits)
+  // Lane layout is O(commits x lanes); memoized so expanding a commit or
+  // toggling the working row re-renders rows without re-laying the graph.
+  const layout = useMemo(() => layoutLanes(commits), [commits])
   const railWidth = (layout.width + 1) * LANE_STEP
   const dirty = hasChanges(working)
-  const placement = dirty ? placeWorking(layout.rows, working.head) : null
+  const placement = useMemo(() => (dirty ? placeWorking(layout.rows, working.head) : null), [dirty, layout, working])
   const workingRow = dirty
     ? (
         <WorkingRow

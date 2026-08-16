@@ -39,19 +39,46 @@ export interface Cell<T> extends Observable<T> {
   update(next: (current: T) => T): void
 }
 
+/** Debounce of persisted-cell writes, milliseconds. */
+export const PERSIST_DEBOUNCE_MS = 300
+
+/**
+ * Pending flushers of debounced cells: a pagehide pass drains them so the
+ * last state before a close still lands (the pending timer alone would be
+ * cancelled by teardown). Cells never unsubscribe — they live for the page.
+ */
+const flushers = new Set<() => void>()
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => {
+    for (const flush of flushers) flush()
+  })
+}
+
 /**
  * Create one shared state cell, optionally mirrored to localStorage.
  *
  * Persistence is a durable boundary: stored text is parsed defensively and a
  * value that does not survive `revive` is discarded in favour of the initial
  * state, so a format change or hand-edited storage cannot wedge the panel.
+ * The mirror is DEBOUNCED and write-skipping: localStorage writes are
+ * synchronous main-thread work, and a keystroke-rate writer (the tree filter)
+ * would otherwise pay a JSON.stringify of the whole state per key. `project`
+ * lets a cell exclude live-only fields (the filter) whose serialization
+ * `revive` would drop anyway.
  * @param initial - starting value when nothing valid was restored.
- * @param persist - localStorage key and reviver; omitted keeps the cell in memory.
+ * @param persist - localStorage key, reviver, and optional persistence
+ * projection; omitted keeps the cell in memory.
  * @returns the cell.
  */
 export function createCell<T>(
   initial: T,
-  persist?: { readonly key: string; readonly revive: (raw: unknown) => T | undefined },
+  persist?: {
+    readonly key: string
+    readonly revive: (raw: unknown) => T | undefined
+    /** Project the persisted form; defaults to the whole value. */
+    readonly project?: (value: T) => unknown
+  },
 ): Cell<T> {
   let value = initial
   if (persist !== undefined && typeof localStorage !== 'undefined') {
@@ -67,6 +94,27 @@ export function createCell<T>(
     }
   }
   const listeners = new Set<() => void>()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let lastWritten: string | undefined
+  const persistNow = (): void => {
+    if (persist === undefined || typeof localStorage === 'undefined') return
+    try {
+      const serialized = JSON.stringify(persist.project === undefined ? value : persist.project(value))
+      if (serialized === lastWritten) return
+      lastWritten = serialized
+      localStorage.setItem(persist.key, serialized)
+    } catch {
+      // A full or blocked quota costs persistence, not the interaction.
+    }
+  }
+  const schedulePersist = (): void => {
+    if (timer !== undefined) clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = undefined
+      persistNow()
+    }, PERSIST_DEBOUNCE_MS)
+    flushers.add(persistNow)
+  }
   return {
     getSnapshot: () => value,
     subscribe: (fn) => {
@@ -77,13 +125,7 @@ export function createCell<T>(
       const candidate = next(value)
       if (candidate === value) return
       value = candidate
-      if (persist !== undefined && typeof localStorage !== 'undefined') {
-        try {
-          localStorage.setItem(persist.key, JSON.stringify(value))
-        } catch {
-          // A full or blocked quota costs persistence, not the interaction.
-        }
-      }
+      if (persist !== undefined && typeof localStorage !== 'undefined') schedulePersist()
       for (const fn of [...listeners]) fn()
     },
   }
@@ -249,7 +291,12 @@ function revivePanel(raw: unknown): PanelState | undefined {
 export function createPanel(): { cell: Cell<PanelState>; actions: PanelActions } {
   const cell = createCell<PanelState>(
     { tab: 'explorer', sidebarCollapsed: false, expanded: {}, query: '' },
-    { key: PANEL_PERSIST_KEY, revive: revivePanel },
+    {
+      key: PANEL_PERSIST_KEY,
+      revive: revivePanel,
+      // The filter is live-only (revive drops it), so it never serializes.
+      project: ({ query: _query, ...durable }) => durable,
+    },
   )
   return {
     cell,

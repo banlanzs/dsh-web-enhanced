@@ -35,19 +35,29 @@ export interface Cell<T> extends Observable<T> {
      */
     update(next: (current: T) => T): void;
 }
+/** Debounce of persisted-cell writes, milliseconds. */
+export declare const PERSIST_DEBOUNCE_MS = 300;
 /**
  * Create one shared state cell, optionally mirrored to localStorage.
  *
  * Persistence is a durable boundary: stored text is parsed defensively and a
  * value that does not survive `revive` is discarded in favour of the initial
  * state, so a format change or hand-edited storage cannot wedge the panel.
+ * The mirror is DEBOUNCED and write-skipping: localStorage writes are
+ * synchronous main-thread work, and a keystroke-rate writer (the tree filter)
+ * would otherwise pay a JSON.stringify of the whole state per key. `project`
+ * lets a cell exclude live-only fields (the filter) whose serialization
+ * `revive` would drop anyway.
  * @param initial - starting value when nothing valid was restored.
- * @param persist - localStorage key and reviver; omitted keeps the cell in memory.
+ * @param persist - localStorage key, reviver, and optional persistence
+ * projection; omitted keeps the cell in memory.
  * @returns the cell.
  */
 export declare function createCell<T>(initial: T, persist?: {
     readonly key: string;
     readonly revive: (raw: unknown) => T | undefined;
+    /** Project the persisted form; defaults to the whole value. */
+    readonly project?: (value: T) => unknown;
 }): Cell<T>;
 /** Which full-frame overlay is open, if any. */
 export interface OverlayState {

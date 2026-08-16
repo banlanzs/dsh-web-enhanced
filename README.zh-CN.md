@@ -125,7 +125,7 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 
 | key | 默认 | 含义 |
 |---|---|---|
-| `cronIntervalMs` | 30000 | 调度器 tick 间隔 |
+| `cronIntervalMs` | 30000 | 调度器最小触发间隔；定时器按最近一次待执行任务一次性布防，无任务时不布防 |
 | `balanceApiKeyEnv` | `DEEPSEEK_API_KEY` | 余额查询的 API key 环境变量 |
 | `balanceCacheTtlMs` | 60000 | 余额视图缓存时长 |
 | `balanceBaseUrl` | `https://api.deepseek.com` | 余额端点基址 |

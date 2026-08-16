@@ -36,5 +36,10 @@ export interface TaskCardProps {
  * @returns true when the card collapses by default.
  */
 export declare function collapsesByDefault(status: TaskRecord['status']): boolean;
-/** One task card: summary, schedule, outcome, and the actions for its column. */
-export declare function TaskCard({ task, workspaces, t, onRun, onOpen, onRemove, onUpdate }: TaskCardProps): import("react").JSX.Element;
+/**
+ * One task card: summary, schedule, outcome, and the actions for its column.
+ * Memoized: the board polls every {@link RUNNING_POLL_MS} while a task runs,
+ * and a card whose task, callbacks, and dictionary seat did not move should
+ * not re-render for it.
+ */
+export declare const TaskCard: import("react").NamedExoticComponent<TaskCardProps>;

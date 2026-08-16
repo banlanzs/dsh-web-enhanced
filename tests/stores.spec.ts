@@ -10,7 +10,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  activeTabOf, createBrowse, createCell, createOverlay, createPanel, createPreview,
+  activeTabOf, createBrowse, createCell, createOverlay, createPanel, createPreview, PERSIST_DEBOUNCE_MS,
 } from '../src/client/stores.ts'
 import type { PreviewTab } from '../src/client/contract.ts'
 
@@ -49,12 +49,18 @@ describe('createCell', () => {
   })
 
   it('restores persisted state and writes changes back', () => {
-    const revive = (raw: unknown): { n: number } | undefined =>
-      typeof raw === 'object' && raw !== null && typeof (raw as { n?: unknown }).n === 'number'
-        ? { n: (raw as { n: number }).n }
-        : undefined
-    createCell({ n: 0 }, { key: 'k', revive }).update(() => ({ n: 7 }))
-    expect(createCell({ n: 0 }, { key: 'k', revive }).getSnapshot()).toEqual({ n: 7 })
+    vi.useFakeTimers()
+    try {
+      const revive = (raw: unknown): { n: number } | undefined =>
+        typeof raw === 'object' && raw !== null && typeof (raw as { n?: unknown }).n === 'number'
+          ? { n: (raw as { n: number }).n }
+          : undefined
+      createCell({ n: 0 }, { key: 'k', revive }).update(() => ({ n: 7 }))
+      vi.advanceTimersByTime(PERSIST_DEBOUNCE_MS)
+      expect(createCell({ n: 0 }, { key: 'k', revive }).getSnapshot()).toEqual({ n: 7 })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('falls back to the initial value when storage is unparseable or rejected', () => {
@@ -135,16 +141,55 @@ describe('workspace view state', () => {
   })
 
   it('persists the tab and open directories but starts the filter empty', () => {
-    const first = createPanel()
-    first.actions.selectTab('scm')
-    first.actions.toggleExpanded('w1', 'src')
-    first.actions.setQuery('needle')
+    vi.useFakeTimers()
+    try {
+      const first = createPanel()
+      first.actions.selectTab('scm')
+      first.actions.toggleExpanded('w1', 'src')
+      first.actions.setQuery('needle')
+      vi.advanceTimersByTime(PERSIST_DEBOUNCE_MS)
 
-    const restored = createPanel().cell.getSnapshot()
+      const restored = createPanel().cell.getSnapshot()
     expect(restored.tab).toBe('scm')
     expect(restored.expanded['w1']).toEqual(['src'])
-    // The filter is a live gesture, not a place.
-    expect(restored.query).toBe('')
+      // The filter is a live gesture, not a place.
+      expect(restored.query).toBe('')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('debounces the storage mirror and never serializes filter-only writes', () => {
+    vi.useFakeTimers()
+    try {
+      localStorage.setItem('dsh.webEnhanced.panel.v2', JSON.stringify({ tab: 'scm' }))
+      const writes = vi.spyOn(Storage.prototype, 'setItem')
+      const { actions } = createPanel()
+      writes.mockClear()
+      actions.setQuery('a')
+      actions.setQuery('ab')
+      actions.setQuery('abc')
+      vi.advanceTimersByTime(PERSIST_DEBOUNCE_MS)
+      // Filter writes collapse into one debounced flush whose payload carries
+      // the durable fields only — never the live query.
+      expect(writes).toHaveBeenCalledTimes(1)
+      expect(JSON.parse(String(writes.mock.calls[0]?.[1]))).not.toHaveProperty('query')
+
+      writes.mockClear()
+      actions.toggleExpanded('w9', 'deep/dir')
+      vi.advanceTimersByTime(PERSIST_DEBOUNCE_MS - 1)
+      expect(writes).toHaveBeenCalledTimes(0)
+      vi.advanceTimersByTime(1)
+      expect(writes).toHaveBeenCalledTimes(1)
+      expect(JSON.parse(String(writes.mock.calls[0]?.[1]))).toEqual({
+        tab: 'scm',
+        sidebarCollapsed: false,
+        expanded: { w9: ['deep/dir'] },
+      })
+      writes.mockRestore()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('restores the pre-explorer files and preview tabs onto the explorer', () => {

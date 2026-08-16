@@ -8,6 +8,8 @@
  * record is written back), so the board polls WHILE it shows a running task
  * and stops as soon as none is left — the status change has no push channel
  * to this plugin, and a permanent timer would poll an idle board forever.
+ * A hidden browser tab skips its ticks (network + a full-column re-render
+ * nobody sees) and the first visible moment catches the poll up.
  * @module dsh-web-enhanced/src/client/board/BoardOverlay
  */
 
@@ -25,6 +27,21 @@ export type BoardOverlayProps = WebEnhancedProps<'shell.overlay'>
 
 /** Poll interval while at least one task is running, in milliseconds. */
 const RUNNING_POLL_MS = 2_000
+
+/**
+ * Same-length, same-record shallow equality: a poll whose records did not
+ * move (id, column, updated timestamp) keeps the previous array reference so
+ * React skips re-rendering every column and card.
+ */
+export function tasksUnchanged(previous: readonly TaskRecord[], next: readonly TaskRecord[]): boolean {
+  return previous.length === next.length && previous.every((task, index) => {
+    const fresh = next[index]
+    return fresh !== undefined
+      && task.id === fresh.id
+      && task.status === fresh.status
+      && task.updatedAt === fresh.updatedAt
+  })
+}
 
 /** The five columns, left to right, with their dictionary keys. */
 const COLUMNS: ReadonlyArray<{ status: TaskStatus; key: 'board.column.planned' | 'board.column.todo' | 'board.column.running' | 'board.column.done' | 'board.column.failed' }> = [
@@ -59,7 +76,9 @@ export function BoardPanel({ remote, workspaces, openSession, t }: BoardPanelPro
       return
     }
     setError(null)
-    setTasks(result.tasks)
+    // Reference-stable when the host answer carries the same records: the
+    // columns and cards then skip their render entirely.
+    setTasks(previous => tasksUnchanged(previous, result.tasks) ? previous : result.tasks)
   }, [remote])
 
   // The panel is mounted only while visible, so mount = open.
@@ -68,8 +87,21 @@ export function BoardPanel({ remote, workspaces, openSession, t }: BoardPanelPro
   const anyRunning = tasks.some(task => task.status === 'running')
   useEffect(() => {
     if (!anyRunning) return
-    const timer = setInterval(() => { void reload() }, RUNNING_POLL_MS)
-    return () => { clearInterval(timer) }
+    const tick = (): void => {
+      // A background tab pays nothing: skip the fetch and the re-render, and
+      // catch up on the first visible moment instead.
+      if (document.hidden) return
+      void reload()
+    }
+    const onVisible = (): void => {
+      if (!document.hidden) void reload()
+    }
+    const timer = setInterval(tick, RUNNING_POLL_MS)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [anyRunning, reload])
 
   /** Run one host mutation and refresh; failures land in the banner. */
@@ -83,6 +115,18 @@ export function BoardPanel({ remote, workspaces, openSession, t }: BoardPanelPro
     }
     await reload()
   }, [reload])
+
+  // Reference-stable per-card gestures (memoized TaskCard skips only when
+  // its callbacks keep their identity across renders).
+  const onRun = useCallback((target: TaskRecord): void => {
+    void mutate(remote.taskRun({ id: target.id }))
+  }, [mutate, remote])
+  const onRemove = useCallback((target: TaskRecord): void => {
+    void mutate(remote.taskRemove({ id: target.id }))
+  }, [mutate, remote])
+  const onUpdate = useCallback((request: TaskUpdateRequest): void => {
+    void mutate(remote.taskUpdate(request))
+  }, [mutate])
 
   return (
     <div className={css.panel} data-testid="board-panel">
@@ -122,10 +166,10 @@ export function BoardPanel({ remote, workspaces, openSession, t }: BoardPanelPro
                           task={task}
                           workspaces={workspaces}
                           t={t}
-                          onRun={(target) => { void mutate(remote.taskRun({ id: target.id })) }}
+                          onRun={onRun}
                           onOpen={openSession}
-                          onRemove={(target) => { void mutate(remote.taskRemove({ id: target.id })) }}
-                          onUpdate={(request: TaskUpdateRequest) => { void mutate(remote.taskUpdate(request)) }}
+                          onRemove={onRemove}
+                          onUpdate={onUpdate}
                         />
                       ))}
                     </ul>

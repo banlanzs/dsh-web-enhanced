@@ -8,11 +8,19 @@
  * record is written back), so the board polls WHILE it shows a running task
  * and stops as soon as none is left — the status change has no push channel
  * to this plugin, and a permanent timer would poll an idle board forever.
+ * A hidden browser tab skips its ticks (network + a full-column re-render
+ * nobody sees) and the first visible moment catches the poll up.
  * @module dsh-web-enhanced/src/client/board/BoardOverlay
  */
-import type { WebEnhancedProps } from '../contract.ts';
+import type { TaskRecord, WebEnhancedProps } from '../contract.ts';
 /** Full composed props of the board overlay. */
 export type BoardOverlayProps = WebEnhancedProps<'shell.overlay'>;
+/**
+ * Same-length, same-record shallow equality: a poll whose records did not
+ * move (id, column, updated timestamp) keeps the previous array reference so
+ * React skips re-rendering every column and card.
+ */
+export declare function tasksUnchanged(previous: readonly TaskRecord[], next: readonly TaskRecord[]): boolean;
 /** What the chrome-free panel needs from its host surface. */
 export interface BoardPanelProps {
     readonly remote: WebEnhancedProps<'shell.overlay'>['remote'];

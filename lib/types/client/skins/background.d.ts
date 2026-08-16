@@ -1,15 +1,16 @@
 /**
  * Background image budgeting and compression.
  *
- * localStorage holds ~5M UTF-16 units and the stored value is a base64 data
- * URL (4 bytes of text per 3 image bytes), so the invariant that matters is
- * the ENCODED data URL length, not the source file size. A picture within
- * budget keeps its original bytes (GIF animation and SVG vectors survive);
- * an oversized one is re-encoded through a canvas on a descending
- * scale/quality plan until the encoded form fits.
+ * The picker's working product is a base64 data URL (4 UTF-16 units of text
+ * per 3 image bytes) that becomes the persisted Blob, so the invariant that
+ * matters is the ENCODED data URL length, not the source file size: the
+ * budget caps the transient encode/decode work. A picture within budget
+ * keeps its original bytes (GIF animation and SVG vectors survive); an
+ * oversized one is re-encoded through a canvas on a descending scale/quality
+ * plan until the encoded form fits.
  * @module dsh-web-enhanced/src/client/skins/background
  */
-/** Budget for the stored data URL, UTF-16 units (localStorage keeps ~5M). */
+/** Budget for the encoded data URL, UTF-16 units (caps transient encode work). */
 export declare const BACKGROUND_MAX_CHARS = 4500000;
 /** One candidate encode setting; earlier entries lose less quality. */
 export interface EncodeStep {

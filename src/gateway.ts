@@ -78,6 +78,12 @@ interface SettingsVisionFace {
 /** Settings namespace whose retry policy the model-retry remotes edit. */
 const MODEL_RETRY_SETTINGS_NS = 'llm-deepseek'
 
+/** How long one cached empty-query search result serves the mention picker (ms). */
+const FS_SEARCH_CACHE_TTL_MS = 30_000
+
+/** Distinct empty-query search results kept at once (insertion-order eviction). */
+const FS_SEARCH_CACHE_LIMIT = 4
+
 /** The resolved shape of the DeepSeek adapter's retry policy settings. */
 interface DeepSeekRetrySettingsValue {
   readonly retryPolicy?: {
@@ -300,6 +306,12 @@ export class WebEnhancedGateway extends TypertRemoteService {
   private profileDirCache: Promise<string | undefined> | undefined
   /** Built on first mutation, so a deployment outside a profile never makes one. */
   private pnpm: PnpmRunner | undefined
+  /**
+   * Empty-query fsSearch results by `${workspaceId}:${path}`. The `+` mention
+   * picker opens with no query and would otherwise rewalk the workspace on
+   * every open; non-empty queries bypass this cache entirely.
+   */
+  private readonly emptySearchCache = new Map<string, { at: number; result: FsSearchResult }>()
 
   /**
    * Register the gateway, mount the task board (recovering interrupted
@@ -737,13 +749,26 @@ export class WebEnhancedGateway extends TypertRemoteService {
     }
   }
 
-  /** Recursive basename search (bounded). */
+  /**
+   * Recursive basename search (bounded). An empty query — the mention picker's
+   * open state — is served from a short-lived per-workspace-path cache; every
+   * non-empty query bypasses it.
+   */
   @Remote('fsSearch')
   async fsSearch(request: FsSearchRequest): Promise<FsSearchResult> {
     const root = this.workspaceRootFor(request.workspaceId)
     if (root === null) return { error: { code: 'workspace-not-found', message: `workspace '${request.workspaceId}' does not exist` } }
+    const rel = request.path ?? ''
+    const cacheable = (request.query ?? '').trim() === ''
+    const key = `${request.workspaceId}:${rel}`
+    if (cacheable) {
+      const hit = this.emptySearchCache.get(key)
+      if (hit !== undefined && Date.now() - hit.at < FS_SEARCH_CACHE_TTL_MS) return hit.result
+    }
     try {
-      return { entries: await searchFiles(root, request.path ?? '', request.query ?? '', this.fsLimits) }
+      const result: FsSearchResult = { entries: await searchFiles(root, rel, request.query ?? '', this.fsLimits) }
+      if (cacheable) this.storeEmptySearch(key, result)
+      return result
     } catch (error) {
       return { error: this.errorOf(error, 'fs-search') }
     }
@@ -768,6 +793,7 @@ export class WebEnhancedGateway extends TypertRemoteService {
     if (root === null) return { error: { code: 'workspace-not-found', message: `workspace '${request.workspaceId}' does not exist` } }
     try {
       await writeFileView(root, request.path, request.content, this.fsLimits)
+      this.invalidateSearchCache(request.workspaceId)
       return { ok: true }
     } catch (error) {
       return { error: this.errorOf(error, 'fs-write') }
@@ -781,6 +807,7 @@ export class WebEnhancedGateway extends TypertRemoteService {
     if (root === null) return { error: { code: 'workspace-not-found', message: `workspace '${request.workspaceId}' does not exist` } }
     try {
       await deleteFileView(root, request.path)
+      this.invalidateSearchCache(request.workspaceId)
       return { ok: true }
     } catch (error) {
       return { error: this.errorOf(error, 'fs-delete') }
@@ -945,6 +972,31 @@ export class WebEnhancedGateway extends TypertRemoteService {
     if (typeof value !== 'object' || value === null) return undefined
     const baseUrl = (value as Record<string, unknown>)['baseURL']
     return typeof baseUrl === 'string' && baseUrl.trim() !== '' ? baseUrl : undefined
+  }
+
+  /**
+   * Store one empty-query result, keeping at most {@link FS_SEARCH_CACHE_LIMIT}
+   * keys: a re-set refreshes recency, and the oldest key is evicted past the
+   * limit (Map insertion order).
+   */
+  private storeEmptySearch(key: string, result: FsSearchResult): void {
+    this.emptySearchCache.delete(key)
+    this.emptySearchCache.set(key, { at: Date.now(), result })
+    while (this.emptySearchCache.size > FS_SEARCH_CACHE_LIMIT) {
+      this.emptySearchCache.delete(this.emptySearchCache.keys().next().value!)
+    }
+  }
+
+  /**
+   * Drop every cached empty-query result of one workspace. A write or delete
+   * changes what an unfiltered listing returns; dropping the whole workspace's
+   * entries is cheap correctness over per-path tracking.
+   */
+  private invalidateSearchCache(workspaceId: string): void {
+    const prefix = `${workspaceId}:`
+    for (const key of [...this.emptySearchCache.keys()]) {
+      if (key.startsWith(prefix)) this.emptySearchCache.delete(key)
+    }
   }
 
   private get fsLimits(): FsLimits {

@@ -5,7 +5,7 @@
  * @module dsh-web-enhanced/src/client/board/TaskCard
  */
 
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import type { TaskRecord, TaskUpdateRequest } from '../contract.ts'
 import type { Translate } from '../locale-keys.ts'
 import css from './TaskCard.module.css'
@@ -50,8 +50,13 @@ export function collapsesByDefault(status: TaskRecord['status']): boolean {
   return status === 'done'
 }
 
-/** One task card: summary, schedule, outcome, and the actions for its column. */
-export function TaskCard({ task, workspaces, t, onRun, onOpen, onRemove, onUpdate }: TaskCardProps) {
+/**
+ * One task card: summary, schedule, outcome, and the actions for its column.
+ * Memoized: the board polls every {@link RUNNING_POLL_MS} while a task runs,
+ * and a card whose task, callbacks, and dictionary seat did not move should
+ * not re-render for it.
+ */
+export const TaskCard = memo(function TaskCard({ task, workspaces, t, onRun, onOpen, onRemove, onUpdate }: TaskCardProps) {
   const [editing, setEditing] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [title, setTitle] = useState(task.title)
@@ -206,4 +211,4 @@ export function TaskCard({ task, workspaces, t, onRun, onOpen, onRemove, onUpdat
       </div>
     </li>
   )
-}
+})

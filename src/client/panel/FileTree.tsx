@@ -27,6 +27,36 @@ export type FileTreeProps = WebEnhancedProps<'conversation.view'> & {
 /** Debounce of the search query, in milliseconds. */
 const SEARCH_DEBOUNCE_MS = 200
 
+/** Directory listings retained at once; the oldest expansion drops. */
+const LISTING_CAPACITY = 50
+
+/**
+ * Shared empty expansion set: the selector below must return one stable
+ * reference, or every panel-store write re-renders the whole recursive tree.
+ */
+const NO_EXPANSIONS: readonly string[] = []
+
+/**
+ * Copy the listings map with one directory's entry replaced, dropping the
+ * oldest entry beyond {@link LISTING_CAPACITY} (insertion order = age; the
+ * replaced key re-arms as newest).
+ */
+function withListing(
+  current: ReadonlyMap<string, Listing>,
+  path: string,
+  listing: Listing,
+): ReadonlyMap<string, Listing> {
+  const next = new Map(current)
+  next.delete(path)
+  next.set(path, listing)
+  while (next.size > LISTING_CAPACITY) {
+    const oldest = next.keys().next()
+    if (oldest.done === true) break
+    next.delete(oldest.value)
+  }
+  return next
+}
+
 /** Cached listing of one directory. */
 type Listing =
   | { readonly phase: 'loading' }
@@ -37,7 +67,7 @@ type Listing =
 export function FileTree({
   workspaceId, usePanel, remote, toggleExpanded, setQuery, openTab, t, onCollapse, collapseLabel,
 }: FileTreeProps) {
-  const expanded = usePanel(state => state.expanded[workspaceId] ?? [])
+  const expanded = usePanel(state => state.expanded[workspaceId] ?? NO_EXPANSIONS)
   const query = usePanel(state => state.query)
 
   const [listings, setListings] = useState<ReadonlyMap<string, Listing>>(new Map())
@@ -46,14 +76,12 @@ export function FileTree({
   useEffect(() => () => { live.current = false }, [])
 
   const list = useCallback(async (path: string): Promise<void> => {
-    setListings(current => new Map(current).set(path, { phase: 'loading' }))
+    setListings(current => withListing(current, path, { phase: 'loading' }))
     const result = await remote.fsList({ workspaceId, path })
     if (!live.current) return
-    setListings(current => new Map(current).set(
-      path,
-      'error' in result
-        ? { phase: 'error', message: result.error.message }
-        : { phase: 'ready', entries: result.entries },
+    setListings(current => withListing(current, path, 'error' in result
+      ? { phase: 'error', message: result.error.message }
+      : { phase: 'ready', entries: result.entries },
     ))
   }, [remote, workspaceId])
 
