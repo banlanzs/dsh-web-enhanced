@@ -66,10 +66,19 @@
   box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
 }
 
+/* The commit list owns its height: filling the panel's flex share and
+   scrolling internally keeps the graph's bottom edge at the composer
+   clearance (like the explorer split) instead of growing the page scroll
+   under the floating composer. */
 .rows {
   list-style: none;
+  flex: 1;
+  min-height: 0;
   margin: 0;
-  padding: 0;
+  padding: 0 0 8px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsw-alias-border-l3, rgba(0 0 0 / 12%)) transparent;
 }
 
 .entry {

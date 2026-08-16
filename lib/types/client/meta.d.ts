@@ -6,6 +6,6 @@
  * @module dsh-web-enhanced/src/client/meta
  */
 /** Plugin version rendered in the About tab. */
-export declare const WEB_ENHANCED_VERSION = "0.17.0";
+export declare const WEB_ENHANCED_VERSION = "0.17.1";
 /** Public repository, rendered as the project-home link. */
 export declare const WEB_ENHANCED_REPOSITORY = "https://github.com/banlanzs/dsh-web-enhanced";
