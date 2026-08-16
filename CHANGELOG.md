@@ -6,6 +6,7 @@
 
 - composer 内粘贴 ≥2000 字符的纯文本时，插件在原生 paste 之前拦截：原文存 `PastedTextStore`（localStorage，单条 ≤200K / 最多 12 条），经 `slash/input-insert-reference` 在草稿里插入一个 `@pasted-text` 引用 chip，不再把整段灌进输入框；发送时由注册的 input-trigger codec 把 chip 还原为完整文本交给模型。
 - 新增 `conversation.input.dock` 的 PastedTextDock：chip 点击打开 Modal 预览 / 编辑 / 保存；移除 chip 经 `slash/input-consume-token` 同步删除草稿引用。卸载插件恢复原生粘贴行为。
+- 修复：insert/consume 事件的 span 补齐输入机 CAS 必需的 `draftRev`——缺失时 CAS 失败会退化为纯文本 `[已粘贴文本xxx]`，现在会正确渲染为可点击 chip。
 
 ### 新增：Git 图谱文件可点击查看 diff（含历史提交）
 

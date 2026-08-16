@@ -8,6 +8,7 @@
 import type { ReactNode } from 'react';
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import type { PastedTextStore } from './store.ts';
+import type { PastedTextSpan } from './apply.ts';
 /** One reference occurrence, narrowed to the fields the dock reads. */
 export interface PastedTextOccurrence {
     readonly occurrenceId: number;
@@ -21,11 +22,8 @@ export interface PastedTextOccurrence {
 /** Injected face of the pasted-text dock registration. */
 export interface PastedTextDockInjected {
     readonly store: PastedTextStore;
-    /** Remove one reference occurrence from the draft (a U+FFFC span). */
-    readonly remove: (span: {
-        readonly start: number;
-        readonly end: number;
-    }) => void;
+    /** Remove one reference occurrence from the draft (a U+FFFC span, CAS'd). */
+    readonly remove: (span: PastedTextSpan) => void;
 }
 /** Full composed props of the pasted-text dock. */
 export type PastedTextDockProps = PropsRuntime<'conversation.input.dock'> & InjectFace<PastedTextDockInjected> & PropsLocale<'webEnhanced'>;

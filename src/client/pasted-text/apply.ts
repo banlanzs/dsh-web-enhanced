@@ -23,12 +23,19 @@ interface SessionsFace {
   scope(id: string): unknown
 }
 
+/** One span in the input machine's CAS currency (start/end + draftRev). */
+export interface PastedTextSpan {
+  readonly start: number
+  readonly end: number
+  readonly draftRev: number
+}
+
 /** The conversation input face (see the mention pipeline for the same shape). */
 interface ConversationInputFace {
   input: {
     for(actx: unknown): {
       setDraft(text: string): void
-      state: { getSnapshot(): { readonly draft: string } }
+      state: { getSnapshot(): { readonly draft: string; readonly draftRev: number } }
     }
   }
 }
@@ -59,7 +66,7 @@ interface PastedTextTriggerSource {
 export function removePastedText(
   ctx: ClientContext,
   sessionId: string,
-  span: { readonly start: number; readonly end: number },
+  span: PastedTextSpan,
 ): void {
   const sessions = ctx.sessions as unknown as SessionsFace
   const actx = sessions.scope(sessionId)
@@ -125,8 +132,11 @@ export function applyPastedText(
       ? crypto.randomUUID()
       : `paste-${Date.now()}-${Math.random().toString(36).slice(2)}`
     store.set(id, text)
+    const input = conversation.input.for(actx)
+    const snapshot = input.state.getSnapshot()
     const start = target.selectionStart ?? 0
     const end = target.selectionEnd ?? start
+    const span: PastedTextSpan = { start, end, draftRev: snapshot.draftRev }
     const reference = {
       source: PASTED_TEXT_SOURCE,
       ref: id,
@@ -136,15 +146,14 @@ export function applyPastedText(
     const inserted = (actx as ScopedInputFace).bail(
       actx,
       'slash/input-insert-reference',
-      { reference, span: { start, end } },
+      { reference, span },
     )
     if (inserted === true) return
     // The trigger pipeline was absent or refused the span: fall back to a
     // short marker so the content is not lost and the chip row can still open
     // the stored text.
     try {
-      const input = conversation.input.for(actx)
-      const draft = input.state.getSnapshot().draft
+      const draft = snapshot.draft
       const marker = `[已粘贴文本:${id.slice(0, 8)}] `
       input.setDraft(`${draft.slice(0, start)}${marker}${draft.slice(end)}`)
     } catch {

@@ -13,11 +13,14 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client';
 import type { PastedTextStore } from './store.ts';
 /** Pastes at least this many characters become a chip instead of draft text. */
 export declare const PASTED_TEXT_THRESHOLD = 2000;
-/** Remove one pasted-text occurrence from the addressed session's draft. */
-export declare function removePastedText(ctx: ClientContext, sessionId: string, span: {
+/** One span in the input machine's CAS currency (start/end + draftRev). */
+export interface PastedTextSpan {
     readonly start: number;
     readonly end: number;
-}): void;
+    readonly draftRev: number;
+}
+/** Remove one pasted-text occurrence from the addressed session's draft. */
+export declare function removePastedText(ctx: ClientContext, sessionId: string, span: PastedTextSpan): void;
 /**
  * Register the pasted-text trigger source and the document-level paste
  * interception. Both ride the calling effect, so unloading the plugin restores
