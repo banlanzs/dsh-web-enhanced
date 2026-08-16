@@ -24,12 +24,22 @@ export type MdSpan =
 /** Column alignment of a GFM table, from its delimiter row. */
 export type MdAlign = 'left' | 'center' | 'right' | undefined
 
+/** One list item: its text, optional GFM task state, and nested child blocks. */
+export interface MdListItem {
+  readonly spans: readonly MdSpan[]
+  /** Present when the item opens with a GFM task marker `[ ]` / `[x]`. */
+  readonly task?: boolean
+  readonly checked?: boolean
+  /** Lists nested inside this item, rendered inside its `<li>`. */
+  readonly children: readonly MdBlock[]
+}
+
 /** One block-level Markdown element. */
 export type MdBlock =
   | { readonly type: 'heading'; readonly level: number; readonly spans: readonly MdSpan[] }
   | { readonly type: 'paragraph'; readonly spans: readonly MdSpan[] }
   | { readonly type: 'code'; readonly lang: string; readonly code: string }
-  | { readonly type: 'list'; readonly ordered: boolean; readonly items: readonly (readonly MdSpan[])[] }
+  | { readonly type: 'list'; readonly ordered: boolean; readonly items: readonly MdListItem[] }
   | { readonly type: 'quote'; readonly spans: readonly MdSpan[] }
   | { readonly type: 'rule' }
   | {
@@ -357,6 +367,39 @@ function tableAlignment(line: string): MdAlign[] | undefined {
   return align.length === 0 ? undefined : align
 }
 
+/** One list-marker line: its indentation, kind, and item text. */
+interface ListMarker {
+  readonly indent: number
+  readonly ordered: boolean
+  readonly text: string
+}
+
+/** Leading indentation width of a line, counting tabs as one column. */
+function indentOf(line: string): number {
+  return line.length - line.trimStart().length
+}
+
+/** Read a list marker at the head of a line, or undefined when there is none. */
+function listMarkerOf(line: string): ListMarker | undefined {
+  const found = /^([ \t]*)([-*+]|\d+[.)])\s+(.*)$/u.exec(line)
+  if (found === null) return undefined
+  return {
+    indent: found[1]!.length,
+    ordered: found[2] !== '-' && found[2] !== '*' && found[2] !== '+',
+    text: found[3]!,
+  }
+}
+
+/**
+ * Read a GFM task marker from the head of list-item text.
+ * @returns the task state and the text after the marker.
+ */
+function taskMarkerOf(text: string): { readonly task: boolean; readonly checked: boolean; readonly text: string } {
+  const found = /^\[([ xX])\]\s*(.*)$/u.exec(text)
+  if (found === null) return { task: false, checked: false, text }
+  return { task: true, checked: found[1]!.toLowerCase() === 'x', text: found[2]! }
+}
+
 /**
  * Parse Markdown into blocks.
  * @param source - the document text.
@@ -367,15 +410,47 @@ export function parseMarkdown(source: string): MdBlock[] {
   const lines = source.split(/\r?\n/u)
   let index = 0
 
-  /** Consume a run of list items sharing one marker style. */
-  const takeList = (ordered: boolean): MdBlock => {
-    const items: MdSpan[][] = []
-    const marker = ordered ? /^\s*\d+[.)]\s+(.*)$/u : /^\s*[-*+]\s+(.*)$/u
+  /**
+   * Consume one list block at `baseIndent`, including task state and nested
+   * child lists. Items keep a shared marker style: every unordered marker
+   * belongs to the same list, while an ordered marker starts a new one.
+   */
+  const takeList = (baseIndent: number, ordered: boolean): MdBlock => {
+    const items: MdListItem[] = []
     while (index < lines.length) {
-      const found = marker.exec(lines[index]!)
-      if (found === null) break
-      items.push(parseInline(found[1]!))
+      const marker = listMarkerOf(lines[index]!)
+      if (marker === undefined || marker.indent !== baseIndent || marker.ordered !== ordered) break
       index += 1
+      // Numbered TODO items are often written `1. - [x] text`; the leading
+      // bullet is the item's marker, so consume it instead of rendering it.
+      let text = ordered && /^[-*+]\s+/u.test(marker.text)
+        ? marker.text.replace(/^[-*+]\s+/u, '')
+        : marker.text
+      const task = taskMarkerOf(text)
+      const parts = task.text === '' ? [] : [task.text]
+      const children: MdBlock[] = []
+      while (index < lines.length) {
+        const line = lines[index]!
+        if (line.trim() === '') break
+        const nested = listMarkerOf(line)
+        if (nested !== undefined) {
+          // A marker at or left of this item starts the next item or block;
+          // one further right is a nested list under this item.
+          if (nested.indent <= baseIndent) break
+          children.push(takeList(nested.indent, nested.ordered))
+          continue
+        }
+        // Indented prose continues the item; anything at or left of the item
+        // marker belongs to the next block.
+        if (indentOf(line) <= baseIndent) break
+        parts.push(line.trim())
+        index += 1
+      }
+      items.push({
+        spans: parts.length === 0 ? [] : parseInline(parts.join(' ')),
+        ...(task.task ? { task: true as const, checked: task.checked } : {}),
+        children,
+      })
     }
     return { type: 'list', ordered, items }
   }
@@ -475,12 +550,9 @@ export function parseMarkdown(source: string): MdBlock[] {
       })
       continue
     }
-    if (/^\s*[-*+]\s+/u.test(line)) {
-      blocks.push(takeList(false))
-      continue
-    }
-    if (/^\s*\d+[.)]\s+/u.test(line)) {
-      blocks.push(takeList(true))
+    const list = listMarkerOf(line)
+    if (list !== undefined) {
+      blocks.push(takeList(list.indent, list.ordered))
       continue
     }
     // A paragraph runs to the next blank line or block-level marker.

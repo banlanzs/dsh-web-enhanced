@@ -241,6 +241,37 @@
   color: var(--dsw-alias-label-secondary, rgb(97 102 107));
 }
 
+/* GFM task items: the checkbox replaces the bullet, so unordered task rows
+   drop their native marker and pull back to where it stood. Ordered task rows
+   keep their number in front of the checkbox. */
+.markdown ul[data-ordered='false'] li[data-task='true'] {
+  list-style: none;
+  margin-inline-start: -1.25em;
+}
+
+.task {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.taskBox {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  margin: 3px 0 0;
+  accent-color: var(--dsw-alias-state-business-primary, rgb(65 118 230));
+}
+
+.taskText {
+  min-width: 0;
+}
+
+.markdown li[data-checked='true'] > .task .taskText {
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
+  text-decoration: line-through;
+}
+
 .inlineCode,
 .codeBlock {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

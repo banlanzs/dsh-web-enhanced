@@ -131,6 +131,61 @@ describe('parseMarkdown', () => {
     expect(blocks[5]).toMatchObject({ ordered: true })
   })
 
+  it('reads task checkboxes and keeps nested lists under their parent item', () => {
+    const [list] = parseMarkdown([
+      '- [x] done',
+      '- [ ] open',
+      '  - nested task',
+      '    * deeper',
+    ].join('\n'))
+    expect(list).toEqual({
+      type: 'list',
+      ordered: false,
+      items: [
+        { spans: [{ type: 'text', text: 'done' }], task: true, checked: true, children: [] },
+        {
+          spans: [{ type: 'text', text: 'open' }],
+          task: true,
+          checked: false,
+          children: [{
+            type: 'list',
+            ordered: false,
+            items: [{
+              spans: [{ type: 'text', text: 'nested task' }],
+              children: [{
+                type: 'list',
+                ordered: false,
+                items: [{ spans: [{ type: 'text', text: 'deeper' }], children: [] }],
+              }],
+            }],
+          }],
+        },
+      ],
+    })
+  })
+
+  it('continues an item across indented prose and reads a numbered item’s leading bullet', () => {
+    expect(parseMarkdown('- [x] done\n  still one item')).toEqual([{
+      type: 'list',
+      ordered: false,
+      items: [{ spans: [{ type: 'text', text: 'done still one item' }], task: true, checked: true, children: [] }],
+    }])
+    expect(parseMarkdown('1. - [x] done\n   - detail')).toEqual([{
+      type: 'list',
+      ordered: true,
+      items: [{
+        spans: [{ type: 'text', text: 'done' }],
+        task: true,
+        checked: true,
+        children: [{
+          type: 'list',
+          ordered: false,
+          items: [{ spans: [{ type: 'text', text: 'detail' }], children: [] }],
+        }],
+      }],
+    }])
+  })
+
   it('keeps fenced code verbatim, including an unterminated fence', () => {
     const [fenced] = parseMarkdown('```ts\nconst a = 1\n# not a heading\n```')
     expect(fenced).toEqual({ type: 'code', lang: 'ts', code: 'const a = 1\n# not a heading' })

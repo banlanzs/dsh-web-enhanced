@@ -38,6 +38,15 @@ export type MdSpan = {
 };
 /** Column alignment of a GFM table, from its delimiter row. */
 export type MdAlign = 'left' | 'center' | 'right' | undefined;
+/** One list item: its text, optional GFM task state, and nested child blocks. */
+export interface MdListItem {
+    readonly spans: readonly MdSpan[];
+    /** Present when the item opens with a GFM task marker `[ ]` / `[x]`. */
+    readonly task?: boolean;
+    readonly checked?: boolean;
+    /** Lists nested inside this item, rendered inside its `<li>`. */
+    readonly children: readonly MdBlock[];
+}
 /** One block-level Markdown element. */
 export type MdBlock = {
     readonly type: 'heading';
@@ -53,7 +62,7 @@ export type MdBlock = {
 } | {
     readonly type: 'list';
     readonly ordered: boolean;
-    readonly items: readonly (readonly MdSpan[])[];
+    readonly items: readonly MdListItem[];
 } | {
     readonly type: 'quote';
     readonly spans: readonly MdSpan[];

@@ -222,31 +222,52 @@ function MarkdownTable({ block }: { block: Extract<MdBlock, { type: 'table' }> }
   )
 }
 
+/** Rendered Markdown blocks, shared by documents and nested list children. */
+function Blocks({ blocks }: { blocks: readonly MdBlock[] }) {
+  return blocks.map((block, index) => {
+    switch (block.type) {
+      case 'heading': {
+        const Tag = `h${String(Math.min(block.level, 6))}` as 'h1'
+        return <Tag key={index}><Spans spans={block.spans} /></Tag>
+      }
+      case 'paragraph': return <p key={index}><Spans spans={block.spans} /></p>
+      case 'code': return <pre className={css.codeBlock} key={index} data-lang={block.lang}><code>{block.code}</code></pre>
+      case 'quote': return <blockquote key={index}><Spans spans={block.spans} /></blockquote>
+      case 'rule': return <hr key={index} />
+      case 'table': return <MarkdownTable block={block} key={index} />
+      case 'list': {
+        const Tag = block.ordered ? 'ol' : 'ul'
+        return (
+          <Tag key={index} data-ordered={block.ordered ? 'true' : 'false'}>
+            {block.items.map((item, itemIndex) => (
+              <li
+                key={itemIndex}
+                data-task={item.task === true ? 'true' : undefined}
+                data-checked={item.task === true && item.checked ? 'true' : undefined}
+              >
+                {item.task === true
+                  ? (
+                    <label className={css.task}>
+                      <input className={css.taskBox} type="checkbox" disabled checked={item.checked} />
+                      <span className={css.taskText}><Spans spans={item.spans} /></span>
+                    </label>
+                  )
+                  : <Spans spans={item.spans} />}
+                {item.children.length > 0 && <Blocks blocks={item.children} />}
+              </li>
+            ))}
+          </Tag>
+        )
+      }
+    }
+  })
+}
+
 /** Structural Markdown rendering. */
 function MarkdownView({ source }: { source: string }) {
   return (
     <div className={css.markdown}>
-      {parseMarkdown(source).map((block, index) => {
-        switch (block.type) {
-          case 'heading': {
-            const Tag = `h${String(Math.min(block.level, 6))}` as 'h1'
-            return <Tag key={index}><Spans spans={block.spans} /></Tag>
-          }
-          case 'paragraph': return <p key={index}><Spans spans={block.spans} /></p>
-          case 'code': return <pre className={css.codeBlock} key={index} data-lang={block.lang}><code>{block.code}</code></pre>
-          case 'quote': return <blockquote key={index}><Spans spans={block.spans} /></blockquote>
-          case 'rule': return <hr key={index} />
-          case 'table': return <MarkdownTable block={block} key={index} />
-          case 'list': {
-            const Tag = block.ordered ? 'ol' : 'ul'
-            return (
-              <Tag key={index}>
-                {block.items.map((item, itemIndex) => <li key={itemIndex}><Spans spans={item} /></li>)}
-              </Tag>
-            )
-          }
-        }
-      })}
+      <Blocks blocks={parseMarkdown(source)} />
     </div>
   )
 }
