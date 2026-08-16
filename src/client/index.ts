@@ -41,6 +41,7 @@ import type { MentionDeps, MentionKind, MentionOption } from './mention.ts'
 import { workspaceOfSessionId } from './workspace.ts'
 import { createBrowse, createOverlay, createPanel, createPreview } from './stores.ts'
 import { SkinLayer } from './skins/skin-layer.ts'
+import { applyNavbar } from './navbar/index.ts'
 import { BrowseOverlay } from './browse/BrowseOverlay.tsx'
 import { BranchStrip } from './git/BranchStrip.tsx'
 import { WorkspaceView } from './panel/WorkspaceView.tsx'
@@ -183,6 +184,9 @@ export function apply(ctx: ClientContext): void {
   const browse = createBrowse()
   const panel = createPanel()
   const preview = createPreview()
+  // The conversation node navbar: DOM-anchored, fully retracted on unload.
+  ctx.effect(() => applyNavbar(ctx), 'web-enhanced: navbar')
+
   // The skin layer owns its theme-service override through effects, so the
   // stock palette returns exactly when this plugin unloads.
   const skinLayer = new SkinLayer(ctx)

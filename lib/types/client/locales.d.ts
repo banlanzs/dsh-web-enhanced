@@ -269,6 +269,8 @@ export declare const zh: {
     readonly 'panel.tab.board': "任务看板";
     readonly 'panel.tab.graph': "Git 图谱";
     readonly 'files.collapse': "收起侧边栏";
+    readonly 'navbar.pin': "精选";
+    readonly 'navbar.unpin': "取消精选";
     readonly 'files.expand': "展开侧边栏";
     readonly 'panel.noWorkspace': "当前会话未绑定项目";
     readonly 'files.search': "按文件名搜索";
