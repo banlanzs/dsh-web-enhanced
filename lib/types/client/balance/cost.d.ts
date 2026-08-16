@@ -29,14 +29,15 @@ export declare function sessionCostOf(usage: TokenUsage | undefined, pricing: Mo
  */
 export declare function formatUsdCost(cost: number): string;
 /**
- * Cost of one session's billed tokens under the active DeepSeek CNY rate.
+ * Cost of one session's billed tokens under the active DeepSeek CNY window
+ * (the 2026-08-17 peak/off-peak billing table).
  * @param usage - the session's token-usage projection.
  * @param rate - the active DeepSeek price window (null outside the table).
  * @returns CNY cost, or null when no tokens were billed or no rate exists.
  */
 export declare function sessionCostCnyOf(usage: TokenUsage | undefined, rate: DeepSeekRateWindow | null | undefined): number | null;
 /**
- * Format a CNY estimate: four decimals while it is under one cent, then two.
+ * Format a CNY estimate: four decimals while it is under one cent, then three.
  * @param cost - CNY amount.
  * @returns the prefixed display string.
  */

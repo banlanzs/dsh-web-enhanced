@@ -4,7 +4,8 @@
 
 ### 新增：余额行升级为 DeepSeek 信息行 + OpenCode Go 额度显示（参考 dsh-bottom-info-bar）
 
-- **DeepSeek 余额模式（余额行升级）**：服务商 / 模型显示名走宿主 LLM 目录（与模型选择器同源，adapter 变更自动重建缓存）；余额显示 CNY 主币种并带 hover 明细（赠送 / 充值），低于 ¥20 显示 ⚠；新增北京时间峰谷价时段（V4 Flash/Pro：高峰/空闲价 + 距下次切换倒计时，legacy chat：固定价，未知模型自动隐藏时段组）；本对话花费对 DeepSeek V4/chat 用 CNY 价表、其余模型回退 models.dev USD，新对话固定显示 `¥0.000`。整行每分钟自动刷新，失败保留上次成功快照并标记 stale，不再随网络抖动消失。
+- **DeepSeek 余额模式（余额行升级）**：服务商 / 模型显示名走宿主 LLM 目录（与模型选择器同源，adapter 变更自动重建缓存）；余额按 `/user/balance` 接口返回币种显示（¥ / $ / €，hover 赠送 / 充值明细，低于 20 个单位 ⚠）；北京时间峰谷时段 + 距下次切换倒计时，hover 显示参与计算的 8.17 峰谷价表；**本对话花费：DeepSeek V4/chat 用 8.17 起生效的 CNY 峰谷价表（`inputCacheHit/Miss × 输入四桶 + output × 输出`），其余模型回退 models.dev USD**。整行每分钟自动刷新，失败保留上次成功快照并标记 stale。
+- **修复（本轮反馈）**：余额单位不再硬编码 ¥——按 `balance_infos` 返回的 currency 映射符号；会话花费按用户确认使用 8.17 新价表计算（本轮跨零点混合计费不拆分，直接按当前档位价估算）。
 - **OpenCode Go 订阅模式**：模型渠道为 `opencode-go` / `opencode` 时，同一行互斥切换为 `OpenCode Go · 模型` + `5h / 周 / 月` 三窗口剩余百分比 + 最紧窗口距重置倒计时。数据来自 `GET https://opencode.ai/zen/go/v1/usage`（防御性解析：status 非 ok / 缺 percent 跳过；失败保留旧快照）；Key 依次读 DSH credentials `OPENCODE_GO_API_KEY` 与环境、再回退 `~/.local/share/opencode/auth.json`（`opencode-go` → `opencode`）。任一窗口剩余 ≤20% 琥珀 ⚠，未配置 key 显示配置引导。**不含 ChatGPT/Codex**——额度在 opencode CLI 消耗，与 DSH 对话记账独立展示。
 - 新增 Remote 3 个：`modelRouteDescribe` / `deepseekRateGet` / `opencodeGoUsageGet`（方法 33 → 36）；`BalanceClient` 增加 last-good 失败合并；新增 config：`opencodeGoUsageUrl` / `opencodeGoCacheTtlMs` / `opencodeGoAuthFile`。
 

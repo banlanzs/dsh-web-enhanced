@@ -3,11 +3,11 @@
  *
  * Two modes, mutually exclusive by model route:
  * - DeepSeek balance mode (the default for an applicable route): provider and
- *   model display names, the CNY balance with grant/top-up detail, a low
- *   threshold warning, the Beijing peak/off-peak price period with a
- *   countdown, and the current conversation's estimated cost (CNY rates for
- *   DeepSeek models, models.dev USD elsewhere). Failures keep the last good
- *   snapshot and mark it stale instead of blinking the row away.
+ *   model display names, the account balance in the currency the endpoint
+ *   reports (CNY/USD/EUR), grant/top-up detail, a low threshold warning, the
+ *   Beijing peak/off-peak price period with a countdown, and the current
+ *   conversation's estimated cost at models.dev USD prices. Failures keep the
+ *   last good snapshot and mark it stale instead of blinking the row away.
  * - OpenCode Go subscription mode for the `opencode-go` / `opencode` routes:
  *   three quota windows (5h / weekly / monthly) with remaining percentages
  *   and the tightest reset countdown, read from the OpenCode Go usage API.
@@ -24,7 +24,11 @@ import type { BalanceInfo, BalanceView, WebEnhancedProps } from '../contract.ts'
 export type BalanceLineProps = WebEnhancedProps<'conversation.composer.dock'>;
 /** Providers whose billing line is the OpenCode Go subscription. */
 export declare function isOpencodeGoProvider(provider: string | undefined): boolean;
-/** The CNY balance line if present, preferring the account's main currency. */
+/** The balance line shown, preferring the account's CNY line when present. */
 export declare function balanceInfoOf(view: BalanceView | null): BalanceInfo | undefined;
+/** Currency symbol or prefix used to spell one balance currency. */
+export declare function currencySymbolOf(currency: string): string;
+/** One balance amount, prefixed with the symbol the API currency names. */
+export declare function formatBalanceAmount(currency: string, value: number): string;
 /** The balance line: one muted row under the composer. */
 export declare function BalanceLine({ remote, modelRoute, sessionId, useProjection, t }: BalanceLineProps): import("react").JSX.Element | null;

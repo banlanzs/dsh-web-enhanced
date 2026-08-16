@@ -379,12 +379,12 @@ export declare const zh: {
     readonly 'balance.title': "余额";
     readonly 'balance.refresh': "刷新";
     readonly 'balance.error': "余额不可用：{message}";
-    readonly 'balance.cost': "本会话约 {cost}";
+    readonly 'balance.cost': "本对话 {cost}";
     readonly 'balance.costCny': "本对话 ¥{cost}";
     readonly 'balance.noKey': "未配置 DEEPSEEK_API_KEY → 设置→模型 填写";
-    readonly 'balance.low': "余额低于 ¥{threshold}";
+    readonly 'balance.low': "余额低于 {threshold}";
     readonly 'balance.stale': "⚠ 刷新失败，显示上次快照";
-    readonly 'balance.balanceTitle': "余额 ¥{total} · 赠送 ¥{granted} · 充值 ¥{toppedUp}";
+    readonly 'balance.balanceTitle': "余额 {total} · 赠送 {granted} · 充值 {toppedUp}";
     readonly 'balance.providerTitle': "服务商：{provider} · 模型：{model}";
     readonly 'balance.peak': "高峰价";
     readonly 'balance.offpeak': "空闲价";

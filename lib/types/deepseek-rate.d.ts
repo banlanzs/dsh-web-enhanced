@@ -1,10 +1,10 @@
 /**
- * DeepSeek peak/off-peak billing clock and the rate table the balance line
- * annotates. DeepSeek's official billing has two peak windows per Beijing
- * day (09:00–12:00 and 14:00–18:00); the V4 Flash/Pro catalog models publish
- * peak and off-peak prices, while the legacy chat model is flat. Models
- * outside the table are `unknown` so the UI hides the period group rather
- * than guessing.
+ * DeepSeek peak/off-peak billing clock and the 2026-08-17 price table the
+ * balance line uses for its cost estimate. DeepSeek's official billing has
+ * two peak windows per Beijing day (09:00–12:00 and 14:00–18:00); the V4
+ * Flash/Pro catalog models publish peak and off-peak prices, while the legacy
+ * chat model is flat. Models outside the table are `unknown` so the UI hides
+ * the period group and falls back to models.dev for the cost.
  * @module dsh-web-enhanced/src/deepseek-rate
  */
 import type { DeepSeekRateView, DeepSeekRateWindow } from './types.ts';
@@ -15,7 +15,7 @@ export interface DeepSeekRateEntry {
     readonly offpeak?: DeepSeekRateWindow;
     readonly price?: DeepSeekRateWindow;
 }
-/** DeepSeek official rates used by the display (reference project table). */
+/** DeepSeek official 2026-08-17 peak-valley billing table. */
 export declare const DEEPSEEK_RATES: Readonly<Record<string, DeepSeekRateEntry>>;
 /** Beijing wall-clock minute of one instant. */
 export declare function beijingMinutes(nowMs: number): number;

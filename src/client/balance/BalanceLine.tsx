@@ -3,11 +3,11 @@
  *
  * Two modes, mutually exclusive by model route:
  * - DeepSeek balance mode (the default for an applicable route): provider and
- *   model display names, the CNY balance with grant/top-up detail, a low
- *   threshold warning, the Beijing peak/off-peak price period with a
- *   countdown, and the current conversation's estimated cost (CNY rates for
- *   DeepSeek models, models.dev USD elsewhere). Failures keep the last good
- *   snapshot and mark it stale instead of blinking the row away.
+ *   model display names, the account balance in the currency the endpoint
+ *   reports (CNY/USD/EUR), grant/top-up detail, a low threshold warning, the
+ *   Beijing peak/off-peak price period with a countdown, and the current
+ *   conversation's estimated cost at models.dev USD prices. Failures keep the
+ *   last good snapshot and mark it stale instead of blinking the row away.
  * - OpenCode Go subscription mode for the `opencode-go` / `opencode` routes:
  *   three quota windows (5h / weekly / monthly) with remaining percentages
  *   and the tightest reset countdown, read from the OpenCode Go usage API.
@@ -40,10 +40,23 @@ export function isOpencodeGoProvider(provider: string | undefined): boolean {
   return provider === 'opencode-go' || provider === 'opencode'
 }
 
-/** The CNY balance line if present, preferring the account's main currency. */
+/** The balance line shown, preferring the account's CNY line when present. */
 export function balanceInfoOf(view: BalanceView | null): BalanceInfo | undefined {
   if (view === null) return undefined
   return view.infos.find(info => info.currency === 'CNY') ?? view.infos[0]
+}
+
+/** Currency symbol or prefix used to spell one balance currency. */
+export function currencySymbolOf(currency: string): string {
+  if (currency === 'CNY') return '¥'
+  if (currency === 'USD') return '$'
+  if (currency === 'EUR') return '€'
+  return `${currency} `
+}
+
+/** One balance amount, prefixed with the symbol the API currency names. */
+export function formatBalanceAmount(currency: string, value: number): string {
+  return `${currencySymbolOf(currency)}${value.toFixed(2)}`
 }
 
 /** Unwrap this plugin's success-or-error union into null on failure. */
@@ -295,12 +308,16 @@ function DeepSeekLine({
   const stale = view.error !== undefined && info !== undefined
   const lowThreshold = 20
   const prices: ModelPricingView | undefined = pricing?.pricing
+  // The 2026-08-17 DeepSeek peak/off-peak table wins for its models; models
+  // outside the table fall back to the models.dev USD estimate.
   const cnyRate = rate?.mode === 'unknown' ? null : rate?.prices ?? null
   const cnyCost = sessionCostCnyOf(usage, cnyRate)
   const usdCost = sessionCostOf(usage, prices)
   const costText = cnyRate !== null
-    ? (cnyCost === null ? t('balance.costCny', { cost: '0.000' }) : t('balance.costCny', { cost: formatCnyCost(cnyCost).slice(1) }))
-    : prices !== undefined && usdCost !== null
+    ? t('balance.costCny', {
+      cost: cnyCost === null ? '0.000' : formatCnyCost(cnyCost).slice(1),
+    })
+    : usdCost !== null
       ? t('balance.cost', { cost: formatUsdCost(usdCost) })
       : null
 
@@ -317,16 +334,19 @@ function DeepSeekLine({
   } else if (info !== undefined) {
     const low = info.totalBalance < lowThreshold
     const title = t('balance.balanceTitle', {
-      total: info.totalBalance.toFixed(2),
-      granted: info.grantedBalance.toFixed(2),
-      toppedUp: info.toppedUpBalance.toFixed(2),
+      total: formatBalanceAmount(info.currency, info.totalBalance),
+      granted: formatBalanceAmount(info.currency, info.grantedBalance),
+      toppedUp: formatBalanceAmount(info.currency, info.toppedUpBalance),
     })
     groups.push(
       <span key="bal" className={css.group} title={title}>
         {t('balance.title')}{' '}
-        <b className={css.num}>{`¥${info.totalBalance.toFixed(2)}`}</b>
+        <b className={css.num}>{formatBalanceAmount(info.currency, info.totalBalance)}</b>
         {low
-          ? <span className={css.warn} title={t('balance.low', { threshold: String(lowThreshold) })}> ⚠</span>
+          ? <span
+              className={css.warn}
+              title={t('balance.low', { threshold: formatBalanceAmount(info.currency, lowThreshold) })}
+            > ⚠</span>
           : null}
       </span>,
     )
@@ -338,6 +358,8 @@ function DeepSeekLine({
   if (rate !== null && rate.mode === 'peak-valley' && rate.prices !== null) {
     const peakNow = rate.period === 'peak'
     const periodLabel = peakNow ? t('balance.peak') : t('balance.offpeak')
+    // Prices are the 2026-08-17 peak/off-peak table, the same numbers the
+    // cost figure uses.
     const title = t('balance.priceTitle', {
       period: periodLabel,
       miss: rate.prices.inputCacheMiss.toFixed(2),

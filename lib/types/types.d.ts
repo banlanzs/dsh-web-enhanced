@@ -437,7 +437,7 @@ export interface ModelRouteDescribeView {
 export type ModelRouteDescribeResult = ModelRouteDescribeView | {
     readonly error: ApiError;
 };
-/** One DeepSeek price window, CNY per one million tokens. */
+/** One DeepSeek price window, CNY per one million tokens (2026-08-17 billing). */
 export interface DeepSeekRateWindow {
     readonly inputCacheHit: number;
     readonly inputCacheMiss: number;
