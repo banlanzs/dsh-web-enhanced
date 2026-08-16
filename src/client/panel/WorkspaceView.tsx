@@ -134,7 +134,13 @@ export function WorkspaceView(props: WorkspaceViewProps) {
         )}
         {tab === 'graph' && (
           <div className={css.module}>
-            <GraphPanel workspaceId={String(workspaceId)} remote={props.remote} t={t} />
+            <GraphPanel
+              workspaceId={String(workspaceId)}
+              remote={props.remote}
+              t={t}
+              openTab={props.openTab}
+              selectTab={props.selectTab}
+            />
           </div>
         )}
       </div>

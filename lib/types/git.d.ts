@@ -67,6 +67,15 @@ export declare class GitClient {
      */
     commit(hash: string): Promise<GitCommitDetailView>;
     /**
+     * Unified diff of one file as one commit changed it, against the commit's
+     * first parent (the same side {@link commit} counts). Binary files still
+     * yield git's binary diff marker, which the preview renders as text.
+     * @param hash - commit to diff against its first parent.
+     * @param path - repository-relative path the commit touched.
+     * @returns the diff text.
+     */
+    commitDiff(hash: string, path: string): Promise<string>;
+    /**
      * The uncommitted state of the work tree, as the graph's top row shows it.
      *
      * Three reads, because git computes three different diffs and there is no

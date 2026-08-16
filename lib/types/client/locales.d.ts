@@ -44,6 +44,15 @@ export declare const zh: {
     readonly 'board.collapse': "折叠任务详情";
     readonly 'board.error': "操作失败：{message}";
     readonly 'board.loading': "加载中…";
+    readonly 'pastedText.label': "已粘贴文本";
+    readonly 'pastedText.chipHint': "点击查看并编辑这段已粘贴的文本";
+    readonly 'pastedText.title': "已粘贴文本";
+    readonly 'pastedText.description': "这段长文本已从输入框挂载为附件；编辑后保存，发送时会以完整内容发给模型。";
+    readonly 'pastedText.close': "关闭";
+    readonly 'pastedText.cancel': "取消";
+    readonly 'pastedText.save': "保存";
+    readonly 'pastedText.remove': "移除该粘贴文本";
+    readonly 'pastedText.removeChip': "移除";
     readonly 'graph.entry': "Git 图谱";
     readonly 'graph.title': "Git 图谱";
     readonly 'graph.close': "关闭";
@@ -59,6 +68,7 @@ export declare const zh: {
     readonly 'graph.detail.author': "作者";
     readonly 'graph.detail.date': "时间";
     readonly 'graph.detail.files': "变更文件（{count}）";
+    readonly 'graph.diffHint': "点击查看该文件的 diff";
     readonly 'graph.working.title': "未提交的改动";
     readonly 'graph.working.counts': "暂存 {staged} · 未暂存 {unstaged} · 未跟踪 {untracked}";
     readonly 'graph.working.staged': "暂存";

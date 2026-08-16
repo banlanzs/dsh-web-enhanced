@@ -187,6 +187,11 @@ export type GitCommitResult = {
 } | {
     readonly error: ApiError;
 };
+export type GitCommitDiffResult = {
+    readonly text: string;
+} | {
+    readonly error: ApiError;
+};
 export type GitWorkingResult = {
     readonly working: GitWorkingView;
 } | {
@@ -233,6 +238,12 @@ export interface GitLogRequest {
 export interface GitCommitRequest {
     readonly workspaceId: string;
     readonly hash: string;
+}
+/** Unified diff of one file as changed by one commit. */
+export interface GitCommitDiffRequest {
+    readonly workspaceId: string;
+    readonly hash: string;
+    readonly path: string;
 }
 export interface GitWorkingRequest {
     readonly workspaceId: string;

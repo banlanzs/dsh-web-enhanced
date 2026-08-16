@@ -53,6 +53,10 @@ import { SettingsSection } from './settings/SettingsSection.tsx'
 import { ModelCapabilitiesSection } from './model-capabilities/ModelCapabilities.tsx'
 import type { ModelCapabilitiesInjected } from './model-capabilities/ModelCapabilities.tsx'
 import { CapabilitiesStore, refreshIfLoaded } from './model-capabilities/store.ts'
+import { PastedTextDock } from './pasted-text/PastedTextDock.tsx'
+import type { PastedTextDockInjected } from './pasted-text/PastedTextDock.tsx'
+import { applyPastedText, removePastedText } from './pasted-text/apply.ts'
+import { PastedTextStore } from './pasted-text/store.ts'
 import { BalanceLine } from './balance/BalanceLine.tsx'
 
 /** Locale namespace owned by this plugin. */
@@ -231,6 +235,24 @@ export function apply(ctx: ClientContext): void {
     ]
     return () => { for (const dispose of disposers) dispose() }
   }, 'web-enhanced: model capabilities invalidations')
+
+  // Long plain-text pastes become reference chips ("已粘贴文本") inside the
+  // composer, editable through a dock row above the card.
+  const pastedText = new PastedTextStore()
+  ctx.effect(
+    () => applyPastedText(ctx, pastedText, () => ctx.locale.bind(NS)('pastedText.label')),
+    'web-enhanced: pasted text',
+  )
+  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
+    name: 'conversation.input.dock',
+    id: 'web-enhanced-pasted-text',
+    order: 10,
+    locale: NS,
+    inject: (sessionId: string): PastedTextDockInjected => ({
+      store: pastedText,
+      remove: (span) => { removePastedText(ctx, String(sessionId), span) },
+    }),
+  }, PastedTextDock))
 
   const overlay = createOverlay()
   const browse = createBrowse()

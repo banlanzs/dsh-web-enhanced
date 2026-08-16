@@ -39,7 +39,8 @@ import type {
   FsOfficePreviewRequest,
   FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult,
   FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest,
-  GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
+  GitCheckoutResult, GitCommitRequest, GitCommitResult, GitCommitDiffRequest, GitCommitDiffResult,
+  GitDiffRequest, GitDiffResult,
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
   ModelRetryConfigView, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
@@ -739,6 +740,14 @@ export class WebEnhancedGateway extends TypertRemoteService {
   @Remote('gitCommit')
   async gitCommit(request: GitCommitRequest): Promise<GitCommitResult> {
     return this.withGit(request.workspaceId, async client => ({ commit: await client.commit(request.hash) }))
+  }
+
+  /** Unified diff of one file as one commit changed it. */
+  @Remote('gitCommitDiff')
+  async gitCommitDiff(request: GitCommitDiffRequest): Promise<GitCommitDiffResult> {
+    return this.withGit(request.workspaceId, async client => ({
+      text: await client.commitDiff(request.hash, request.path),
+    }))
   }
 
   /**

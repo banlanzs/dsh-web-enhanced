@@ -1,0 +1,111 @@
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--dsh-chat-content-width);
+  margin: 0 auto;
+  padding: 4px calc(var(--dsh-composer-side-clearance) + 16px) 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 9%));
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-card, rgba(255 255 255 / 60%));
+  overflow: hidden;
+  max-width: 420px;
+}
+
+.open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 8px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.open:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}
+
+.icon {
+  flex: none;
+  font-size: 13px;
+}
+
+.label {
+  flex: none;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+}
+
+.preview {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-tertiary, rgb(143 148 155));
+}
+
+.remove {
+  flex: none;
+  border: none;
+  border-left: 1px solid var(--dsw-alias-border-l1, rgba(0 0 0 / 4%));
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, rgb(143 148 155));
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 7px;
+}
+
+.remove:hover {
+  color: var(--dsw-alias-state-danger, rgb(214 74 74));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}
+
+.dialog {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.dialogContent {
+  padding: 0;
+}
+
+.editor {
+  box-sizing: border-box;
+  width: 100%;
+  height: 50vh;
+  min-height: 280px;
+  max-height: 560px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 9%));
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base, rgb(255 255 255));
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px;
+  resize: vertical;
+}
+
+.editor:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
+}
+
+.danger {
+  color: var(--dsw-alias-state-danger, rgb(214 74 74));
+}

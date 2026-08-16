@@ -16,7 +16,8 @@ import type {
   FsOfficePreviewRequest,
   FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult,
   FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest,
-  GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
+  GitCheckoutResult, GitCommitDiffRequest, GitCommitDiffResult, GitCommitRequest, GitCommitResult,
+  GitDiffRequest, GitDiffResult,
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
   ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
@@ -66,6 +67,7 @@ export interface WebEnhancedRemote {
   gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>
   gitLog(request: GitLogRequest): Promise<GitLogResult>
   gitCommit(request: GitCommitRequest): Promise<GitCommitResult>
+  gitCommitDiff(request: GitCommitDiffRequest): Promise<GitCommitDiffResult>
   gitWorking(request: GitWorkingRequest): Promise<GitWorkingResult>
   gitCheckout(request: GitCheckoutRequest): Promise<GitCheckoutResult>
   gitStatus(request: GitStatusRequest): Promise<GitStatusResult>
@@ -95,7 +97,8 @@ export type {
   FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest,
   FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchView, GitBranchesRequest,
   GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitDetailView, GitCommitFileView,
-  GitCommitRequest, GitCommitResult, GitCommitView, GitDiffRequest,
+  GitCommitRequest, GitCommitResult, GitCommitView, GitCommitDiffRequest, GitCommitDiffResult,
+  GitDiffRequest,
   GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry,
   GitStatusRequest, GitStatusResult, GitWorkingFileView, GitWorkingRequest, GitWorkingResult,
   GitWorkingState, GitWorkingView,

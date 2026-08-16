@@ -144,6 +144,16 @@ describe('GitClient', () => {
     expect(detail.parents).toEqual([])
   })
 
+  it('commitDiff shows one file against the first parent and validates the path', async () => {
+    const { fake, git } = client()
+    fake.enqueue({ stdout: 'diff --git a/src/a.ts b/src/a.ts\n' })
+    await expect(git.commitDiff('abc123', 'src/a.ts')).resolves.toBe('diff --git a/src/a.ts b/src/a.ts\n')
+    expect(fake.calls[0]!.argv.join(' ')).toContain('--first-parent')
+    expect(fake.calls[0]!.argv).toContain('--')
+    await expect(git.commitDiff('abc123', '../outside.ts')).rejects.toThrow('must not contain')
+    await expect(git.commitDiff('-x', 'a.ts')).rejects.toThrow("must not start with '-'")
+  })
+
   it('working reads three diffs, caps the list, and only counts retained untracked files', async () => {
     const { fake, git } = client()
     fake.enqueue({ stdout: 'abc\n' })

@@ -16,8 +16,9 @@ import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {
   GitBranchView, GitCommitDetailView, GitCommitView, GitWorkingFileView, GitWorkingView,
-  WebEnhancedProps, WebEnhancedRemote,
+  PanelTab, PreviewTab, WebEnhancedProps, WebEnhancedRemote,
 } from '../contract.ts'
+import { baseNameOf } from '../preview.ts'
 import { OverlayShell } from '../shell/OverlayShell.tsx'
 import { workspaceOfSession } from '../workspace.ts'
 import { laneColor, layoutLanes, placeWorking, shortHash } from './lanes.ts'
@@ -56,10 +57,14 @@ export interface GraphPanelProps {
   readonly workspaceId: string | undefined
   readonly remote: WebEnhancedRemote
   readonly t: WebEnhancedProps<'shell.overlay'>['t']
+  /** Open one diff as an explorer preview tab. */
+  readonly openTab: (tab: PreviewTab) => void
+  /** Switch to the explorer so the opened diff is visible. */
+  readonly selectTab: (tab: PanelTab) => void
 }
 
 /** The chrome-free graph: filter, refresh, and the laid-out commit list. */
-export function GraphPanel({ workspaceId, remote, t }: GraphPanelProps) {
+export function GraphPanel({ workspaceId, remote, t, openTab, selectTab }: GraphPanelProps) {
   const [commits, setCommits] = useState<Commits>({ phase: 'loading' })
   const [working, setWorking] = useState<GitWorkingView | null>(null)
   const [workingOpen, setWorkingOpen] = useState(false)
@@ -141,6 +146,8 @@ export function GraphPanel({ workspaceId, remote, t }: GraphPanelProps) {
                         workingOpen={workingOpen}
                         workspaceId={workspaceId}
                         remote={remote}
+                        openTab={openTab}
+                        selectTab={selectTab}
                         onToggle={hash => { setExpanded(current => (current === hash ? null : hash)) }}
                         onToggleWorking={() => { setWorkingOpen(value => !value) }}
                         t={t}
@@ -154,7 +161,7 @@ export function GraphPanel({ workspaceId, remote, t }: GraphPanelProps) {
 
 /** The git graph overlay: the same panel under the full-frame chrome. */
 export function GraphOverlay({
-  useOverlay, useSessions, useWorkspaces, remote, closeOverlay, t,
+  useOverlay, useSessions, useWorkspaces, remote, closeOverlay, t, openTab, selectTab,
 }: GraphOverlayProps) {
   const open = useOverlay(state => state.open === 'graph')
   const sessions = useSessions(state => state)
@@ -163,7 +170,7 @@ export function GraphOverlay({
   if (!open) return null
   return (
     <OverlayShell title={t('graph.title')} closeLabel={t('graph.close')} onClose={closeOverlay} testId="graph-overlay" fill>
-      <GraphPanel workspaceId={workspaceId === undefined ? undefined : String(workspaceId)} remote={remote} t={t} />
+      <GraphPanel workspaceId={workspaceId === undefined ? undefined : String(workspaceId)} remote={remote} t={t} openTab={openTab} selectTab={selectTab} />
     </OverlayShell>
   )
 }
@@ -178,6 +185,8 @@ interface GraphBodyProps {
   readonly workingOpen: boolean
   readonly workspaceId: string
   readonly remote: WebEnhancedRemote
+  readonly openTab: (tab: PreviewTab) => void
+  readonly selectTab: (tab: PanelTab) => void
   readonly onToggle: (hash: string) => void
   readonly onToggleWorking: () => void
   readonly t: GraphPanelProps['t']
@@ -190,7 +199,8 @@ function hasChanges(working: GitWorkingView | null): working is GitWorkingView {
 
 /** The laid-out commit list; the lane math itself lives in `./lanes.ts`. */
 function GraphBody({
-  commits, working, empty, expanded, workingOpen, workspaceId, remote, onToggle, onToggleWorking, t,
+  commits, working, empty, expanded, workingOpen, workspaceId, remote, openTab, selectTab,
+  onToggle, onToggleWorking, t,
 }: GraphBodyProps) {
   // Lane layout is O(commits x lanes); memoized so expanding a commit or
   // toggling the working row re-renders rows without re-laying the graph.
@@ -207,6 +217,10 @@ function GraphBody({
           railWidth={railWidth}
           open={workingOpen}
           onToggle={onToggleWorking}
+          workspaceId={workspaceId}
+          remote={remote}
+          openTab={openTab}
+          selectTab={selectTab}
           t={t}
         />
       )
@@ -277,7 +291,14 @@ function GraphBody({
               </time>
             </button>
             {expanded === row.commit.hash && (
-              <CommitDetail hash={row.commit.hash} workspaceId={workspaceId} remote={remote} t={t} />
+              <CommitDetail
+                hash={row.commit.hash}
+                workspaceId={workspaceId}
+                remote={remote}
+                openTab={openTab}
+                selectTab={selectTab}
+                t={t}
+              />
             )}
           </li>
         </Fragment>
@@ -294,6 +315,10 @@ interface WorkingRowProps {
   readonly railWidth: number
   readonly open: boolean
   readonly onToggle: () => void
+  readonly workspaceId: string
+  readonly remote: WebEnhancedRemote
+  readonly openTab: (tab: PreviewTab) => void
+  readonly selectTab: (tab: PanelTab) => void
   readonly t: GraphPanelProps['t']
 }
 
@@ -302,7 +327,9 @@ interface WorkingRowProps {
  * a dashed stub. Dashed and hollow because it is not a commit — nothing in the
  * repository records it, and it disappears the moment it is committed.
  */
-function WorkingRow({ working, lane, through, railWidth, open, onToggle, t }: WorkingRowProps) {
+function WorkingRow({
+  working, lane, through, railWidth, open, onToggle, workspaceId, remote, openTab, selectTab, t,
+}: WorkingRowProps) {
   const dotX = (lane + 1) * LANE_STEP
   return (
     <li className={css.entry}>
@@ -351,13 +378,55 @@ function WorkingRow({ working, lane, through, railWidth, open, onToggle, t }: Wo
           })}
         </span>
       </button>
-      {open && <WorkingDetail working={working} t={t} />}
+      {open && (
+        <WorkingDetail
+          working={working}
+          workspaceId={workspaceId}
+          remote={remote}
+          openTab={openTab}
+          selectTab={selectTab}
+          t={t}
+        />
+      )}
     </li>
   )
 }
 
+/** Open a working-tree diff as an explorer preview tab. */
+async function openWorkingDiff(
+  workspaceId: string,
+  file: GitWorkingFileView,
+  remote: WebEnhancedRemote,
+  openTab: (tab: PreviewTab) => void,
+  selectTab: (tab: PanelTab) => void,
+): Promise<void> {
+  const result = await remote.gitDiff({ workspaceId, path: file.path, staged: file.state === 'staged' })
+  const text = 'error' in result ? '' : result.text
+  const error = 'error' in result ? result.error.message : undefined
+  openTab({
+    path: `${file.path}.diff`,
+    name: `${baseNameOf(file.path)} (diff)`,
+    kind: 'diff',
+    mode: 'view',
+    content: text,
+    truncated: false,
+    size: text.length,
+    ...(error === undefined ? {} : { error }),
+  })
+  selectTab('explorer')
+}
+
 /** The expanded file list of the uncommitted row. */
-function WorkingDetail({ working, t }: { readonly working: GitWorkingView; readonly t: GraphPanelProps['t'] }) {
+function WorkingDetail({
+  working, workspaceId, remote, openTab, selectTab, t,
+}: {
+  readonly working: GitWorkingView
+  readonly workspaceId: string
+  readonly remote: WebEnhancedRemote
+  readonly openTab: (tab: PreviewTab) => void
+  readonly selectTab: (tab: PanelTab) => void
+  readonly t: GraphPanelProps['t']
+}) {
   return (
     <div className={css.detail} data-testid="graph-working-detail">
       {working.truncated && (
@@ -368,19 +437,19 @@ function WorkingDetail({ working, t }: { readonly working: GitWorkingView; reado
       <ul className={css.files}>
         {working.files.map(file => (
           <li className={css.file} key={`${file.state}:${file.path}`}>
-            <span className={css.stateTag} data-state={file.state}>{stateLabel(file, t)}</span>
-            <span className={css.filePath} title={file.path}>{file.path}</span>
-            <span
-              className={css.added}
-              title={file.added === null ? t('graph.working.unknown') : undefined}
+            <button
+              type="button"
+              className={css.fileButton}
+              title={`${file.path} — ${t('graph.diffHint')}`}
+              onClick={() => { void openWorkingDiff(workspaceId, file, remote, openTab, selectTab) }}
             >
-              {file.added === null ? '—' : `+${String(file.added)}`}
-            </span>
-            {/* An untracked file has no old side at all, so no removal count is
-                shown rather than a zero that would claim git measured one. */}
-            <span className={css.removed}>
-              {file.removed === null ? '—' : `-${String(file.removed)}`}
-            </span>
+              <span className={css.stateTag} data-state={file.state}>{stateLabel(file, t)}</span>
+              <span className={css.filePath}>{file.path}</span>
+              <span className={css.added} title={file.added === null ? t('graph.working.unknown') : undefined}>
+                {file.added === null ? '—' : `+${String(file.added)}`}
+              </span>
+              <span className={css.removed}>{file.removed === null ? '—' : `-${String(file.removed)}`}</span>
+            </button>
           </li>
         ))}
       </ul>
@@ -395,10 +464,12 @@ function stateLabel(file: GitWorkingFileView, t: GraphPanelProps['t']): string {
 }
 
 /** One expanded commit: identity, message body, and the files it touched. */
-function CommitDetail({ hash, workspaceId, remote, t }: {
+function CommitDetail({ hash, workspaceId, remote, openTab, selectTab, t }: {
   readonly hash: string
   readonly workspaceId: string
   readonly remote: WebEnhancedRemote
+  readonly openTab: (tab: PreviewTab) => void
+  readonly selectTab: (tab: PanelTab) => void
   readonly t: GraphPanelProps['t']
 }) {
   const [detail, setDetail] = useState<Detail>({ phase: 'loading' })
@@ -439,10 +510,34 @@ function CommitDetail({ hash, workspaceId, remote, t }: {
         <ul className={css.files}>
           {commit.files.map(file => (
             <li className={css.file} key={file.path}>
-              <span className={css.filePath} title={file.path}>{file.path}</span>
-              {/* A binary file has no line counts; git says `-` and so does this. */}
-              <span className={css.added}>{file.added === null ? '—' : `+${String(file.added)}`}</span>
-              <span className={css.removed}>{file.removed === null ? '—' : `-${String(file.removed)}`}</span>
+              <button
+                type="button"
+                className={css.fileButton}
+                title={`${file.path} — ${t('graph.diffHint')}`}
+                onClick={() => {
+                  void (async () => {
+                    const result = await remote.gitCommitDiff({ workspaceId, hash, path: file.path })
+                    const text = 'error' in result ? '' : result.text
+                    const error = 'error' in result ? result.error.message : undefined
+                    openTab({
+                      path: `${hash.slice(0, 8)}-${file.path}.diff`,
+                      name: `${baseNameOf(file.path)} (diff)`,
+                      kind: 'diff',
+                      mode: 'view',
+                      content: text,
+                      truncated: false,
+                      size: text.length,
+                      ...(error === undefined ? {} : { error }),
+                    })
+                    selectTab('explorer')
+                  })()
+                }}
+              >
+                <span className={css.filePath}>{file.path}</span>
+                {/* A binary file has no line counts; git says `-` and so does this. */}
+                <span className={css.added}>{file.added === null ? '—' : `+${String(file.added)}`}</span>
+                <span className={css.removed}>{file.removed === null ? '—' : `-${String(file.removed)}`}</span>
+              </button>
             </li>
           ))}
         </ul>

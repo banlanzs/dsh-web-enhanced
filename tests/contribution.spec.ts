@@ -194,6 +194,7 @@ const payloads: Record<string, unknown[]> = {
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
   gitCommit: [{ commit: commitDetail }, errorPayload],
+  gitCommitDiff: [{ text: 'diff --git a/a.ts b/a.ts' }, errorPayload],
   gitWorking: [{
     working: {
       head: 'abc',
@@ -293,10 +294,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 36 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 37 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(36)
+    expect(methods).toHaveLength(37)
   })
 
   it('every result schema accepts its success and error payloads', () => {

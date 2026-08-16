@@ -169,6 +169,7 @@ export interface GitStatusEntry {
 export type GitBranchesResult = { readonly branches: readonly GitBranchView[] } | { readonly error: ApiError }
 export type GitLogResult = { readonly commits: readonly GitCommitView[] } | { readonly error: ApiError }
 export type GitCommitResult = { readonly commit: GitCommitDetailView } | { readonly error: ApiError }
+export type GitCommitDiffResult = { readonly text: string } | { readonly error: ApiError }
 export type GitWorkingResult = { readonly working: GitWorkingView } | { readonly error: ApiError }
 export type GitCheckoutResult = { readonly ok: boolean; readonly message?: string } | { readonly error: ApiError }
 export type GitStatusResult = { readonly entries: readonly GitStatusEntry[] } | { readonly error: ApiError }
@@ -188,6 +189,12 @@ export interface GitLogRequest {
   readonly branch?: string
 }
 export interface GitCommitRequest { readonly workspaceId: string; readonly hash: string }
+/** Unified diff of one file as changed by one commit. */
+export interface GitCommitDiffRequest {
+  readonly workspaceId: string
+  readonly hash: string
+  readonly path: string
+}
 export interface GitWorkingRequest { readonly workspaceId: string }
 export interface GitCheckoutRequest { readonly workspaceId: string; readonly branch: string }
 export interface GitDiffRequest { readonly workspaceId: string; readonly path?: string; readonly staged?: boolean }

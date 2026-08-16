@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### 新增：长文本粘贴自动挂载为“已粘贴文本”
+
+- composer 内粘贴 ≥2000 字符的纯文本时，插件在原生 paste 之前拦截：原文存 `PastedTextStore`（localStorage，单条 ≤200K / 最多 12 条），经 `slash/input-insert-reference` 在草稿里插入一个 `@pasted-text` 引用 chip，不再把整段灌进输入框；发送时由注册的 input-trigger codec 把 chip 还原为完整文本交给模型。
+- 新增 `conversation.input.dock` 的 PastedTextDock：chip 点击打开 Modal 预览 / 编辑 / 保存；移除 chip 经 `slash/input-consume-token` 同步删除草稿引用。卸载插件恢复原生粘贴行为。
+
+### 新增：Git 图谱文件可点击查看 diff（含历史提交）
+
+- 新增远程 `gitCommitDiff`（方法 36 → 37）：`git show --format= --first-parent -m <hash> -- <path>`，沿用现有 hash / 相对路径安全校验。
+- “未提交的改动”文件行与“提交详情”文件行均改为可点击按钮：点击取对应 diff，在资源管理器预览侧打开 diff 标签并切到 explorer。提交后仍然可以在图谱里回看每个历史提交的文件 diff。
+- 测试 405 passed + 2 skipped（新增 pasted-text store 4、git commitDiff 1 等）。
+
 ## [0.19.0] - 2026-08-17
 
 ### 发布：npm 首发（dsh-web-enhanced@0.19.0）

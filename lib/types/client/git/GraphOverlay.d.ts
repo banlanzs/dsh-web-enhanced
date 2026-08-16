@@ -10,7 +10,7 @@
  * out. Two controls because they are two different questions.
  * @module dsh-web-enhanced/src/client/git/GraphOverlay
  */
-import type { WebEnhancedProps, WebEnhancedRemote } from '../contract.ts';
+import type { PanelTab, PreviewTab, WebEnhancedProps, WebEnhancedRemote } from '../contract.ts';
 /** Full composed props of the graph overlay. */
 export type GraphOverlayProps = WebEnhancedProps<'shell.overlay'>;
 /** What the chrome-free panel needs from its host surface. */
@@ -19,8 +19,12 @@ export interface GraphPanelProps {
     readonly workspaceId: string | undefined;
     readonly remote: WebEnhancedRemote;
     readonly t: WebEnhancedProps<'shell.overlay'>['t'];
+    /** Open one diff as an explorer preview tab. */
+    readonly openTab: (tab: PreviewTab) => void;
+    /** Switch to the explorer so the opened diff is visible. */
+    readonly selectTab: (tab: PanelTab) => void;
 }
 /** The chrome-free graph: filter, refresh, and the laid-out commit list. */
-export declare function GraphPanel({ workspaceId, remote, t }: GraphPanelProps): import("react").JSX.Element;
+export declare function GraphPanel({ workspaceId, remote, t, openTab, selectTab }: GraphPanelProps): import("react").JSX.Element;
 /** The git graph overlay: the same panel under the full-frame chrome. */
-export declare function GraphOverlay({ useOverlay, useSessions, useWorkspaces, remote, closeOverlay, t, }: GraphOverlayProps): import("react").JSX.Element | null;
+export declare function GraphOverlay({ useOverlay, useSessions, useWorkspaces, remote, closeOverlay, t, openTab, selectTab, }: GraphOverlayProps): import("react").JSX.Element | null;

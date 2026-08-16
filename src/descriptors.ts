@@ -381,6 +381,7 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
   unary('gitBranches', 'GitBranchesRequest', 'GitBranchesResult', okOrError(z.object({ branches: z.array(gitBranchViewSchema) }))),
   unary('gitLog', 'GitLogRequest', 'GitLogResult', okOrError(z.object({ commits: z.array(gitCommitViewSchema) }))),
   unary('gitCommit', 'GitCommitRequest', 'GitCommitResult', okOrError(z.object({ commit: gitCommitDetailSchema }))),
+  unary('gitCommitDiff', 'GitCommitDiffRequest', 'GitCommitDiffResult', okOrError(z.object({ text: z.string() }))),
   unary('gitWorking', 'GitWorkingRequest', 'GitWorkingResult', okOrError(z.object({ working: gitWorkingSchema }))),
   unary('gitCheckout', 'GitCheckoutRequest', 'GitCheckoutResult', okOrError(gitOkSchema)),
   unary('gitStatus', 'GitStatusRequest', 'GitStatusResult', okOrError(z.object({ entries: z.array(gitStatusEntrySchema) }))),

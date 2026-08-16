@@ -33,12 +33,15 @@ describe('createRemoteFacade', () => {
     const facade = createRemoteFacade(rawWith({
       taskList: vi.fn(async () => carrierFailure),
       gitStatus: vi.fn(async () => carrierFailure),
+      gitCommitDiff: vi.fn(async () => carrierFailure),
       fsList: vi.fn(async () => carrierFailure),
       modelRouteDescribe: vi.fn(async () => carrierFailure),
       deepseekRateGet: vi.fn(async () => carrierFailure),
     }))
     expect(await facade.taskList()).toEqual({ error: { code: 'not-found', message: 'no such Remote method' } })
     expect(await facade.gitStatus({ workspaceId: 'w1' })).toEqual({ error: { code: 'not-found', message: 'no such Remote method' } })
+    expect(await facade.gitCommitDiff({ workspaceId: 'w1', hash: 'h', path: 'a.ts' }))
+      .toEqual({ error: { code: 'not-found', message: 'no such Remote method' } })
     expect(await facade.fsList({ workspaceId: 'w1' })).toEqual({ error: { code: 'not-found', message: 'no such Remote method' } })
     expect(await facade.modelRouteDescribe({ provider: 'p', model: 'm' }))
       .toEqual({ error: { code: 'not-found', message: 'no such Remote method' } })

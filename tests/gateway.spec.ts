@@ -229,7 +229,7 @@ describe('WebEnhancedGateway', () => {
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet', 'pricingGet',
       'modelRouteDescribe', 'deepseekRateGet', 'opencodeGoUsageGet',
       'visionStatus', 'visionConfigGet', 'visionConfigSet', 'modelRetryGet', 'modelRetrySet', 'visionEndpointModels',
-      'gitBranches', 'gitLog', 'gitCommit', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
+      'gitBranches', 'gitLog', 'gitCommit', 'gitCommitDiff', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',
       'pluginList', 'pluginRemove', 'pluginUpdate',
