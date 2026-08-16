@@ -14,6 +14,9 @@ export const NAV_WINDOW = 11
 /** Nodes on either side of the active one inside a window. */
 export const NAV_HALF_WINDOW = 5
 
+/** Upper bound on per-turn virtual dots for unrendered older turns. */
+export const MAX_OLDER_DOTS = 200
+
 /** The visible index range of one navbar render. */
 export interface NavWindow {
   /** First visible node index (inclusive). */
@@ -44,6 +47,22 @@ export function olderNodeCount(
     return Math.max(0, firstTurn - 1)
   }
   return Math.max(0, totalTurns - renderedCount)
+}
+
+/**
+ * Cap the number of per-turn virtual dots for unrendered older turns.
+ *
+ * The strip still navigates into the page beyond `加载更早`, but a session
+ * with thousands of earlier turns must not materialize one button per turn.
+ * The closest {@link MAX_OLDER_DOTS} turns stay individually addressable;
+ * anything older folds into one "load older" marker.
+ * @param count - unrendered older turns.
+ * @param max - per-turn dot budget.
+ * @returns how many turns fold away and how many get dots.
+ */
+export function olderWindow(count: number, max: number = MAX_OLDER_DOTS): { readonly hidden: number; readonly visible: number } {
+  const visible = Math.min(Math.max(0, count), max)
+  return { hidden: Math.max(0, count - visible), visible }
 }
 
 /**

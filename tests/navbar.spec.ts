@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { createPinStore } from '../src/client/navbar/pin-store.ts'
-import { NAV_HALF_WINDOW, NAV_WINDOW, navWindow, olderNodeCount } from '../src/client/navbar/window.ts'
+import { MAX_OLDER_DOTS, NAV_HALF_WINDOW, NAV_WINDOW, navWindow, olderNodeCount, olderWindow } from '../src/client/navbar/window.ts'
 
 /** In-memory storage double. */
 function memoryStorage(): { store: Map<string, string>; seam: { getItem(k: string): string | null; setItem(k: string, v: string): void } } {
@@ -65,6 +65,16 @@ describe('olderNodeCount', () => {
     expect(olderNodeCount(null, 30, 10)).toBe(20)
     expect(olderNodeCount(null, 3, 10)).toBe(0)
     expect(olderNodeCount(null, 12, 0)).toBe(0)
+  })
+})
+
+describe('olderWindow', () => {
+  it('keeps the virtual-dot DOM bounded for very long sessions', () => {
+    expect(olderWindow(50)).toEqual({ hidden: 0, visible: 50 })
+    expect(olderWindow(MAX_OLDER_DOTS)).toEqual({ hidden: 0, visible: MAX_OLDER_DOTS })
+    expect(olderWindow(MAX_OLDER_DOTS + 1)).toEqual({ hidden: 1, visible: MAX_OLDER_DOTS })
+    expect(olderWindow(12_000)).toEqual({ hidden: 12_000 - MAX_OLDER_DOTS, visible: MAX_OLDER_DOTS })
+    expect(olderWindow(0)).toEqual({ hidden: 0, visible: 0 })
   })
 })
 
