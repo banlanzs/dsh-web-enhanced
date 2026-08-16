@@ -107,17 +107,12 @@ export function WorkspaceView(props: WorkspaceViewProps) {
                 )
                 : (
                   <aside className={css.sidebar}>
-                    <button
-                      type="button"
-                      className={css.collapse}
-                      aria-label={t('files.collapse')}
-                      data-testid="workspace-sidebar-collapse"
-                      title={t('files.collapse')}
-                      onClick={() => { setSidebarCollapsed(true) }}
-                    >
-                      <span aria-hidden="true">‹</span>
-                    </button>
-                    <FileTree {...props} workspaceId={String(workspaceId)} />
+                    <FileTree
+                      {...props}
+                      workspaceId={String(workspaceId)}
+                      onCollapse={() => { setSidebarCollapsed(true) }}
+                      collapseLabel={t('files.collapse')}
+                    />
                   </aside>
                 )}
               <PreviewPane {...props} workspaceId={String(workspaceId)} />

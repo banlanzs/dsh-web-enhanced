@@ -17,7 +17,12 @@ import { loadPreviewTab } from '../preview.ts'
 import css from './FileTree.module.css'
 
 /** Props of the file tree: the panel's composed props plus the resolved workspace. */
-export type FileTreeProps = WebEnhancedProps<'conversation.view'> & { readonly workspaceId: string }
+export type FileTreeProps = WebEnhancedProps<'conversation.view'> & {
+  readonly workspaceId: string
+  /** When present, the tree renders a collapse control beside its search box. */
+  readonly onCollapse?: () => void
+  readonly collapseLabel?: string
+}
 
 /** Debounce of the search query, in milliseconds. */
 const SEARCH_DEBOUNCE_MS = 200
@@ -30,7 +35,7 @@ type Listing =
 
 /** The file tree. */
 export function FileTree({
-  workspaceId, usePanel, remote, toggleExpanded, setQuery, openTab, t,
+  workspaceId, usePanel, remote, toggleExpanded, setQuery, openTab, t, onCollapse, collapseLabel,
 }: FileTreeProps) {
   const expanded = usePanel(state => state.expanded[workspaceId] ?? [])
   const query = usePanel(state => state.query)
@@ -90,14 +95,28 @@ export function FileTree({
 
   return (
     <div className={css.tree} data-testid="file-tree">
-      <input
-        className={css.search}
-        value={query}
-        placeholder={t('files.search')}
-        aria-label={t('files.search')}
-        data-testid="file-tree-search"
-        onChange={event => { setQuery(event.target.value) }}
-      />
+      <div className={css.searchRow}>
+        <input
+          className={css.search}
+          value={query}
+          placeholder={t('files.search')}
+          aria-label={t('files.search')}
+          data-testid="file-tree-search"
+          onChange={event => { setQuery(event.target.value) }}
+        />
+        {onCollapse !== undefined && (
+          <button
+            type="button"
+            className={css.collapse}
+            aria-label={collapseLabel ?? ''}
+            title={collapseLabel}
+            data-testid="workspace-sidebar-collapse"
+            onClick={onCollapse}
+          >
+            <span aria-hidden="true">‹</span>
+          </button>
+        )}
+      </div>
       {matches !== null
         ? (
             <ul className={css.list} data-testid="file-tree-matches">

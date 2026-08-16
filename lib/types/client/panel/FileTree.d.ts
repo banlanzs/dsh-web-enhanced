@@ -13,6 +13,9 @@ import type { WebEnhancedProps } from '../contract.ts';
 /** Props of the file tree: the panel's composed props plus the resolved workspace. */
 export type FileTreeProps = WebEnhancedProps<'conversation.view'> & {
     readonly workspaceId: string;
+    /** When present, the tree renders a collapse control beside its search box. */
+    readonly onCollapse?: () => void;
+    readonly collapseLabel?: string;
 };
 /** The file tree. */
-export declare function FileTree({ workspaceId, usePanel, remote, toggleExpanded, setQuery, openTab, t, }: FileTreeProps): import("react").JSX.Element;
+export declare function FileTree({ workspaceId, usePanel, remote, toggleExpanded, setQuery, openTab, t, onCollapse, collapseLabel, }: FileTreeProps): import("react").JSX.Element;

@@ -6,9 +6,21 @@
   overflow: hidden;
 }
 
-.search {
+/* Search box and the optional collapse control share one header row: the
+   input flexes to make room for the button instead of the button hanging on
+   the tree/preview boundary. */
+.searchRow {
+  display: flex;
   flex: none;
-  margin: 8px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 0;
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   padding: 5px 8px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
   border-radius: 8px;
@@ -22,6 +34,34 @@
   outline: 2px solid transparent;
   outline-offset: 2px;
   box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
+}
+
+.collapse {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2, transparent);
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.collapse:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+}
+
+.collapse:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, rgb(65 118 230));
+  outline-offset: 1px;
 }
 
 .list {
@@ -102,6 +142,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .search,
+  .collapse,
   .row {
     transition: none;
   }
