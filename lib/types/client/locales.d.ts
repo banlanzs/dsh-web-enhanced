@@ -104,11 +104,12 @@ export declare const zh: {
     readonly 'skins.violet.name': "紫晶";
     readonly 'skins.violet.desc': "薰衣草浅紫与梅子深紫，虹彩紫点缀。";
     readonly 'skins.bg.title': "自定义背景图片";
-    readonly 'skins.bg.hint': "支持 PNG / JPG / WebP / GIF / AVIF / BMP / ICO / SVG（≤4MB），保存在浏览器本地。所有自定义背景统一做淡化处理（高透明度蒙层 + 轻微模糊），与皮肤和明暗模式同时生效，不影响页面内容阅读。";
+    readonly 'skins.bg.hint': "支持 PNG / JPG / WebP / GIF / AVIF / BMP / ICO / SVG，保存在浏览器本地。超过存储预算的图片会自动压缩后应用；所有自定义背景统一做淡化处理（高透明度蒙层 + 轻微模糊），与皮肤和明暗模式同时生效，不影响页面内容阅读。";
     readonly 'skins.bg.none': "未设置背景";
     readonly 'skins.bg.pick': "选择图片";
     readonly 'skins.bg.clear': "清除背景";
-    readonly 'skins.bg.tooLarge': "图片超过 4MB 上限，请压缩后再试。";
+    readonly 'skins.bg.compressed': "图片超过存储预算，已自动压缩后应用。";
+    readonly 'skins.bg.tooLarge': "图片压缩后仍超过存储预算，请换一张或降低分辨率。";
     readonly 'skins.bg.badType': "不支持的文件类型，请选择图片文件。";
     readonly 'vision.refresh': "刷新状态";
     readonly 'vision.loading': "读取中…";

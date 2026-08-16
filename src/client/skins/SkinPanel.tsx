@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import type { Translate } from '../locale-keys.ts'
+import { encodeBackground, fitsBudget } from './background.ts'
 import { SKINS } from './themes.ts'
 import type { SkinFace } from './skin-layer.ts'
 import css from './SkinPanel.module.css'
@@ -25,17 +26,20 @@ export interface SkinPanelProps {
 /** Accepted background image formats (picker filter + validation). */
 const BACKGROUND_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.avif,.bmp,.ico,.svg,image/*'
 
-/** Upper bound on the stored data URL, bytes (localStorage holds ~5 MiB). */
-const BACKGROUND_MAX_BYTES = 4 * 1024 * 1024
-
 /** The skins tab body. */
 export function SkinPanel({ skin, t }: SkinPanelProps) {
   const [current, setCurrent] = useState(skin.current)
   const [dark, setDark] = useState(skin.dark)
   const [background, setBackground] = useState(skin.background)
   const [backgroundError, setBackgroundError] = useState<string | null>(null)
+  const [backgroundNote, setBackgroundNote] = useState<string | null>(null)
 
   useEffect(() => skin.subscribe(setDark), [skin])
+
+  const applyBackground = (dataUrl: string): void => {
+    skin.setBackground(dataUrl)
+    setBackground(dataUrl)
+  }
 
   const onBackgroundPicked = (file: File | undefined): void => {
     if (file === undefined) return
@@ -43,20 +47,33 @@ export function SkinPanel({ skin, t }: SkinPanelProps) {
       setBackgroundError(t('skins.bg.badType'))
       return
     }
-    if (file.size > BACKGROUND_MAX_BYTES) {
-      setBackgroundError(t('skins.bg.tooLarge'))
-      return
-    }
     const reader = new FileReader()
     reader.onload = () => {
-      const dataUrl = typeof reader.result === 'string' ? reader.result : ''
-      if (dataUrl === '') {
+      const original = typeof reader.result === 'string' ? reader.result : ''
+      if (original === '') {
         setBackgroundError(t('skins.bg.badType'))
         return
       }
-      setBackgroundError(null)
-      skin.setBackground(dataUrl)
-      setBackground(dataUrl)
+      // Original bytes win when they already fit the storage budget (GIF
+      // animation and SVG vectors survive untouched); an oversized picture
+      // is compressed down the scale/quality plan until it fits.
+      if (fitsBudget(original)) {
+        setBackgroundError(null)
+        setBackgroundNote(null)
+        applyBackground(original)
+        return
+      }
+      void encodeBackground(file).then(
+        (encoded) => {
+          setBackgroundError(null)
+          setBackgroundNote(t('skins.bg.compressed'))
+          applyBackground(encoded)
+        },
+        () => {
+          setBackgroundNote(null)
+          setBackgroundError(t('skins.bg.tooLarge'))
+        },
+      )
     }
     reader.onerror = () => { setBackgroundError(t('skins.bg.badType')) }
     reader.readAsDataURL(file)
@@ -145,6 +162,8 @@ export function SkinPanel({ skin, t }: SkinPanelProps) {
           </div>
         </div>
         {backgroundError !== null && <p className={css.bgError} data-testid="skin-bg-error">{backgroundError}</p>}
+        {backgroundError === null && backgroundNote !== null
+          && <p className={css.bgNote} data-testid="skin-bg-note">{backgroundNote}</p>}
       </section>
     </div>
   )

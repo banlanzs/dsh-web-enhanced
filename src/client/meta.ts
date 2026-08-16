@@ -7,7 +7,7 @@
  */
 
 /** Plugin version rendered in the About tab. */
-export const WEB_ENHANCED_VERSION = '0.17.1'
+export const WEB_ENHANCED_VERSION = '0.17.2'
 
 /** Public repository, rendered as the project-home link. */
 export const WEB_ENHANCED_REPOSITORY = 'https://github.com/banlanzs/dsh-web-enhanced'
