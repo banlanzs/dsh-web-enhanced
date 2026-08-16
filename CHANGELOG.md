@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [0.19.0] - 2026-08-17
+
+### 发布：npm 首发（dsh-web-enhanced@0.19.0）
+
+- 包以 `dsh-web-enhanced` 发布到 npm registry（`latest` 指向 0.19.0）。安装：`dsh plugin --profile web add dsh-web-enhanced`；升级：`dsh plugin --profile web update dsh-web-enhanced`。GitHub 源仍可用：`add github:banlanzs/dsh-web-enhanced`。
+- 开发 / 发布门槛写入 README：提交或 `npm publish` 前必须 `pnpm check`（重建 `lib/`，CI 漂移门核对 src 与 lib）；npm 不允许覆盖已发布版本，需先 bump `version`。
+- 本次发布同步移除 git 中遗留的 `lib/types/terminal*` 4 个文件（终端功能已于 0.16.0 移除，这些文件只是历史构建残留；`pnpm check` 从此不再需要手动恢复它们）。
 
 ### 新增：余额行升级为 DeepSeek 信息行 + OpenCode Go 额度显示（参考 dsh-bottom-info-bar）
 
@@ -32,9 +38,9 @@
 - 0.19.0 的节点导航条只看得见已渲染轮次；现在经 sessionStats projection 补齐未渲染的更早轮次虚拟点，点击自动分页 `loadOlder` 并跳转；虚拟点上限 200，超出折叠为「还有更早轮次」标记，避免超长会话节点失控。
 - 测试 400 passed + 2 skipped（新增模型能力 14、OpenCode Go 10、峰谷价 8、目录名 4、余额 stale 1、CNY 花费 3 等）。
 
-## [0.19.0] - 2026-08-16
+### 早期开发记录（2026-08-16，随本次 npm 首发一并发布）
 
-### 新增：对话节点导航条（移植自 dsh-navbar）
+#### 新增：对话节点导航条（移植自 dsh-navbar）
 
 - 对话流右缘节点串，每条 user 消息一节点：激活药丸跟随阅读位置（视口最顶 user 消息，与跳转对齐）；悬停/键盘聚焦弹 6 行截断预览卡；点击平滑跳转到该消息；>11 节点滑动窗口（激活 ±5，端点细点）；导航条上滚轮逐条切换（120ms 节流）；整条可点按垂直最近节点命中，无死区。
 - **精选轮次**：assistant 操作条（copy 与反馈之间）新增「精选」按钮，按会话持久化到 localStorage；精选轮次节点呈金色药丸、恒在窗口内可见、预览显示精选上下文、点击直达被精选的回复。

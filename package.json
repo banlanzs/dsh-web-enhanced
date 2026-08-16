@@ -7,7 +7,7 @@
   "types": "lib/types/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/banlanzs/dsh-web-enhanced.git"
+    "url": "git+https://github.com/banlanzs/dsh-web-enhanced.git"
   },
   "homepage": "https://github.com/banlanzs/dsh-web-enhanced",
   "bugs": {

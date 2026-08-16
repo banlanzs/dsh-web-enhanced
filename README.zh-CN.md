@@ -42,16 +42,20 @@
 
 ## 安装
 
-插件是一个 bundle 组合包（`dsh.bundle`），安装进 Web profile：
+插件是一个 bundle 组合包（`dsh.bundle`），已发布到 npm，安装进 Web profile：
 
 ```sh
-dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # 推荐
-# 或：
-# dsh plugin --profile web add ./dsh-web-enhanced-0.12.1.tgz
-# dsh plugin --profile web add dsh-web-enhanced
+# npm（推荐）
+dsh plugin --profile web add dsh-web-enhanced
+
+# GitHub（跟默认分支；update 重新解析分支头）
+dsh plugin --profile web add github:banlanzs/dsh-web-enhanced
+
+# 本地源码打包产物
+dsh plugin --profile web add ./dsh-web-enhanced-<version>.tgz
 ```
 
-`lib/` 随仓提交，因此没有 `prepare` 步骤——从 git 安装无需工具链，也不会提示 `allowBuilds`。
+`lib/` 随仓提交，因此没有 `prepare` 步骤——安装无需工具链，也不会提示 `allowBuilds`。
 
 > **要安装，不要 `link:`。** 所有 `@deepseek-ai/*` 都是 **peer** 依赖，必须解析到 profile 提供的那一份。Node 解析符号链接包时以其**真实路径**为起点，所以 `link:` 安装的插件会在自己的 `node_modules` 里解析这些包——于是有了第二份 `@deepseek-ai/dsh-typert-protocol`。`@Remote` 装饰器把标记记录在该模块的私有状态里，持有另一份实例的 host 网关因此看不到任何 descriptor，`/api/webEnhanced/*` 全部返回 **404**，而客户端半仍能正常加载渲染（故障表现具有迷惑性）。怀疑安装有问题时这样验证：
 >
@@ -83,6 +87,7 @@ cd dsh-web-enhanced
 **不需要先卸载再装。** `dsh plugin` 是一个 pnpm 转发器：它把参数原样交给 profile 目录里的 `pnpm` 执行，再按**已安装状态**重新对齐 bundle 层列表。所以更新就是一条命令，然后重启 DSH：
 
 ```sh
+# npm 安装：升级到 registry 上的最新已发布版本
 dsh plugin --profile web update dsh-web-enhanced
 dsh --profile web
 ```
@@ -94,7 +99,7 @@ dsh-web-enhanced: github:banlanzs/dsh-web-enhanced
   → codeload.github.com/banlanzs/dsh-web-enhanced/tar.gz/<commit>
 ```
 
-`pnpm install` 尊重锁文件、只会重装同一个 commit；`update` 会重新解析分支 HEAD 并改写锁文件。
+`pnpm install` 尊重锁文件、只会重装同一个 commit；`update` 会重新解析分支 HEAD 并改写锁文件。npm 依赖同理是按版本解析：`update` 才会移到新发布的版本；要从 Git 源切到 npm 源（或反过来），用显式 `add` 重写 spec，`update` 不会自动改写来源。
 
 层列表按「已安装状态」而不是「依赖差异」对齐是刻意的：这样某个包在新版本里**才开始**声明 `dsh.bundle` 时，`update` 也能把它加进层栈。
 
@@ -102,9 +107,10 @@ dsh-web-enhanced: github:banlanzs/dsh-web-enhanced
 
 ```sh
 dsh plugin --profile web update --force dsh-web-enhanced
-# 仍然不动时的兜底
+# 仍然不动时的兜底：显式重装想要的来源
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git
+dsh plugin --profile web add dsh-web-enhanced             # npm
+# dsh plugin --profile web add github:banlanzs/dsh-web-enhanced   # git
 ```
 
 ### 开发迭代
@@ -114,13 +120,27 @@ host 能力失效）。改用打包重装来迭代：
 
 ```sh
 cd dsh-web-enhanced
-pnpm install && pnpm run check && npm pack
+pnpm install
+pnpm check       # 提交/发布前必跑：typecheck + 全部测试 + 重建 lib/
+npm pack         # 产出的 tarball 用于冒烟安装
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.12.1.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-<version>.tgz
 ```
 
+**开发门槛。** `lib/` 是提交进仓库的构建产物——不要手改，每次提交或 npm 发布前必须跑 `pnpm check`（= `rm lib + tsc -b --force + vitest run + tsdown`），由 `src/` 确定性重建 `lib/`（CI 的漂移门会核对二者）。check 会删除构建不再产出的文件，所以提交前务必看一眼 `git status`。
+
+**发布到 npm。** 本包以包名 `dsh-web-enhanced` 发布：
+
+```sh
+npm login
+pnpm check
+npm publish --access public
+```
+
+npm 不允许覆盖已发布版本：先 bump `package.json` 的 `version`（并同步 CHANGELOG）。`files` 白名单只发布 `lib/`、`cordis.patch.yml`、双语文 README、CHANGELOG 与 LICENSE，发布前可用 `npm pack --dry-run` 核对 tarball。
+
 Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPackage` 步骤）。
-若报 `EPERM ... symlink`，可开启开发者模式，或改用 git URL 安装（不走该路径）。
+若报 `EPERM ... symlink`，可开启开发者模式，或改用 npm / git 安装（不走该路径）。
 
 ## 配置
 
@@ -181,11 +201,11 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + 全部测试 + 构建（297 个测试）
+pnpm run check   # typecheck + 全部测试 + 构建（400 个测试，2 个跳过）
 ```
 
 构建产物：
-- `lib/index.js` — node half：`web-enhanced` 函数插件（挂载 `WebEnhancedGateway` Typert 服务：task*/git*/fs*/balanceGet/pricingGet/visionStatus/visionConfigGet/visionConfigSet/visionEndpointModels + cron 调度器 + 重启恢复，以及带 settings 命名空间的 `VisionInterceptor` 识图服务）
+- `lib/index.js` — node half：`web-enhanced` 函数插件（挂载 `WebEnhancedGateway` Typert 服务：task*/git*/fs*/balanceGet/pricingGet/modelRouteDescribe/deepseekRateGet/opencodeGoUsageGet/visionStatus/visionConfigGet/visionConfigSet/visionEndpointModels + cron 调度器 + 重启恢复，以及带 settings 命名空间的 `VisionInterceptor` 识图服务）
 - `lib/client.js` — 浏览器 half：模块加载器闭包格式（`window.__ModuleLoader__.load`），由 `dsh.client` manifest 声明
 - `cordis.patch.yml` — bundle 补丁：插入 `web-enhanced` 行（一个行同时承载 node 与 browser 两个 half）
 

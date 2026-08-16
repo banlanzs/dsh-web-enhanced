@@ -42,16 +42,20 @@ Captured from the real UI by `scripts/e2e.mjs --capture` (no model key needed):
 
 ## Installation
 
-The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile:
+The plugin is a bundle combo package (`dsh.bundle`) installed into a Web profile. It is published to npm, so a bare package name resolves from the registry:
 
 ```sh
-dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git   # recommended
-# or:
-# dsh plugin --profile web add ./dsh-web-enhanced-0.12.1.tgz
-# dsh plugin --profile web add dsh-web-enhanced
+# npm (recommended)
+dsh plugin --profile web add dsh-web-enhanced
+
+# GitHub (tracks the default branch; `update` re-resolves it)
+dsh plugin --profile web add github:banlanzs/dsh-web-enhanced
+
+# local tarball from a checkout
+dsh plugin --profile web add ./dsh-web-enhanced-<version>.tgz
 ```
 
-`lib/` is committed, so there is no `prepare` step and installing from git needs no toolchain and no `allowBuilds` prompt.
+`lib/` is committed, so there is no `prepare` step and installing needs no toolchain and no `allowBuilds` prompt.
 
 > **Install it, do not `link:` it.** Every `@deepseek-ai/*` package is a **peer** dependency and must resolve to the single copy the profile provides. Node resolves a symlinked package from its REAL path, so a `link:`-installed plugin resolves those specifiers inside its own `node_modules` instead — a second `@deepseek-ai/dsh-typert-protocol` instance. The `@Remote` decorator records its markers in that module's private state, so the host gateway (holding the other instance) then sees no descriptors at all and every `/api/webEnhanced/*` answers **404** while the client half still loads and renders. Verify a suspicious install with:
 >
@@ -83,6 +87,7 @@ cd dsh-web-enhanced
 **No uninstall-then-reinstall needed.** `dsh plugin` is a pnpm forwarder: it hands your arguments verbatim to `pnpm` in the profile directory, then reconciles the bundle layer list against the **installed state**. So an update is one command, then a restart:
 
 ```sh
+# npm install: moves to the latest published registry version
 dsh plugin --profile web update dsh-web-enhanced
 dsh --profile web
 ```
@@ -94,7 +99,7 @@ dsh-web-enhanced: github:banlanzs/dsh-web-enhanced
   → codeload.github.com/banlanzs/dsh-web-enhanced/tar.gz/<commit>
 ```
 
-`pnpm install` honours that lock and reinstalls the same commit; `update` re-resolves the branch head and rewrites it.
+`pnpm install` honours that lock and reinstalls the same commit; `update` re-resolves the branch head and rewrites it. For an npm-registry dependency the same rule applies at the version level: `update` moves to the latest matching published version, and an already-installed Git spec is not silently rewritten — switch sources with an explicit `add` (below).
 
 Reconciling by installed state rather than by dependency diff is deliberate: it is what lets `update` activate a package that only started declaring `dsh.bundle` in a newer version.
 
@@ -102,9 +107,10 @@ If an update ever fails to move (pnpm can hold on to a cached git resolution), t
 
 ```sh
 dsh plugin --profile web update --force dsh-web-enhanced
-# last resort
+# last resort: reinstall the wanted source explicitly
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add git+https://github.com/banlanzs/dsh-web-enhanced.git
+dsh plugin --profile web add dsh-web-enhanced             # npm
+# dsh plugin --profile web add github:banlanzs/dsh-web-enhanced   # git
 ```
 
 ### Developer iteration
@@ -115,14 +121,28 @@ reinstalling from a packed tarball instead:
 
 ```sh
 cd dsh-web-enhanced
-pnpm install && pnpm run check && npm pack
+pnpm install
+pnpm check       # REQUIRED before committing/publishing: typecheck + full tests + rebuilds lib/
+npm pack         # then install the produced tarball for a smoke test
 dsh plugin --profile web remove dsh-web-enhanced
-dsh plugin --profile web add ./dsh-web-enhanced-0.12.1.tgz
+dsh plugin --profile web add ./dsh-web-enhanced-<version>.tgz
 ```
+
+**Development gate.** `lib/` is a committed build artifact — never edit it by hand. Every commit or npm publish must run `pnpm check` first, which regenerates `lib/` deterministically from `src/` (the CI drift gate compares them). `pnpm check` = `rm lib + tsc -b --force + vitest run + tsdown`; it deletes files that are no longer produced by the build, so review `git status` before committing.
+
+**Publishing to npm.** The package is published by name (`dsh-web-enhanced`):
+
+```sh
+npm login
+pnpm check
+npm publish --access public
+```
+
+npm will not publish over an existing version: bump `version` in `package.json` (and keep CHANGELOG current) first. The `files` allowlist ships exactly `lib/`, `cordis.patch.yml`, READMEs, CHANGELOG, and LICENSE — verify the tarball with `npm pack --dry-run` before publishing.
 
 On Windows, tarball installs need real symlink permission (pnpm's
 `importPackage` step). If it fails with `EPERM ... symlink`, either enable
-Developer Mode or install from the git URL, which does not take that path.
+Developer Mode or install from npm/Git, which do not take that path.
 
 ## Configuration
 
@@ -191,11 +211,11 @@ Plugin-row `config` fields (all have defaults; the `vision*` ones can also be ed
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + full tests + build (297 tests)
+pnpm run check   # typecheck + full tests + build (400 tests, 2 skipped)
 ```
 
 Build outputs:
-- `lib/index.js` — node half: the `web-enhanced` function plugin (mounts the `WebEnhancedGateway` Typert service: task*/git*/fs*/balanceGet/pricingGet/visionStatus/visionConfigGet/visionConfigSet/visionEndpointModels + cron scheduler + restart recovery, and the `VisionInterceptor` image-understanding service with its settings namespace)
+- `lib/index.js` — node half: the `web-enhanced` function plugin (mounts the `WebEnhancedGateway` Typert service: task*/git*/fs*/balanceGet/pricingGet/modelRouteDescribe/deepseekRateGet/opencodeGoUsageGet/visionStatus/visionConfigGet/visionConfigSet/visionEndpointModels + cron scheduler + restart recovery, and the `VisionInterceptor` image-understanding service with its settings namespace)
 - `lib/client.js` — browser half: module-loader closure format (`window.__ModuleLoader__.load`), declared by the `dsh.client` manifest
 - `cordis.patch.yml` — bundle patch: inserts the `web-enhanced` row (one row carries both the node and browser halves)
 
