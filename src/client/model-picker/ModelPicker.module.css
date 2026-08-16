@@ -1,0 +1,117 @@
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 132px;
+  max-width: 260px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 5px 8px;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.trigger:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}
+
+.trigger:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.triggerLabel,
+.triggerEffort {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triggerLabel {
+  flex: 1;
+  min-width: 0;
+  text-align: start;
+}
+
+.triggerEffort {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
+}
+
+.chevron {
+  flex: none;
+}
+
+/* Widen the portaled primitives menu. The class sits on Menu's wrapper span,
+   so descendant selectors reach the real list/submenus inside the portal. */
+.menu [role='menu'] {
+  min-width: 380px;
+  max-width: min(520px, calc(100vw - 24px));
+  max-height: min(560px, calc(100vh - 24px));
+}
+
+.menu [role='menu'] [role='menu'] {
+  min-width: 320px;
+  max-width: min(440px, calc(100vw - 24px));
+}
+
+.providerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.count {
+  margin-inline-start: auto;
+  flex: none;
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
+}
+
+.modelRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.modelCopy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.modelName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.description {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectedMark {
+  flex: none;
+  color: var(--dsw-alias-text-accent, #4c9aff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger {
+    transition: none;
+  }
+}

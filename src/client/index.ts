@@ -42,6 +42,8 @@ import { workspaceOfSessionId } from './workspace.ts'
 import { createBrowse, createOverlay, createPanel, createPreview } from './stores.ts'
 import { SkinLayer } from './skins/skin-layer.ts'
 import { applyNavbar } from './navbar/index.ts'
+import { ModelPicker } from './model-picker/ModelPicker.tsx'
+import type { ModelPickerInjected } from './model-picker/ModelPicker.tsx'
 import { BrowseOverlay } from './browse/BrowseOverlay.tsx'
 import { BranchStrip } from './git/BranchStrip.tsx'
 import { WorkspaceView } from './panel/WorkspaceView.tsx'
@@ -79,6 +81,20 @@ interface ConversationFace {
       readonly state: { getSnapshot(): { readonly draft: string } }
     }
   }
+}
+
+/** The optional per-session model-directory service the picker reuses. */
+interface ModelPickerDirectoryFace {
+  directoryFor(sessionId: never): {
+    readonly store: NonNullable<ModelPickerInjected['directory']>
+    load(): Promise<unknown>
+    select(selection: Parameters<ModelPickerInjected['select']>[0]): Promise<unknown>
+  }
+}
+
+/** Sessions face needed to keep addressed-subagent sessions unavailable. */
+interface ModelPickerSessionsFace {
+  subagentAddress(sessionId: never): unknown
 }
 
 /**
@@ -186,6 +202,40 @@ export function apply(ctx: ClientContext): void {
   const preview = createPreview()
   // The conversation node navbar: DOM-anchored, fully retracted on unload.
   ctx.effect(() => applyNavbar(ctx), 'web-enhanced: navbar')
+
+  // Shadow the host composer model seat at a lower priority with the wider,
+  // provider-collapsed picker. Reuses the host's per-session directory, so
+  // /model and this seat still share one selection fact.
+  ctx.effect(() => {
+    const directories = (): ModelPickerDirectoryFace | undefined =>
+      ctx.get('modelDirectories' as never) as unknown as ModelPickerDirectoryFace | undefined
+    const sessions = ctx.sessions as unknown as ModelPickerSessionsFace
+    return ctx.slots.inject('conversation.input.model', () => ctx.slots.register({
+      name: 'conversation.input.model',
+      locale: NS,
+      priority: -1,
+      inject: (sessionId: string): ModelPickerInjected => {
+        const directory = directories()?.directoryFor(sessionId as never)
+        const available = sessions.subagentAddress(sessionId as never) === undefined
+        return {
+          available,
+          directory: directory?.store ?? null,
+          load: () => {
+            if (available && directory !== undefined) directory.load().catch(() => { /* store carries the error */ })
+          },
+          select: async (selection) => {
+            if (!available || directory === undefined) return false
+            try {
+              await directory.select(selection)
+              return true
+            } catch {
+              return false
+            }
+          },
+        }
+      },
+    }, ModelPicker))
+  }, 'web-enhanced: model picker')
 
   // The skin layer owns its theme-service override through effects, so the
   // stock palette returns exactly when this plugin unloads.

@@ -273,6 +273,12 @@ export declare const zh: {
     readonly 'navbar.unpin': "取消精选";
     readonly 'navbar.olderTurn': "第 {turn} 轮（尚未加载，点击加载并跳转）";
     readonly 'navbar.olderMore': "还有 {count} 个更早轮次未显示，点击加载";
+    readonly 'modelPicker.select': "选择模型";
+    readonly 'modelPicker.loading': "读取模型…";
+    readonly 'modelPicker.retry': "重试";
+    readonly 'modelPicker.effort': "推理强度";
+    readonly 'modelPicker.providerDefault': "渠道默认";
+    readonly 'modelPicker.error': "模型选择失败：{message}";
     readonly 'files.expand': "展开侧边栏";
     readonly 'panel.noWorkspace': "当前会话未绑定项目";
     readonly 'files.search': "按文件名搜索";
