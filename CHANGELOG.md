@@ -1,5 +1,30 @@
 # Changelog
 
+## [Unreleased]
+
+### 新增：设置 → 模型能力（编辑模型 input 与推理强度）
+
+宿主「模型」页只编辑 id / 名称 / 上下文参数，`input` 与推理强度一直只能手改 settings.yaml。新增独立设置节 `model-capabilities`（紧邻「模型」之后），复用宿主同款 `llm.providers` + `settings.describe` + `llm.models` 数据源与 `settings.mutate` 路径补丁纪律：
+
+- **DeepSeek 官方（llm-deepseek）**：渠道级 `thinking`（enabled / disabled）与 `reasoningEffort`（off / high / max），并按适配器约束拒绝 `thinking: disabled` + 非 off 的组合。
+- **pi-ai 渠道（llm-pi-ai）**：渠道级 `defaultInput`（text / image，至少一项）与默认 `reasoning` 档位；每个模型级 `input` 与 `reasoningEfforts`（继承 / 不支持推理 false / 自定义 off～max 七档及其 wire 值）。
+- 目录渠道默认走最小 `modelOverrides` 条目（下拉选模型即可新增覆盖，不重写整个目录）；已拥有 `models` 列表的渠道在原列表行内编辑。未知字段、宿主页字段与 secret 均不会被改写，保存立即生效。
+- 模型选「继承」时直接显示目录实际能力：`目录能力：low / medium / high；默认 high`；目录未声明推理时明确提示渠道级默认只是请求默认、不会在选择器里生成档位。
+- 只显示已配置 / 激活 / 手写声明的渠道；休眠目录渠道仍由宿主「模型」页负责首次配置。
+
+### 修复：模型能力页同命名空间保存冲突
+
+- 多张 pi-ai 卡片共享一个 `llm-pi-ai` revision，先保存的卡片会让其余卡片误报 settings-conflict。现在本页自己的成功写入会在同命名空间卡片间共享新 revision；外部改动（settings.yaml / 宿主页）仍正确冲突，并提供「重新加载当前值」按钮：重新拉取 settings 后重建该卡草稿再编辑。
+
+### 调整：模型选择器改为居中更大的悬浮窗
+
+- composer 模型座位继续以 `priority: -1` 影子宿主实现，交互从锚定浮层改为居中 `Modal`（宽度 `min(640px, 100vw - 32px)`）：provider 手风琴默认折叠、只展开当前渠道；每个模型仍保留推理强度选择，失败/只读状态与宿主目录同源。
+
+### 增强：对话节点导航条补齐更早轮次
+
+- 0.19.0 的节点导航条只看得见已渲染轮次；现在经 sessionStats projection 补齐未渲染的更早轮次虚拟点，点击自动分页 `loadOlder` 并跳转；虚拟点上限 200，超出折叠为「还有更早轮次」标记，避免超长会话节点失控。
+- 测试 373 passed + 2 skipped（新增模型能力 14 例）。
+
 ## [0.19.0] - 2026-08-16
 
 ### 新增：对话节点导航条（移植自 dsh-navbar）
