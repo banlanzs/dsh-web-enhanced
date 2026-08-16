@@ -80,6 +80,8 @@
     }
   },
   "dependencies": {
+    "@deepseek-ai/dsh-terminal": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-terminal-bash": "0.1.0-rc.6",
     "fflate": "^0.8.2",
     "zod": "^4.4.3"
   },

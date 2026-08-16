@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.1] - 2026-08-16
+
+### 修复：Web 终端报「宿主未组合 terminal 服务」
+
+- 终端能力现在随插件自带：`@deepseek-ai/dsh-terminal`（PTY 注册表）与 `@deepseek-ai/dsh-terminal-bash`（bash 后端）成为插件 dependencies，`cordis.patch.yml` 增加 `terminal` / `terminal-bash` 两个 Loader 行——安装插件即自动具备，无需在宿主 profile 手动组合。后端注册仍是被动件，只有打开终端才会真正 spawn PTY。
+- 已有 profile 升级插件后即可生效（`pnpm update dsh-web-enhanced` 后重启宿主）。
+
 ## [0.15.0] - 2026-08-16
 
 ### 新增：Web 终端 + 可收起文件树侧边栏；预览内容留白加宽

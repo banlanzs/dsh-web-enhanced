@@ -1,6 +1,13 @@
-# dsh-web-enhanced bundle patch: one Loader row that mounts the plugin's
-# node half (the webEnhanced gateway service) and, through the package's
-# dsh.client manifest, the browser half in the Web profile.
+# dsh-web-enhanced bundle patch: Loader rows that mount the plugin's node
+# half (the webEnhanced gateway service) and, through the package's
+# dsh.client manifest, the browser half in the Web profile — plus the host's
+# native PTY capability the Web terminal rides (registry + bash backend,
+# declared as dependencies so a profile install pulls them). The backend is
+# passive until a terminal is opened; disposing either row retracts cleanly.
 - insert:
+    - id: terminal
+      name: '@deepseek-ai/dsh-terminal'
+    - id: terminal-bash
+      name: '@deepseek-ai/dsh-terminal-bash'
     - id: web-enhanced
       name: dsh-web-enhanced
