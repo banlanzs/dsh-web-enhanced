@@ -18,6 +18,14 @@
   text-overflow: clip;
 }
 
+/* The composer stack (input card + stats + this balance row) owns the bottom
+   of the active conversation scrollport. Keep scroll-into-view and anchor
+   jumps above that stack: the boundary is the composer seat's top edge, and
+   its live height rides the host's own --dsh-composer-height variable. */
+:global([data-conversation-scroll]) {
+  scroll-padding-bottom: var(--dsh-composer-height, 152px);
+}
+
 .line {
   /* Same width discipline as the host's stats line under the composer: the
      row lives in the bar's width column, so it must center on the chat
