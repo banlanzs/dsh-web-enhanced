@@ -274,6 +274,9 @@ export declare const zh: {
     readonly 'navbar.olderTurn': "第 {turn} 轮（尚未加载，点击加载并跳转）";
     readonly 'navbar.olderMore': "还有 {count} 个更早轮次未显示，点击加载";
     readonly 'modelPicker.select': "选择模型";
+    readonly 'modelPicker.title': "选择模型";
+    readonly 'modelPicker.close': "关闭";
+    readonly 'modelPicker.hint': "按渠道选择模型；默认只展开当前渠道。";
     readonly 'modelPicker.loading': "读取模型…";
     readonly 'modelPicker.retry': "重试";
     readonly 'modelPicker.effort': "推理强度";

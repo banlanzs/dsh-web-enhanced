@@ -46,32 +46,145 @@
   flex: none;
 }
 
-/* Widen the portaled primitives menu. The class sits on Menu's wrapper span,
-   so descendant selectors reach the real list/submenus inside the portal. */
-.menu [role='menu'] {
-  min-width: 380px;
-  max-width: min(520px, calc(100vw - 24px));
-  max-height: min(560px, calc(100vh - 24px));
+/* The centered dialog card: wider and roomier than the host's small menu. */
+.modal {
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 32px));
 }
 
-.menu [role='menu'] [role='menu'] {
-  min-width: 320px;
-  max-width: min(440px, calc(100vw - 24px));
+.modalContent {
+  max-height: min(640px, calc(100vh - 120px));
 }
 
-.providerRow {
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
+}
+
+.footerCurrent {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loading {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
+}
+
+.error,
+.warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 6px 8px;
+}
+
+.error {
+  background: var(--dsw-alias-state-error-secondary, rgb(242 90 90));
+  color: var(--dsw-alias-state-error-primary, rgb(236 19 19));
+}
+
+.warning {
+  background: var(--dsw-alias-state-warn-tertiary, rgb(254 245 231));
+  color: var(--dsw-alias-state-warn-primary, rgb(245 158 11));
+}
+
+.retry {
+  flex: none;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+.retry:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group {
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.providerHeader {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-width: 0;
+  border: none;
+  background: var(--dsw-alias-bg-layer-2, transparent);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: start;
+  padding: 9px 10px;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.providerHeader:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}
+
+.providerHeader:focus-visible,
+.modelRow:focus-visible,
+.retry:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
+}
+
+.providerName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .count {
   margin-inline-start: auto;
   flex: none;
   font-size: 12px;
+  font-weight: 400;
   color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
+}
+
+.chevronClosed,
+.chevronOpen {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
+  transition: transform 140ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.models {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid var(--dsw-alias-border-l1, rgba(0 0 0 / 4%));
+  padding: 6px;
 }
 
 .modelRow {
@@ -79,7 +192,28 @@
   align-items: flex-start;
   gap: 10px;
   width: 100%;
-  min-width: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+  padding: 7px 8px;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.modelRow:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}
+
+.modelRow:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.modelSelected {
+  background: var(--dsw-alias-interactive-bg-active, rgba(38 49 72 / 10%));
 }
 
 .modelCopy {
@@ -110,8 +244,24 @@
   color: var(--dsw-alias-text-accent, #4c9aff);
 }
 
+.effortSection {
+  margin-top: 10px;
+}
+
+.effortTitle {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .trigger {
+  .trigger,
+  .providerHeader,
+  .modelRow,
+  .retry,
+  .chevronClosed,
+  .chevronOpen {
     transition: none;
   }
 }

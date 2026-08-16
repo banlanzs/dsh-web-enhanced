@@ -4,8 +4,8 @@
  *
  * The host ui-model-selection component is a small in-place menu with every
  * provider expanded at once. This registration wins the single slot at a lower
- * priority and renders a wider portaled menu instead: one row per provider
- * (collapsed by default) whose submenu lists that provider's models, plus the
+ * priority and renders a centered floating dialog instead: one collapsible
+ * section per provider (only the selected provider starts expanded), plus the
  * current model's reasoning-effort choices. Data and writes still ride the
  * host's shared per-session ModelDirectory, so the /model command and this
  * seat stay one fact source.
@@ -74,7 +74,7 @@ export type ModelPickerProps = ModelPickerInjected & {
     readonly t: Translate;
 };
 /**
- * The composer model seat replacement.
+ * The composer model seat replacement: compact trigger + centered dialog.
  * @param props - locked, shared directory store, load/select verbs, locale.
  */
 export declare function ModelPicker({ locked, available, directory, load, select, t }: ModelPickerProps): import("react").JSX.Element | null;
