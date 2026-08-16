@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.0] - 2026-08-16
+
+### 移除：取消 Web 终端支持
+
+- 按需求回退 0.15.x 引入的 Web 终端：删除「终端」标签页、`TerminalPane`、网关 6 个 `terminal*` Remote、Typert 描述符、wire 类型与中英文案，以及 `@deepseek-ai/dsh-terminal` / `dsh-terminal-bash` 依赖与 `cordis.patch.yml` 挂载行。
+- 同一提交里的其余改动保留：可收起文件树侧边栏、预览内容留白加宽。
+- 已安装的 profile 执行 `pnpm update dsh-web-enhanced` 后重启宿主即可回到无终端状态（terminal 包随之移除）。
+
 ## [0.15.1] - 2026-08-16
 
 ### 修复：Web 终端报「宿主未组合 terminal 服务」

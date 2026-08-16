@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, TerminalCloseRequest, TerminalCloseResult, TerminalListRequest, TerminalListResult, TerminalOpenRequest, TerminalOpenResult, TerminalReadRequest, TerminalReadResult, TerminalSendRequest, TerminalSendResult, TerminalSignalRequest, TerminalSignalResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
 /** One fallback vision endpoint entry, as declared in plugin config. */
 export interface VisionFallbackConfig {
     model: string;
@@ -83,8 +83,6 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     private readonly pricing;
     /** Resolved lazily: the walk is filesystem work no other capability needs. */
     private profileDirCache;
-    /** The web terminal's server half over the host's native PTY registry. */
-    private readonly terminal;
     /** Built on first mutation, so a deployment outside a profile never makes one. */
     private pnpm;
     /**
@@ -132,18 +130,6 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
      * key is never stored, logged, or returned.
      */
     visionEndpointModels(request: VisionEndpointModelsRequest): Promise<VisionEndpointModelsResult>;
-    /** Open one PTY owned by the conversation's live agent, rooted in the workspace. */
-    terminalOpen(request: TerminalOpenRequest): Promise<TerminalOpenResult>;
-    /** Send one line of input and await the backend's wait boundary. */
-    terminalSend(request: TerminalSendRequest): Promise<TerminalSendResult>;
-    /** Read one bounded page of retained scrollback. */
-    terminalRead(request: TerminalReadRequest): TerminalReadResult;
-    /** Deliver one permitted signal to the foreground process group. */
-    terminalSignal(request: TerminalSignalRequest): Promise<TerminalSignalResult>;
-    /** Close one session and drop it from the owner's registry. */
-    terminalClose(request: TerminalCloseRequest): Promise<TerminalCloseResult>;
-    /** List the conversation agent's live sessions. */
-    terminalList(request: TerminalListRequest): Promise<TerminalListResult>;
     /** Local branches; the current branch carries the flag. */
     gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>;
     /** Recent commits with branch markers; one branch when the graph filters. */

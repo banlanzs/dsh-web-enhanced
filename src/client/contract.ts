@@ -22,10 +22,7 @@ import type {
   PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
   PricingView, TaskCreateRequest,
   TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest,
-  TaskRunResult, TaskUpdateRequest, TaskUpdateResult, TerminalCloseRequest, TerminalCloseResult,
-  TerminalListRequest, TerminalListResult, TerminalOpenRequest, TerminalOpenResult, TerminalReadRequest,
-  TerminalReadResult, TerminalSendRequest, TerminalSendResult, TerminalSignalRequest, TerminalSignalResult,
-  VisionConfigGetResult, VisionConfigPatch,
+  TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigPatch,
   VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelView,
   VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult,
 } from '../types.ts'
@@ -76,12 +73,6 @@ export interface WebEnhancedRemote {
   fsOfficePreview(request: FsOfficePreviewRequest): Promise<FsOfficePreviewResult>
   fsBrowse(request: FsBrowseRequest): Promise<FsBrowseResult>
   pluginList(request: PluginListRequest): Promise<PluginListResult>
-  terminalOpen(request: TerminalOpenRequest): Promise<TerminalOpenResult>
-  terminalSend(request: TerminalSendRequest): Promise<TerminalSendResult>
-  terminalRead(request: TerminalReadRequest): Promise<TerminalReadResult>
-  terminalSignal(request: TerminalSignalRequest): Promise<TerminalSignalResult>
-  terminalClose(request: TerminalCloseRequest): Promise<TerminalCloseResult>
-  terminalList(request: TerminalListRequest): Promise<TerminalListResult>
   pluginRemove(request: PluginMutateRequest): Promise<PluginMutateResult>
   pluginUpdate(request: PluginMutateRequest): Promise<PluginMutateResult>
 }
@@ -103,11 +94,7 @@ export type {
   ModelPricingView, PricingGetRequest, PricingGetResult, PricingView, TaskCreateRequest,
   TaskCreateResult,
   TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
-  TaskStatus, TaskUpdateRequest, TaskUpdateResult, TerminalCloseRequest, TerminalCloseResult,
-  TerminalListRequest, TerminalListResult, TerminalOpenRequest, TerminalOpenResult, TerminalReadRequest,
-  TerminalReadResult, TerminalSendRequest, TerminalSendResult, TerminalSessionStatusView,
-  TerminalSessionView, TerminalSignalRequest, TerminalSignalResult, VisionAttemptFailureView,
-  VisionConfigGetResult,
+  TaskStatus, TaskUpdateRequest, TaskUpdateResult, VisionAttemptFailureView, VisionConfigGetResult,
   VisionConfigPatch, VisionConfigSaveRequest, VisionConfigSaveView, VisionConfigSetResult,
   VisionConfigView, VisionEndpointModelView, VisionEndpointModelsRequest, VisionEndpointModelsResult,
   VisionEndpointModelsView, VisionHarnessModelView, VisionModelOptionView, VisionProviderOptionView,
@@ -120,7 +107,7 @@ export type {
  * the right — one tab, because opening a file from the tree answers where it
  * renders, not which tab the view is on.
  */
-export type PanelTab = 'explorer' | 'scm' | 'board' | 'graph' | 'terminal'
+export type PanelTab = 'explorer' | 'scm' | 'board' | 'graph'
 
 /**
  * How one preview tab renders. `source` is the raw editor, `view` the

@@ -228,7 +228,6 @@ describe('WebEnhancedGateway', () => {
     expect(remoteMethods(gateway).map(entry => entry.method)).toEqual([
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet', 'pricingGet',
       'visionStatus', 'visionConfigGet', 'visionConfigSet', 'visionEndpointModels',
-      'terminalOpen', 'terminalSend', 'terminalRead', 'terminalSignal', 'terminalClose', 'terminalList',
       'gitBranches', 'gitLog', 'gitCommit', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',

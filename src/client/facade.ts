@@ -55,12 +55,6 @@ export function createRemoteFacade(
 ): WebEnhancedRemote {
   return {
     taskList: async () => open(await raw.taskList()),
-    terminalOpen: async request => open(await raw.terminalOpen(request)),
-    terminalSend: async request => open(await raw.terminalSend(request)),
-    terminalRead: async request => open(await raw.terminalRead(request)),
-    terminalSignal: async request => open(await raw.terminalSignal(request)),
-    terminalClose: async request => open(await raw.terminalClose(request)),
-    terminalList: async request => open(await raw.terminalList(request)),
     taskCreate: async request => open(await raw.taskCreate(request)),
     taskUpdate: async request => open(await raw.taskUpdate(request)),
     taskRemove: async request => open(await raw.taskRemove(request)),

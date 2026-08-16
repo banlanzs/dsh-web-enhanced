@@ -24,7 +24,6 @@ import { officePreviewView } from './office.ts'
 import type { OfficeLimits } from './office.ts'
 import { PnpmRunner, pnpmFailureCode } from './pnpm.ts'
 import { ModelsDevPricing } from './pricing.ts'
-import { TerminalHost } from './terminal.ts'
 import { findProfileDir, readInventory } from './profile.ts'
 import type { PresetRoster, RunDeps } from './run-task.ts'
 import { classifyVisionHttpError, DEFAULT_VISION_MARKER, DEFAULT_VISION_PROMPT, resolveVisionApiKey, VISION_SETTINGS_NS } from './vision.ts'
@@ -42,10 +41,7 @@ import type {
   PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
   TaskCreateRequest, TaskCreateResult,
   TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
-  TaskUpdateRequest, TaskUpdateResult, TerminalCloseRequest, TerminalCloseResult, TerminalListRequest,
-  TerminalListResult, TerminalOpenRequest, TerminalOpenResult, TerminalReadRequest, TerminalReadResult,
-  TerminalSendRequest, TerminalSendResult, TerminalSignalRequest, TerminalSignalResult,
-  VisionConfigGetResult, VisionConfigPatch,
+  TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigPatch,
   VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelView,
   VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionModelOptionView,
   VisionProviderOptionView, VisionStatusResult, VisionStatusView, WorkspaceId,
@@ -285,8 +281,6 @@ export class WebEnhancedGateway extends TypertRemoteService {
   private readonly pricing: ModelsDevPricing
   /** Resolved lazily: the walk is filesystem work no other capability needs. */
   private profileDirCache: Promise<string | undefined> | undefined
-  /** The web terminal's server half over the host's native PTY registry. */
-  private readonly terminal: TerminalHost
   /** Built on first mutation, so a deployment outside a profile never makes one. */
   private pnpm: PnpmRunner | undefined
 
@@ -319,7 +313,6 @@ export class WebEnhancedGateway extends TypertRemoteService {
     this.board = new TaskBoard(ctx, this.boardDeps(ctx), {
       cronIntervalMs: this.resolved.cronIntervalMs,
     })
-    this.terminal = new TerminalHost(ctx)
     this.pricing = new ModelsDevPricing({
       url: this.resolved.modelsDevUrl,
       ttlMs: this.resolved.modelsDevCacheTtlMs,
@@ -559,48 +552,6 @@ export class WebEnhancedGateway extends TypertRemoteService {
         ),
       }
     }
-  }
-
-  // ── terminal ─────────────────────────────────────────────────────────────
-
-  /** Open one PTY owned by the conversation's live agent, rooted in the workspace. */
-  @Remote('terminalOpen')
-  async terminalOpen(request: TerminalOpenRequest): Promise<TerminalOpenResult> {
-    const root = this.workspaceRootFor(request.workspaceId)
-    if (root === null) {
-      return { error: { code: 'workspace-not-found', message: `workspace '${String(request.workspaceId)}' does not exist` } }
-    }
-    return this.terminal.open(request, root)
-  }
-
-  /** Send one line of input and await the backend's wait boundary. */
-  @Remote('terminalSend')
-  terminalSend(request: TerminalSendRequest): Promise<TerminalSendResult> {
-    return Promise.resolve(this.terminal.send(request))
-  }
-
-  /** Read one bounded page of retained scrollback. */
-  @Remote('terminalRead')
-  terminalRead(request: TerminalReadRequest): TerminalReadResult {
-    return this.terminal.read(request)
-  }
-
-  /** Deliver one permitted signal to the foreground process group. */
-  @Remote('terminalSignal')
-  async terminalSignal(request: TerminalSignalRequest): Promise<TerminalSignalResult> {
-    return this.terminal.signal(request)
-  }
-
-  /** Close one session and drop it from the owner's registry. */
-  @Remote('terminalClose')
-  async terminalClose(request: TerminalCloseRequest): Promise<TerminalCloseResult> {
-    return this.terminal.close(request)
-  }
-
-  /** List the conversation agent's live sessions. */
-  @Remote('terminalList')
-  async terminalList(request: TerminalListRequest): Promise<TerminalListResult> {
-    return this.terminal.list(request.ownerSessionId)
   }
 
   // ── git ──────────────────────────────────────────────────────────────────

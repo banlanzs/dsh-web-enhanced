@@ -200,7 +200,7 @@ export interface PanelState {
 export interface PanelActions {
   /**
    * Select the active tab.
-   * @param tab - explorer, scm, board, graph, or terminal.
+   * @param tab - explorer, scm, board, or graph.
    */
   readonly selectTab: (tab: PanelTab) => void
   /**
@@ -236,7 +236,7 @@ function revivePanel(raw: unknown): PanelState | undefined {
     // The pre-0.14 layout kept files and preview as separate tabs; both
     // restore onto the combined explorer surface.
     tab: tab === 'files' || tab === 'preview' ? 'explorer'
-      : tab === 'scm' || tab === 'board' || tab === 'graph' || tab === 'terminal' ? tab
+      : tab === 'scm' || tab === 'board' || tab === 'graph' ? tab
         : 'explorer',
     sidebarCollapsed: record['sidebarCollapsed'] === true,
     expanded,

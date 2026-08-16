@@ -71,19 +71,6 @@ const taskRecordSchema = z.object({
   lastRunAt: z.number().nullable(),
 })
 
-const terminalStatusSchema = z.union([
-  z.object({ kind: z.literal('running') }),
-  z.object({ kind: z.literal('exited'), exitCode: z.number().nullable(), signal: z.string().nullable() }),
-])
-
-const terminalSessionSchema = z.object({
-  sessionId: z.string(),
-  type: z.string(),
-  name: z.string().optional(),
-  pid: z.number().optional(),
-  status: terminalStatusSchema,
-})
-
 const gitBranchViewSchema = z.object({ name: z.string(), current: z.boolean() })
 
 const gitCommitViewSchema = z.object({
@@ -269,33 +256,6 @@ function nullary(
 
 /** Every invocation this plugin exposes, in gateway declaration order. */
 export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
-  unary('terminalOpen', 'TerminalOpenRequest', 'TerminalOpenResult', okOrError(z.object({
-    session: terminalSessionSchema,
-    motd: z.string(),
-  }))),
-  unary('terminalSend', 'TerminalSendRequest', 'TerminalSendResult', okOrError(z.object({
-    viewport: z.string(),
-    waitReason: z.enum(['stdin_read', 'inferred_idle', 'timeout', 'session_exit']),
-    sessionStatus: terminalStatusSchema,
-    truncated: z.boolean(),
-  }))),
-  unary('terminalRead', 'TerminalReadRequest', 'TerminalReadResult', okOrError(z.object({
-    text: z.string(),
-    totalLines: z.number(),
-    lineBegin: z.number(),
-    lineEnd: z.number(),
-    truncated: z.boolean(),
-  }))),
-  unary('terminalSignal', 'TerminalSignalRequest', 'TerminalSignalResult', okOrError(z.object({
-    delivered: z.literal(true),
-    targetPgid: z.number(),
-  }))),
-  unary('terminalClose', 'TerminalCloseRequest', 'TerminalCloseResult', okOrError(z.object({
-    closed: z.boolean(),
-  }))),
-  unary('terminalList', 'TerminalListRequest', 'TerminalListResult', okOrError(z.object({
-    sessions: z.array(terminalSessionSchema),
-  }))),
   nullary('taskList', 'TaskListResult', okOrError(z.object({ tasks: z.array(taskRecordSchema) }))),
   unary('taskCreate', 'TaskCreateRequest', 'TaskCreateResult', okOrError(z.object({ task: taskRecordSchema }))),
   unary('taskUpdate', 'TaskUpdateRequest', 'TaskUpdateResult', okOrError(z.object({ task: taskRecordSchema }))),

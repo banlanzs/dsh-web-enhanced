@@ -20,7 +20,6 @@ import { workspaceOfSessionId } from '../workspace.ts'
 import { BoardPanel } from '../board/BoardOverlay.tsx'
 import { GraphPanel } from '../git/GraphOverlay.tsx'
 import { FileTree } from './FileTree.tsx'
-import { TerminalPane } from './TerminalPane.tsx'
 import { PreviewPane } from './PreviewPane.tsx'
 import { ScmPane } from './ScmPane.tsx'
 import css from './WorkspaceView.module.css'
@@ -31,13 +30,12 @@ export type WorkspaceViewProps = WebEnhancedProps<'conversation.view'>
 /** Tabs in display order with their dictionary keys. */
 const TABS: ReadonlyArray<{
   tab: PanelTab
-  key: 'panel.tab.explorer' | 'panel.tab.scm' | 'panel.tab.board' | 'panel.tab.graph' | 'panel.tab.terminal'
+  key: 'panel.tab.explorer' | 'panel.tab.scm' | 'panel.tab.board' | 'panel.tab.graph'
 }> = [
   { tab: 'explorer', key: 'panel.tab.explorer' },
   { tab: 'scm', key: 'panel.tab.scm' },
   { tab: 'board', key: 'panel.tab.board' },
   { tab: 'graph', key: 'panel.tab.graph' },
-  { tab: 'terminal', key: 'panel.tab.terminal' },
 ]
 
 /** The workspace view. */
@@ -120,7 +118,6 @@ export function WorkspaceView(props: WorkspaceViewProps) {
             <PreviewPane {...props} workspaceId={String(workspaceId)} />
           </div>
         )}
-        {tab === 'terminal' && <TerminalPane {...props} workspaceId={String(workspaceId)} />}
         {tab === 'scm' && <ScmPane {...props} workspaceId={String(workspaceId)} />}
         {tab === 'board' && (
           <BoardPanel remote={props.remote} workspaces={workspaces.items} openSession={props.openSession} t={t} />

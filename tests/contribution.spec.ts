@@ -205,12 +205,6 @@ const payloads: Record<string, unknown[]> = {
     { ok: true, added: ['x'], removed: [], restartRequired: true, output: 'up to date' },
     errorPayload,
   ],
-  terminalOpen: [{ session: { sessionId: 'pty-1', type: 'shell', pid: 7, status: { kind: 'running' } }, motd: 'hi' }, errorPayload],
-  terminalSend: [{ viewport: 'out', waitReason: 'inferred_idle', sessionStatus: { kind: 'running' }, truncated: false }, errorPayload],
-  terminalRead: [{ text: 'page', totalLines: 3, lineBegin: 0, lineEnd: 3, truncated: false }, errorPayload],
-  terminalSignal: [{ delivered: true, targetPgid: 9 }, errorPayload],
-  terminalClose: [{ closed: true }, errorPayload],
-  terminalList: [{ sessions: [{ sessionId: 'pty-1', type: 'shell', status: { kind: 'exited', exitCode: 0, signal: null } }] }, errorPayload],
 }
 
 describe('webEnhancedRemote contribution', () => {
@@ -244,7 +238,7 @@ describe('webEnhancedRemote contribution', () => {
   it('exposes exactly the 31 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(37)
+    expect(methods).toHaveLength(31)
   })
 
   it('every result schema accepts its success and error payloads', () => {

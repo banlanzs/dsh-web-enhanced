@@ -130,7 +130,7 @@ export interface PanelState {
 export interface PanelActions {
     /**
      * Select the active tab.
-     * @param tab - explorer, scm, board, graph, or terminal.
+     * @param tab - explorer, scm, board, or graph.
      */
     readonly selectTab: (tab: PanelTab) => void;
     /**
