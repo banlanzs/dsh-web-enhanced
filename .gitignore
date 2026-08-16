@@ -5,3 +5,5 @@ lib/*.map
 FEATURE-REQUEST.md
 TODO.md
 MEMORY.md
+.claude
+.codex
