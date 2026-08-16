@@ -133,15 +133,29 @@
   scrollbar-color: var(--dsw-alias-border-l3, rgba(0 0 0 / 12%)) transparent;
 }
 
-/* The graph panel is chrome-free and the explorer owns the full bleed, so the
-   non-explorer panels get their own inset frame. Horizontal breathing room
-   keeps the commit rails and row text off the view's left/right edges. */
-.graph {
+/* Every workspace tab renders inside one framed, padded card: the margin
+   separates the card from the view's edges and the 2px border makes the
+   module boundary explicit instead of letting content bleed to the frame. */
+.module {
   display: flex;
   flex: 1;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
-  padding: 14px 20px 0;
+  margin: 12px;
+  padding: 12px;
+  border: 2px solid var(--dsw-alias-border-l3, rgba(0 0 0 / 12%));
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-1, transparent);
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsw-alias-border-l3, rgba(0 0 0 / 12%)) transparent;
+}
+
+.module > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

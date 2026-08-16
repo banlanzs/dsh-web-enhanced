@@ -86,48 +86,56 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       </nav>
       <div className={css.body} role="tabpanel">
         {tab === 'explorer' && (
-          <div
-            className={sidebarCollapsed ? css.explorerCollapsed : css.explorer}
-            data-testid="workspace-explorer"
-            data-sidebar={sidebarCollapsed ? 'collapsed' : 'expanded'}
-          >
-            {sidebarCollapsed
-              ? (
-                <button
-                  type="button"
-                  className={css.expand}
-                  aria-label={t('files.expand')}
-                  data-testid="workspace-sidebar-expand"
-                  title={t('files.expand')}
-                  onClick={() => { setSidebarCollapsed(false) }}
-                >
-                  <span aria-hidden="true">›</span>
-                </button>
-              )
-              : (
-                <aside className={css.sidebar}>
+          <div className={css.module}>
+            <div
+              className={sidebarCollapsed ? css.explorerCollapsed : css.explorer}
+              data-testid="workspace-explorer"
+              data-sidebar={sidebarCollapsed ? 'collapsed' : 'expanded'}
+            >
+              {sidebarCollapsed
+                ? (
                   <button
                     type="button"
-                    className={css.collapse}
-                    aria-label={t('files.collapse')}
-                    data-testid="workspace-sidebar-collapse"
-                    title={t('files.collapse')}
-                    onClick={() => { setSidebarCollapsed(true) }}
+                    className={css.expand}
+                    aria-label={t('files.expand')}
+                    data-testid="workspace-sidebar-expand"
+                    title={t('files.expand')}
+                    onClick={() => { setSidebarCollapsed(false) }}
                   >
-                    <span aria-hidden="true">‹</span>
+                    <span aria-hidden="true">›</span>
                   </button>
-                  <FileTree {...props} workspaceId={String(workspaceId)} />
-                </aside>
-              )}
-            <PreviewPane {...props} workspaceId={String(workspaceId)} />
+                )
+                : (
+                  <aside className={css.sidebar}>
+                    <button
+                      type="button"
+                      className={css.collapse}
+                      aria-label={t('files.collapse')}
+                      data-testid="workspace-sidebar-collapse"
+                      title={t('files.collapse')}
+                      onClick={() => { setSidebarCollapsed(true) }}
+                    >
+                      <span aria-hidden="true">‹</span>
+                    </button>
+                    <FileTree {...props} workspaceId={String(workspaceId)} />
+                  </aside>
+                )}
+              <PreviewPane {...props} workspaceId={String(workspaceId)} />
+            </div>
           </div>
         )}
-        {tab === 'scm' && <ScmPane {...props} workspaceId={String(workspaceId)} />}
+        {tab === 'scm' && (
+          <div className={css.module}>
+            <ScmPane {...props} workspaceId={String(workspaceId)} />
+          </div>
+        )}
         {tab === 'board' && (
-          <BoardPanel remote={props.remote} workspaces={workspaces.items} openSession={props.openSession} t={t} />
+          <div className={css.module}>
+            <BoardPanel remote={props.remote} workspaces={workspaces.items} openSession={props.openSession} t={t} />
+          </div>
         )}
         {tab === 'graph' && (
-          <div className={css.graph}>
+          <div className={css.module}>
             <GraphPanel workspaceId={String(workspaceId)} remote={props.remote} t={t} />
           </div>
         )}
