@@ -63,7 +63,11 @@ export function WorkspaceView(props: WorkspaceViewProps) {
   }
 
   return (
-    <section className={css.view} data-testid="workspace-view">
+    // Opting into the host's composer-overlay layout: ConversationRoot then
+    // gives this view a definite height and lets it own every scroller (the
+    // same contract the Trajectory view uses), instead of the page-scrolled
+    // default where the tree and the preview would ride one scroll together.
+    <section className={css.view} data-testid="workspace-view" data-conversation-composer-overlay="">
       <nav className={css.tabs} role="tablist">
         {TABS.map(entry => (
           <button

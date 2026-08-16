@@ -6,6 +6,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .tabs {
@@ -124,6 +125,9 @@
   flex: 1;
   flex-direction: column;
   min-height: 0;
+  /* The overlay layout floats the composer over this view's bottom edge;
+     ConversationRoot publishes its live height so the clearance tracks it. */
+  padding-bottom: calc(var(--dsh-composer-height, 152px) + 16px);
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--dsw-alias-border-l3, rgba(0 0 0 / 12%)) transparent;
