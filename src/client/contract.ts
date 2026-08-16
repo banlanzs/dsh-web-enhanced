@@ -18,6 +18,7 @@ import type {
   GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
+  ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
   OfficeBlock, OfficeKind, PluginListRequest,
   PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
   PricingView, TaskCreateRequest,
@@ -55,6 +56,8 @@ export interface WebEnhancedRemote {
   visionConfigGet(): Promise<VisionConfigGetResult>
   visionConfigSet(request: VisionConfigSaveRequest): Promise<VisionConfigSetResult>
   visionEndpointModels(request: VisionEndpointModelsRequest): Promise<VisionEndpointModelsResult>
+  modelRetryGet(): Promise<ModelRetryGetResult>
+  modelRetrySet(request: ModelRetrySetRequest): Promise<ModelRetrySetResult>
   gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>
   gitLog(request: GitLogRequest): Promise<GitLogResult>
   gitCommit(request: GitCommitRequest): Promise<GitCommitResult>
@@ -89,6 +92,7 @@ export type {
   GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry,
   GitStatusRequest, GitStatusResult, GitWorkingFileView, GitWorkingRequest, GitWorkingResult,
   GitWorkingState, GitWorkingView,
+  ModelRetryConfigView, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
   OfficeBlock, OfficeKind, PluginListRequest, PluginListResult,
   PluginListView, PluginMutateRequest, PluginMutateResult, PluginMutateView, PluginView,
   ModelPricingView, PricingGetRequest, PricingGetResult, PricingView, TaskCreateRequest,

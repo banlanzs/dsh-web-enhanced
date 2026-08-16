@@ -37,6 +37,7 @@ import type {
   GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
+  ModelRetryConfigView, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
   PluginListRequest, PluginListResult,
   PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
   TaskCreateRequest, TaskCreateResult,
@@ -72,6 +73,22 @@ interface SettingsVisionFace {
   describe(options?: { readonly redactSecrets?: boolean }): ReadonlyArray<{ readonly ns: string; readonly revision: number }>
   update(ns: unknown, patch: object, expectedRevision?: number): Promise<void>
   readonly writable: boolean
+}
+
+/** Settings namespace whose retry policy the model-retry remotes edit. */
+const MODEL_RETRY_SETTINGS_NS = 'llm-deepseek'
+
+/** The resolved shape of the DeepSeek adapter's retry policy settings. */
+interface DeepSeekRetrySettingsValue {
+  readonly retryPolicy?: {
+    readonly mode?: 'normal' | 'always'
+    readonly maxRetries?: number
+    readonly backoff?: {
+      readonly initialDelayMs?: number
+      readonly maxDelayMs?: number
+      readonly jitterRatio?: number
+    }
+  }
 }
 
 /** The provider/model directory face the vision config picker reads. */
@@ -481,6 +498,71 @@ export class WebEnhancedGateway extends TypertRemoteService {
   }
 
   /**
+   * Read the DeepSeek provider's current model-request retry policy from the
+   * host's settings service. Saving a number switches the provider back to
+   * bounded normal mode and takes effect on the next request without a
+   * restart (`llm-deepseek` re-registers its route when the policy changes).
+   */
+  @Remote('modelRetryGet')
+  async modelRetryGet(): Promise<ModelRetryGetResult> {
+    try {
+      const settings = this.modelRetrySettings()
+      if (settings === undefined) {
+        return { error: { code: 'model-retry-settings-unavailable', message: 'the settings service is not mounted in this deployment' } }
+      }
+      const raw = settings.get(MODEL_RETRY_SETTINGS_NS as never) as DeepSeekRetrySettingsValue | undefined
+      const policy = raw?.retryPolicy
+      if (raw === undefined || policy === undefined) {
+        return { error: { code: 'model-retry-settings-unmanaged', message: `settings namespace '${MODEL_RETRY_SETTINGS_NS}' is not registered` } }
+      }
+      const descriptor = settings.describe().find(entry => entry.ns === MODEL_RETRY_SETTINGS_NS)
+      const config: ModelRetryConfigView = {
+        provider: 'deepseek-official',
+        managed: true,
+        writable: settings.writable,
+        revision: descriptor?.revision ?? null,
+        mode: policy.mode === 'always' ? 'always' : 'normal',
+        maxRetries: policy.mode === 'always' ? null : policy.maxRetries ?? 2,
+        initialDelayMs: policy.backoff?.initialDelayMs ?? 500,
+        maxDelayMs: policy.backoff?.maxDelayMs ?? 10_000,
+        jitterRatio: policy.backoff?.jitterRatio ?? 0.1,
+      }
+      return { config }
+    } catch (error) {
+      return { error: this.errorOf(error, 'model-retry-config') }
+    }
+  }
+
+  /** Save a bounded retry count into the DeepSeek provider settings. */
+  @Remote('modelRetrySet')
+  async modelRetrySet(request: ModelRetrySetRequest): Promise<ModelRetrySetResult> {
+    try {
+      if (!Number.isSafeInteger(request.maxRetries) || request.maxRetries < 0) {
+        return { error: { code: 'model-retry-invalid', message: 'maxRetries must be a non-negative safe integer' } }
+      }
+      const settings = this.modelRetrySettings()
+      if (settings === undefined) {
+        return { error: { code: 'model-retry-settings-unavailable', message: 'the settings service is not mounted in this deployment' } }
+      }
+      if (!settings.writable) {
+        return { error: { code: 'model-retry-settings-readonly', message: 'the settings provider is read-only' } }
+      }
+      const raw = settings.get(MODEL_RETRY_SETTINGS_NS as never)
+      if (raw === undefined) {
+        return { error: { code: 'model-retry-settings-unmanaged', message: `settings namespace '${MODEL_RETRY_SETTINGS_NS}' is not registered` } }
+      }
+      await settings.update(MODEL_RETRY_SETTINGS_NS as never, {
+        retryPolicy: { mode: 'normal', maxRetries: request.maxRetries },
+      }, request.expectedRevision)
+      const revision = settings.describe().find(entry => entry.ns === MODEL_RETRY_SETTINGS_NS)?.revision ?? 0
+      return { ok: true, revision }
+    } catch (error) {
+      const conflict = (error as { code?: unknown }).code === 'SETTINGS_CONFLICT'
+      return { error: this.errorOf(error, conflict ? 'model-retry-conflict' : 'model-retry-save') }
+    }
+  }
+
+  /**
    * Fetch the dedicated endpoint's `/models` listing. A typed key is one-shot
    * for this call; otherwise the SAVED key (or its env fallback) is used. The
    * key is never stored, logged, or returned.
@@ -773,6 +855,11 @@ export class WebEnhancedGateway extends TypertRemoteService {
   // ── internals ────────────────────────────────────────────────────────────
   /** The settings provider the vision config remotes read and write. */
   private visionSettings(): SettingsVisionFace | undefined {
+    return this.ctx.get('settings' as never, false) as unknown as SettingsVisionFace | undefined
+  }
+
+  /** The settings provider the model-retry remotes read and write. */
+  private modelRetrySettings(): SettingsVisionFace | undefined {
     return this.ctx.get('settings' as never, false) as unknown as SettingsVisionFace | undefined
   }
 

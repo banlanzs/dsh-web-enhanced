@@ -227,7 +227,7 @@ describe('WebEnhancedGateway', () => {
     expect(gateway.typertRemote).toMatchObject({ serviceKey: 'webEnhanced', namespace: 'webEnhanced' })
     expect(remoteMethods(gateway).map(entry => entry.method)).toEqual([
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet', 'pricingGet',
-      'visionStatus', 'visionConfigGet', 'visionConfigSet', 'visionEndpointModels',
+      'visionStatus', 'visionConfigGet', 'visionConfigSet', 'modelRetryGet', 'modelRetrySet', 'visionEndpointModels',
       'gitBranches', 'gitLog', 'gitCommit', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',
@@ -811,6 +811,77 @@ describe('WebEnhancedGateway', () => {
 
       vi.unstubAllGlobals()
       expect(await gateway.visionEndpointModels({})).toMatchObject({ error: { code: 'vision-endpoint-missing' } })
+    })
+  })
+
+  describe('model retry remote', () => {
+    it('answers model-retry-settings-unavailable when no settings service is mounted', async () => {
+      const { gateway } = await harness()
+      expect(await gateway.modelRetryGet()).toMatchObject({ error: { code: 'model-retry-settings-unavailable' } })
+      expect(await gateway.modelRetrySet({ maxRetries: 3 }))
+        .toMatchObject({ error: { code: 'model-retry-settings-unavailable' } })
+    })
+
+    it('reads the DeepSeek retry policy and saves a bounded retry count with CAS', async () => {
+      const { ctx, gateway } = await harness()
+      const section: Record<string, unknown> = {
+        retryPolicy: {
+          mode: 'always',
+          backoff: { initialDelayMs: 25, maxDelayMs: 100, jitterRatio: 0.2 },
+        },
+      }
+      const update = vi.fn(async (_ns: unknown, patch: object) => {
+        Object.assign(section.retryPolicy as Record<string, unknown>, patch.retryPolicy as Record<string, unknown>)
+      })
+      ctx.provide('settings' as never, {
+        get: () => section,
+        describe: () => [{ ns: 'llm-deepseek', revision: 5 }],
+        update,
+        writable: true,
+      } as never)
+
+      const view = await gateway.modelRetryGet()
+      if ('error' in view) throw new Error(view.error.message)
+      expect(view.config).toMatchObject({
+        provider: 'deepseek-official', mode: 'always', maxRetries: null,
+        initialDelayMs: 25, maxDelayMs: 100, jitterRatio: 0.2,
+      })
+
+      expect(await gateway.modelRetrySet({ maxRetries: 4, expectedRevision: 5 }))
+        .toEqual({ ok: true, revision: 5 })
+      expect(update).toHaveBeenCalledWith('llm-deepseek', {
+        retryPolicy: { mode: 'normal', maxRetries: 4 },
+      }, 5)
+    })
+
+    it('rejects a non-integer retry count before touching settings', async () => {
+      const { ctx, gateway } = await harness()
+      const update = vi.fn(async () => {})
+      ctx.provide('settings' as never, {
+        get: () => ({ retryPolicy: { mode: 'normal', maxRetries: 2 } }),
+        describe: () => [{ ns: 'llm-deepseek', revision: 1 }],
+        update,
+        writable: true,
+      } as never)
+      expect(await gateway.modelRetrySet({ maxRetries: 1.5 }))
+        .toMatchObject({ error: { code: 'model-retry-invalid' } })
+      expect(update).not.toHaveBeenCalled()
+    })
+
+    it('maps a settings conflict onto the conflict code', async () => {
+      const { ctx, gateway } = await harness()
+      ctx.provide('settings' as never, {
+        get: () => ({ retryPolicy: { mode: 'normal', maxRetries: 2 } }),
+        describe: () => [{ ns: 'llm-deepseek', revision: 9 }],
+        update: async () => {
+          const error = new Error('stale') as Error & { code: string }
+          error.code = 'SETTINGS_CONFLICT'
+          throw error
+        },
+        writable: true,
+      } as never)
+      expect(await gateway.modelRetrySet({ maxRetries: 1, expectedRevision: 3 }))
+        .toMatchObject({ error: { code: 'model-retry-conflict' } })
     })
   })
 

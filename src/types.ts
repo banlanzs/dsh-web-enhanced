@@ -431,6 +431,43 @@ export interface VisionStatusView {
 
 export type VisionStatusResult = VisionStatusView | { readonly error: ApiError }
 
+/**
+ * The DeepSeek provider's model-request retry policy, as the Settings tab
+ * edits it. `maxRetries` is null when the provider is configured for
+ * unbounded (`always`) retries; saving a number switches it to bounded normal
+ * mode.
+ */
+export interface ModelRetryConfigView {
+  readonly provider: 'deepseek-official'
+  /** Whether the llm-deepseek settings namespace is registered. */
+  readonly managed: boolean
+  readonly writable: boolean
+  /** CAS revision; send it back with the next save. */
+  readonly revision: number | null
+  readonly mode: 'normal' | 'always'
+  /** null = retries every failure until success, cancellation, or disposal. */
+  readonly maxRetries: number | null
+  readonly initialDelayMs: number
+  readonly maxDelayMs: number
+  readonly jitterRatio: number
+}
+
+export type ModelRetryGetResult = { readonly config: ModelRetryConfigView } | { readonly error: ApiError }
+
+/** One save, carrying the revision the form loaded. */
+export interface ModelRetrySetRequest {
+  readonly maxRetries: number
+  readonly expectedRevision?: number
+}
+
+/** Successful save; `revision` is the new CAS value. */
+export interface ModelRetrySetView {
+  readonly ok: true
+  readonly revision: number
+}
+
+export type ModelRetrySetResult = ModelRetrySetView | { readonly error: ApiError }
+
 /** One model a DSH provider offers, with its advertised image capability. */
 export interface VisionModelOptionView {
   readonly id: string

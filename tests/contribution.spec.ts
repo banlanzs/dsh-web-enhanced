@@ -31,7 +31,7 @@ const entry = { name: 'a', path: 'a', kind: 'file', size: 3 }
  * Methods invoked with no argument at all. Everything else takes exactly one
  * request object — see the arity guard below.
  */
-const nullaryMethods = new Set(['taskList', 'visionStatus', 'visionConfigGet'])
+const nullaryMethods = new Set(['taskList', 'visionStatus', 'visionConfigGet', 'modelRetryGet'])
 
 const visionStatusSample = {
   mounted: true,
@@ -133,6 +133,32 @@ const payloads: Record<string, unknown[]> = {
     models: [],
     truncated: true,
   }, errorPayload],
+  modelRetryGet: [{
+    config: {
+      provider: 'deepseek-official',
+      managed: true,
+      writable: true,
+      revision: 7,
+      mode: 'normal',
+      maxRetries: 3,
+      initialDelayMs: 500,
+      maxDelayMs: 10000,
+      jitterRatio: 0.1,
+    },
+  }, {
+    config: {
+      provider: 'deepseek-official',
+      managed: true,
+      writable: true,
+      revision: 8,
+      mode: 'always',
+      maxRetries: null,
+      initialDelayMs: 25,
+      maxDelayMs: 100,
+      jitterRatio: 0.2,
+    },
+  }, errorPayload],
+  modelRetrySet: [{ ok: true, revision: 9 }, errorPayload],
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
   gitCommit: [{ commit: commitDetail }, errorPayload],
@@ -235,10 +261,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 31 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 33 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(31)
+    expect(methods).toHaveLength(33)
   })
 
   it('every result schema accepts its success and error payloads', () => {

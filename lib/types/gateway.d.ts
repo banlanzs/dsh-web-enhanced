@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
 /** One fallback vision endpoint entry, as declared in plugin config. */
 export interface VisionFallbackConfig {
     model: string;
@@ -125,6 +125,15 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
      */
     visionConfigSet(request: VisionConfigSaveRequest): Promise<VisionConfigSetResult>;
     /**
+     * Read the DeepSeek provider's current model-request retry policy from the
+     * host's settings service. Saving a number switches the provider back to
+     * bounded normal mode and takes effect on the next request without a
+     * restart (`llm-deepseek` re-registers its route when the policy changes).
+     */
+    modelRetryGet(): Promise<ModelRetryGetResult>;
+    /** Save a bounded retry count into the DeepSeek provider settings. */
+    modelRetrySet(request: ModelRetrySetRequest): Promise<ModelRetrySetResult>;
+    /**
      * Fetch the dedicated endpoint's `/models` listing. A typed key is one-shot
      * for this call; otherwise the SAVED key (or its env fallback) is used. The
      * key is never stored, logged, or returned.
@@ -188,6 +197,8 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     pluginUpdate(request: PluginMutateRequest): Promise<PluginMutateResult>;
     /** The settings provider the vision config remotes read and write. */
     private visionSettings;
+    /** The settings provider the model-retry remotes read and write. */
+    private modelRetrySettings;
     /** The live integration status, or the explicit unmounted state. */
     private visionStatusView;
     /** Providers and models for the Vision tab, from the model picker's source. */

@@ -8,10 +8,10 @@
  * shell's own id allowlist (an unknown id gets the generic one) and nothing
  * else about the nav is ours to decide.
  *
- * The page carries its own tabs because it hosts four unrelated things:
- * managing what the profile has installed, configuring image understanding,
- * switching the interface skin, and describing what this plugin is. None
- * deserves a separate nav row.
+ * The page carries its own tabs because it hosts five unrelated things:
+ * managing what the profile has installed, editing the model-request retry
+ * count, configuring image understanding, switching the interface skin, and
+ * describing what this plugin is. None deserves a separate nav row.
  * @module dsh-web-enhanced/src/client/settings/SettingsSection
  */
 import type { WebEnhancedProps } from '../contract.ts';
