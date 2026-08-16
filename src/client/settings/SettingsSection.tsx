@@ -9,8 +9,8 @@
  * else about the nav is ours to decide.
  *
  * The page carries its own tabs because it hosts five unrelated things:
- * managing what the profile has installed, editing the model-request retry
- * count, configuring image understanding, switching the interface skin, and
+ * managing what the profile has installed, general settings (model-request
+ * retry), configuring image understanding, switching the interface skin, and
  * describing what this plugin is. None deserves a separate nav row.
  * @module dsh-web-enhanced/src/client/settings/SettingsSection
  */
@@ -22,7 +22,7 @@ import type { WebEnhancedProps } from '../contract.ts'
 import { SkinPanel } from '../skins/SkinPanel.tsx'
 import type { SkinFace } from '../skins/skin-layer.ts'
 import { AboutPanel } from './AboutPanel.tsx'
-import { ModelRetryPanel } from './ModelRetryPanel.tsx'
+import { GeneralSettingsPanel } from './GeneralSettingsPanel.tsx'
 import { PluginManager } from './PluginManager.tsx'
 import { VisionStatusPanel } from './VisionStatusPanel.tsx'
 import css from './SettingsSection.module.css'
@@ -31,14 +31,14 @@ import css from './SettingsSection.module.css'
 export type SettingsSectionProps = WebEnhancedProps<'settings.section'>
 
 /** Which page of the section is showing. */
-type Tab = 'plugins' | 'model' | 'vision' | 'skins' | 'about'
+type Tab = 'plugins' | 'general' | 'vision' | 'skins' | 'about'
 
 /** The web-enhanced settings page. */
 export function SettingsSection({ remote, t, skin }: SettingsSectionProps) {
   const [tab, setTab] = useState<Tab>('plugins')
   const tabs: ReadonlyArray<{ id: Tab; label: string }> = [
     { id: 'plugins', label: t('settings.tab.plugins') },
-    { id: 'model', label: t('settings.tab.model') },
+    { id: 'general', label: t('settings.tab.general') },
     { id: 'vision', label: t('settings.tab.vision') },
     { id: 'skins', label: t('settings.tab.skins') },
     { id: 'about', label: t('settings.tab.about') },
@@ -61,7 +61,7 @@ export function SettingsSection({ remote, t, skin }: SettingsSectionProps) {
       </div>
       <div className={css.body}>
         {tab === 'plugins' && <PluginManager remote={remote} t={t} />}
-        {tab === 'model' && <ModelRetryPanel remote={remote} t={t} />}
+        {tab === 'general' && <GeneralSettingsPanel remote={remote} t={t} />}
         {tab === 'vision' && <VisionStatusPanel remote={remote} t={t} />}
         {tab === 'skins' && <SkinPanel skin={skin} t={t} />}
         {tab === 'about' && <AboutPanel t={t} />}

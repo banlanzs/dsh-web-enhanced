@@ -87,10 +87,12 @@ export declare const zh: {
     readonly 'browse.error': "读取目录失败：{message}";
     readonly 'settings.nav': "Web 增强";
     readonly 'settings.tab.plugins': "插件管理";
-    readonly 'settings.tab.model': "模型重试";
+    readonly 'settings.tab.general': "通用设置";
     readonly 'settings.tab.vision': "识图";
     readonly 'settings.tab.about': "关于";
     readonly 'settings.tab.skins': "皮肤";
+    readonly 'settings.general.title': "通用设置";
+    readonly 'settings.general.hint': "不属于其他标签页的通用偏好。";
     readonly 'modelRetry.title': "模型请求重试";
     readonly 'modelRetry.provider': "渠道";
     readonly 'modelRetry.providerName': "DeepSeek 官方（deepseek-official）";

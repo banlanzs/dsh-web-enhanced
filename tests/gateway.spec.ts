@@ -854,6 +854,23 @@ describe('WebEnhancedGateway', () => {
       }, 5)
     })
 
+    it('reads normal defaults when the namespace has no stored retryPolicy yet', async () => {
+      const { ctx, gateway } = await harness()
+      ctx.provide('settings' as never, {
+        get: () => ({}),
+        describe: () => [{ ns: 'llm-deepseek', revision: 1 }],
+        update: async () => {},
+        writable: true,
+      } as never)
+      const view = await gateway.modelRetryGet()
+      if ('error' in view) throw new Error(view.error.message)
+      expect(view.config).toMatchObject({
+        provider: 'deepseek-official', mode: 'normal', maxRetries: 2,
+        initialDelayMs: 500, maxDelayMs: 10000, jitterRatio: 0.1,
+      })
+      expect(await gateway.modelRetrySet({ maxRetries: 0 })).toEqual({ ok: true, revision: 1 })
+    })
+
     it('rejects a non-integer retry count before touching settings', async () => {
       const { ctx, gateway } = await harness()
       const update = vi.fn(async () => {})

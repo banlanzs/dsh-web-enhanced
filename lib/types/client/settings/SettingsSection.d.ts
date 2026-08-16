@@ -9,8 +9,8 @@
  * else about the nav is ours to decide.
  *
  * The page carries its own tabs because it hosts five unrelated things:
- * managing what the profile has installed, editing the model-request retry
- * count, configuring image understanding, switching the interface skin, and
+ * managing what the profile has installed, general settings (model-request
+ * retry), configuring image understanding, switching the interface skin, and
  * describing what this plugin is. None deserves a separate nav row.
  * @module dsh-web-enhanced/src/client/settings/SettingsSection
  */
