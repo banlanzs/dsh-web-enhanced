@@ -325,6 +325,73 @@ export interface PricingView {
 
 export type PricingGetResult = PricingView | { readonly error: ApiError }
 
+/** One display-name lookup for the balance line's provider/model group. */
+export interface ModelRouteDescribeRequest {
+  readonly provider: string
+  readonly model: string
+}
+
+/** Directory display names matching the model picker, with raw ids echoed. */
+export interface ModelRouteDescribeView {
+  readonly provider: string
+  readonly model: string
+  readonly providerName: string
+  readonly modelName: string
+}
+
+export type ModelRouteDescribeResult = ModelRouteDescribeView | { readonly error: ApiError }
+
+/** One DeepSeek price window, CNY per one million tokens. */
+export interface DeepSeekRateWindow {
+  readonly inputCacheHit: number
+  readonly inputCacheMiss: number
+  readonly output: number
+}
+
+/** One DeepSeek billing-clock lookup for the session's current model. */
+export interface DeepSeekRateGetRequest {
+  readonly model: string
+}
+
+/** The current DeepSeek period and prices; `unknown` hides the period group. */
+export interface DeepSeekRateView {
+  readonly model: string
+  readonly mode: 'peak-valley' | 'flat' | 'unknown'
+  readonly period: 'peak' | 'offpeak' | 'flat'
+  readonly currency: 'CNY'
+  /** Prices active at `now`; null for models outside the table. */
+  readonly prices: DeepSeekRateWindow | null
+  /** Epoch ms of the next peak/off-peak switch; null for flat/unknown. */
+  readonly nextSwitchAt: number | null
+  /** Beijing `HH:MM` of the next switch. */
+  readonly nextSwitchLabel: string | null
+  /** Whether the next switch enters a peak window. */
+  readonly nextIsPeak: boolean
+  /** The instant the view describes. */
+  readonly now: number
+}
+
+export type DeepSeekRateGetResult = DeepSeekRateView | { readonly error: ApiError }
+
+/** One OpenCode Go usage window: rolling 5 hours, weekly, or monthly. */
+export interface OpencodeGoWindow {
+  readonly key: 'five_hour' | 'seven_day' | 'monthly'
+  /** Used percent as published, 0–100. */
+  readonly usedPercent: number
+  /** Reset instant in epoch ms, or null when the API omitted it. */
+  readonly resetsAt: number | null
+}
+
+/** OpenCode Go subscription usage; `error` is a field, never a throw. */
+export interface OpencodeGoUsageView {
+  readonly provider: 'opencode-go'
+  readonly plan: 'OpenCode Go'
+  readonly windows: readonly OpencodeGoWindow[]
+  /** Last successful fetch; null until one succeeds. */
+  readonly fetchedAt: number | null
+  readonly error?: ApiError
+}
+
 /** One installed profile plugin. */
 export interface PluginView {
   readonly name: string

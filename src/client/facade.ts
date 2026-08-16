@@ -16,7 +16,7 @@
  */
 
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
-import type { ApiError, BalanceView, WebEnhancedRemote } from './contract.ts'
+import type { ApiError, BalanceView, OpencodeGoUsageView, WebEnhancedRemote } from './contract.ts'
 
 /**
  * The raw mounted namespace: the same method names, each resolving to the
@@ -71,6 +71,22 @@ export function createRemoteFacade(
         : { applicable: true, isAvailable: false, infos: [], cachedAt: now(), error: apiErrorOf(settled.error) }
     },
     pricingGet: async request => open(await raw.pricingGet(request)),
+    modelRouteDescribe: async request => open(await raw.modelRouteDescribe(request)),
+    deepseekRateGet: async request => open(await raw.deepseekRateGet(request)),
+    // OpencodeGoUsageView carries its own optional `error`, so a carrier
+    // failure becomes an unavailable view instead of a foreign shape.
+    opencodeGoUsageGet: async (): Promise<OpencodeGoUsageView> => {
+      const settled = await raw.opencodeGoUsageGet()
+      return settled.ok
+        ? settled.value
+        : {
+          provider: 'opencode-go',
+          plan: 'OpenCode Go',
+          windows: [],
+          fetchedAt: null,
+          error: apiErrorOf(settled.error),
+        }
+    },
     visionStatus: async () => open(await raw.visionStatus()),
     visionConfigGet: async () => open(await raw.visionConfigGet()),
     visionConfigSet: async request => open(await raw.visionConfigSet(request)),

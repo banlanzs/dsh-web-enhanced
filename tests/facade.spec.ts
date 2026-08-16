@@ -34,10 +34,16 @@ describe('createRemoteFacade', () => {
       taskList: vi.fn(async () => carrierFailure),
       gitStatus: vi.fn(async () => carrierFailure),
       fsList: vi.fn(async () => carrierFailure),
+      modelRouteDescribe: vi.fn(async () => carrierFailure),
+      deepseekRateGet: vi.fn(async () => carrierFailure),
     }))
     expect(await facade.taskList()).toEqual({ error: { code: 'not-found', message: 'no such Remote method' } })
     expect(await facade.gitStatus({ workspaceId: 'w1' })).toEqual({ error: { code: 'not-found', message: 'no such Remote method' } })
     expect(await facade.fsList({ workspaceId: 'w1' })).toEqual({ error: { code: 'not-found', message: 'no such Remote method' } })
+    expect(await facade.modelRouteDescribe({ provider: 'p', model: 'm' }))
+      .toEqual({ error: { code: 'not-found', message: 'no such Remote method' } })
+    expect(await facade.deepseekRateGet({ model: 'm' }))
+      .toEqual({ error: { code: 'not-found', message: 'no such Remote method' } })
   })
 
   it('keeps a failed balance query a renderable, still-applicable BalanceView', async () => {
@@ -52,6 +58,17 @@ describe('createRemoteFacade', () => {
       isAvailable: false,
       infos: [],
       cachedAt: 1234,
+      error: { code: 'not-found', message: 'no such Remote method' },
+    })
+  })
+
+  it('keeps a failed OpenCode Go query a renderable usage view', async () => {
+    const facade = createRemoteFacade(rawWith({ opencodeGoUsageGet: vi.fn(async () => carrierFailure) }), () => 1234)
+    expect(await facade.opencodeGoUsageGet()).toEqual({
+      provider: 'opencode-go',
+      plan: 'OpenCode Go',
+      windows: [],
+      fetchedAt: null,
       error: { code: 'not-found', message: 'no such Remote method' },
     })
   })

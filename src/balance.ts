@@ -31,6 +31,8 @@ export type ResolveCredential = (ref: string) => Promise<string | undefined>
 /** Balance query client with a short-lived view cache. */
 export class BalanceClient {
   private cache: { readonly at: number; readonly value: BalanceReading } | null = null
+  /** Last successful snapshot, kept across failures for the stale display. */
+  private lastGood: BalanceReading | null = null
 
   /**
    * @param config - key reference, cache TTL, and endpoint base.
@@ -47,12 +49,14 @@ export class BalanceClient {
     if (this.cache !== null && now - this.cache.at < this.config.cacheTtlMs) return this.cache.value
     const view = await this.fetchBalance(now)
     this.cache = { at: now, value: view }
+    if (view.error === undefined) this.lastGood = view
     return view
   }
 
   /** Drop the cached view (the settings plane can force a refresh). */
   clear(): void {
     this.cache = null
+    this.lastGood = null
   }
 
   /**
@@ -68,16 +72,22 @@ export class BalanceClient {
     return ambient === undefined || ambient.trim() === '' ? undefined : ambient
   }
 
+  /** One failure view, carrying the last successful snapshot when there is one. */
+  private failure(now: number, code: string, message: string): BalanceReading {
+    if (this.lastGood === null) {
+      return { isAvailable: false, infos: [], cachedAt: now, error: { code, message } }
+    }
+    return { ...this.lastGood, isAvailable: false, cachedAt: now, error: { code, message } }
+  }
+
   private async fetchBalance(now: number): Promise<BalanceReading> {
     const key = await this.apiKey()
     if (key === undefined) {
-      return {
-        isAvailable: false, infos: [], cachedAt: now,
-        error: {
-          code: 'no-api-key',
-          message: `credential ${this.config.apiKeyEnv} is not configured (checked the credential store and the environment)`,
-        },
-      }
+      return this.failure(
+        now,
+        'no-api-key',
+        `credential ${this.config.apiKeyEnv} is not configured (checked the credential store and the environment)`,
+      )
     }
     let response: Response
     try {
@@ -85,25 +95,16 @@ export class BalanceClient {
         headers: { Accept: 'application/json', Authorization: `Bearer ${key}` },
       })
     } catch {
-      return {
-        isAvailable: false, infos: [], cachedAt: now,
-        error: { code: 'balance-unreachable', message: 'the balance endpoint could not be reached' },
-      }
+      return this.failure(now, 'balance-unreachable', 'the balance endpoint could not be reached')
     }
     if (!response.ok) {
-      return {
-        isAvailable: false, infos: [], cachedAt: now,
-        error: { code: 'balance-http', message: `balance endpoint answered ${response.status}` },
-      }
+      return this.failure(now, 'balance-http', `balance endpoint answered ${response.status}`)
     }
     let body: unknown
     try {
       body = await response.json()
     } catch {
-      return {
-        isAvailable: false, infos: [], cachedAt: now,
-        error: { code: 'balance-invalid', message: 'the balance response was not JSON' },
-      }
+      return this.failure(now, 'balance-invalid', 'the balance response was not JSON')
     }
     return parseBalanceBody(body, now)
   }

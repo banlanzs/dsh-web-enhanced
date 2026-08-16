@@ -10,7 +10,8 @@ import type {
   InjectFace, PropsLocale, PropsRuntime, SlotMap,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
-  BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest,
+  BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult,
+  FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest,
   FsListResult,
   FsOfficePreviewRequest,
   FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult,
@@ -19,6 +20,7 @@ import type {
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
   ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
+  ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView,
   OfficeBlock, OfficeKind, PluginListRequest,
   PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
   PricingView, TaskCreateRequest,
@@ -52,6 +54,9 @@ export interface WebEnhancedRemote {
   taskRun(request: TaskRunRequest): Promise<TaskRunResult>
   balanceGet(request: BalanceGetRequest): Promise<BalanceView>
   pricingGet(request: PricingGetRequest): Promise<PricingGetResult>
+  modelRouteDescribe(request: ModelRouteDescribeRequest): Promise<ModelRouteDescribeResult>
+  deepseekRateGet(request: DeepSeekRateGetRequest): Promise<DeepSeekRateGetResult>
+  opencodeGoUsageGet(): Promise<OpencodeGoUsageView>
   visionStatus(): Promise<VisionStatusResult>
   visionConfigGet(): Promise<VisionConfigGetResult>
   visionConfigSet(request: VisionConfigSaveRequest): Promise<VisionConfigSetResult>
@@ -82,7 +87,9 @@ export interface WebEnhancedRemote {
 
 /** Re-exported payload types (components, tests, and preview helpers). */
 export type {
-  ApiError, BalanceGetRequest, BalanceView, FsBrowseEntry, FsBrowseRequest, FsBrowseResult,
+  ApiError, BalanceGetRequest, BalanceInfo, BalanceView, DeepSeekRateGetRequest,
+  DeepSeekRateGetResult, DeepSeekRateView, DeepSeekRateWindow, FsBrowseEntry,
+  FsBrowseRequest, FsBrowseResult,
   FsBrowseView, FsDeleteRequest, FsEntryView, FsListRequest,
   FsListResult,
   FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest,
@@ -93,6 +100,8 @@ export type {
   GitStatusRequest, GitStatusResult, GitWorkingFileView, GitWorkingRequest, GitWorkingResult,
   GitWorkingState, GitWorkingView,
   ModelRetryConfigView, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
+  ModelRouteDescribeRequest, ModelRouteDescribeResult, ModelRouteDescribeView,
+  OpencodeGoUsageView, OpencodeGoWindow,
   OfficeBlock, OfficeKind, PluginListRequest, PluginListResult,
   PluginListView, PluginMutateRequest, PluginMutateResult, PluginMutateView, PluginView,
   ModelPricingView, PricingGetRequest, PricingGetResult, PricingView, TaskCreateRequest,

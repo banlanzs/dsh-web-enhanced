@@ -29,6 +29,8 @@ export declare class BalanceClient {
     private readonly config;
     private readonly resolveCredential?;
     private cache;
+    /** Last successful snapshot, kept across failures for the stale display. */
+    private lastGood;
     /**
      * @param config - key reference, cache TTL, and endpoint base.
      * @param resolveCredential - credential-seam lookup; omitted falls back to the environment.
@@ -43,5 +45,7 @@ export declare class BalanceClient {
      * next refresh — the same per-operation contract the adapters follow.
      */
     private apiKey;
+    /** One failure view, carrying the last successful snapshot when there is one. */
+    private failure;
     private fetchBalance;
 }

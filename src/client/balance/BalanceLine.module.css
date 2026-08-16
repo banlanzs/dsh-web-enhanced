@@ -29,10 +29,13 @@
 .line {
   /* Same width discipline as the host's stats line under the composer: the
      row lives in the bar's width column, so it must center on the chat
-     content width and elide instead of bleeding past the card. */
+     content width and elide instead of bleeding past the card. Groups wrap
+     onto a second centered line instead of pushing each other out. */
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   box-sizing: border-box;
   width: 100%;
   max-width: var(--dsh-chat-content-width);
@@ -46,6 +49,45 @@
 .label {
   flex: none;
   color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
+}
+
+.group {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group strong {
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+}
+
+.peak,
+.offpeak {
+  font-weight: 700;
+}
+
+.peak {
+  color: var(--dsw-alias-state-warn-primary, rgb(217 119 6));
+}
+
+.offpeak {
+  color: var(--dsw-alias-state-success-primary, rgb(22 163 74));
+}
+
+.stale {
+  color: var(--dsw-alias-state-warn-primary, rgb(217 119 6));
+}
+
+.warn {
+  color: var(--dsw-alias-state-error-primary, rgb(236 19 19));
 }
 
 .value,

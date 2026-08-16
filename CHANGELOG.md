@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### 新增：余额行升级为 DeepSeek 信息行 + OpenCode Go 额度显示（参考 dsh-bottom-info-bar）
+
+- **DeepSeek 余额模式（余额行升级）**：服务商 / 模型显示名走宿主 LLM 目录（与模型选择器同源，adapter 变更自动重建缓存）；余额显示 CNY 主币种并带 hover 明细（赠送 / 充值），低于 ¥20 显示 ⚠；新增北京时间峰谷价时段（V4 Flash/Pro：高峰/空闲价 + 距下次切换倒计时，legacy chat：固定价，未知模型自动隐藏时段组）；本对话花费对 DeepSeek V4/chat 用 CNY 价表、其余模型回退 models.dev USD，新对话固定显示 `¥0.000`。整行每分钟自动刷新，失败保留上次成功快照并标记 stale，不再随网络抖动消失。
+- **OpenCode Go 订阅模式**：模型渠道为 `opencode-go` / `opencode` 时，同一行互斥切换为 `OpenCode Go · 模型` + `5h / 周 / 月` 三窗口剩余百分比 + 最紧窗口距重置倒计时。数据来自 `GET https://opencode.ai/zen/go/v1/usage`（防御性解析：status 非 ok / 缺 percent 跳过；失败保留旧快照）；Key 依次读 DSH credentials `OPENCODE_GO_API_KEY` 与环境、再回退 `~/.local/share/opencode/auth.json`（`opencode-go` → `opencode`）。任一窗口剩余 ≤20% 琥珀 ⚠，未配置 key 显示配置引导。**不含 ChatGPT/Codex**——额度在 opencode CLI 消耗，与 DSH 对话记账独立展示。
+- 新增 Remote 3 个：`modelRouteDescribe` / `deepseekRateGet` / `opencodeGoUsageGet`（方法 33 → 36）；`BalanceClient` 增加 last-good 失败合并；新增 config：`opencodeGoUsageUrl` / `opencodeGoCacheTtlMs` / `opencodeGoAuthFile`。
+
 ### 新增：设置 → 模型能力（编辑模型 input 与推理强度）
 
 宿主「模型」页只编辑 id / 名称 / 上下文参数，`input` 与推理强度一直只能手改 settings.yaml。新增独立设置节 `model-capabilities`（紧邻「模型」之后），复用宿主同款 `llm.providers` + `settings.describe` + `llm.models` 数据源与 `settings.mutate` 路径补丁纪律：
@@ -23,7 +29,7 @@
 ### 增强：对话节点导航条补齐更早轮次
 
 - 0.19.0 的节点导航条只看得见已渲染轮次；现在经 sessionStats projection 补齐未渲染的更早轮次虚拟点，点击自动分页 `loadOlder` 并跳转；虚拟点上限 200，超出折叠为「还有更早轮次」标记，避免超长会话节点失控。
-- 测试 373 passed + 2 skipped（新增模型能力 14 例）。
+- 测试 400 passed + 2 skipped（新增模型能力 14、OpenCode Go 10、峰谷价 8、目录名 4、余额 stale 1、CNY 花费 3 等）。
 
 ## [0.19.0] - 2026-08-16
 

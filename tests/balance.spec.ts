@@ -145,6 +145,28 @@ describe('BalanceClient', () => {
     expect((await notObject.get()).error?.code).toBe('balance-invalid')
   })
 
+  it('keeps the last successful snapshot on a later failure, marked by the error', async () => {
+    process.env.WEB_ENHANCED_TEST_KEY = 'sk-test'
+    const payload = {
+      is_available: true,
+      balance_infos: [{ currency: 'CNY', total_balance: '10.5', granted_balance: 2, topped_up_balance: '8.5' }],
+    }
+    const retrying = { ...config, cacheTtlMs: 0 }
+    fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => payload })
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
+    vi.stubGlobal('fetch', fetchMock)
+    const client = new BalanceClient(retrying)
+    const first = await client.get()
+    expect(first.error).toBeUndefined()
+    const second = await client.get()
+    expect(second).toMatchObject({
+      isAvailable: false,
+      infos: first.infos,
+      error: { code: 'balance-http' },
+    })
+  })
+
   it('drops malformed info lines and tolerates missing numeric fields', async () => {
     process.env.WEB_ENHANCED_TEST_KEY = 'sk-test'
     const client = mount({

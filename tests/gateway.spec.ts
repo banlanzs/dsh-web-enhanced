@@ -227,6 +227,7 @@ describe('WebEnhancedGateway', () => {
     expect(gateway.typertRemote).toMatchObject({ serviceKey: 'webEnhanced', namespace: 'webEnhanced' })
     expect(remoteMethods(gateway).map(entry => entry.method)).toEqual([
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet', 'pricingGet',
+      'modelRouteDescribe', 'deepseekRateGet', 'opencodeGoUsageGet',
       'visionStatus', 'visionConfigGet', 'visionConfigSet', 'modelRetryGet', 'modelRetrySet', 'visionEndpointModels',
       'gitBranches', 'gitLog', 'gitCommit', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',

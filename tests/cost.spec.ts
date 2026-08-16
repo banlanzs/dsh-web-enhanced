@@ -4,7 +4,9 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { formatUsdCost, sessionCostOf } from '../src/client/balance/cost.ts'
+import {
+  formatCnyCost, formatUsdCost, sessionCostCnyOf, sessionCostOf,
+} from '../src/client/balance/cost.ts'
 
 const pricing = { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: null }
 
@@ -39,5 +41,40 @@ describe('formatUsdCost', () => {
     expect(formatUsdCost(0)).toBe('$0.00')
     expect(formatUsdCost(0.0042)).toBe('$0.0042')
     expect(formatUsdCost(0.123456)).toBe('$0.12')
+  })
+})
+
+describe('sessionCostCnyOf', () => {
+  const rate = { inputCacheHit: 0.1, inputCacheMiss: 3, output: 9 }
+
+  it('bills the four token buckets at the active CNY window', () => {
+    expect(sessionCostCnyOf(
+      {
+        uncachedInputTokens: 1_000_000,
+        cacheReadTokens: 1_000_000,
+        cacheWriteTokens: 1_000_000,
+        outputTokens: 1_000_000,
+      },
+      rate,
+    )).toBeCloseTo(3 + 0.1 + 3 + 9)
+  })
+
+  it('answers null without billed tokens or a DeepSeek rate', () => {
+    expect(sessionCostCnyOf(
+      { uncachedInputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 },
+      rate,
+    )).toBeNull()
+    expect(sessionCostCnyOf(
+      { uncachedInputTokens: 10, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 },
+      null,
+    )).toBeNull()
+  })
+})
+
+describe('formatCnyCost', () => {
+  it('keeps four decimals below one cent and settles to three above', () => {
+    expect(formatCnyCost(0)).toBe('¥0.000')
+    expect(formatCnyCost(0.0042)).toBe('¥0.0042')
+    expect(formatCnyCost(0.123456)).toBe('¥0.123')
   })
 })

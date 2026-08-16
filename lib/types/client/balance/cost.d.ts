@@ -7,7 +7,7 @@
  * durable accounting, but a price can lag a vendor's repricing.
  * @module dsh-web-enhanced/src/client/balance/cost
  */
-import type { ModelPricingView } from '../contract.ts';
+import type { DeepSeekRateWindow, ModelPricingView } from '../contract.ts';
 /** The four token buckets the host's token-usage projection carries. */
 export interface TokenUsage {
     readonly uncachedInputTokens: number;
@@ -28,3 +28,16 @@ export declare function sessionCostOf(usage: TokenUsage | undefined, pricing: Mo
  * @returns the prefixed display string.
  */
 export declare function formatUsdCost(cost: number): string;
+/**
+ * Cost of one session's billed tokens under the active DeepSeek CNY rate.
+ * @param usage - the session's token-usage projection.
+ * @param rate - the active DeepSeek price window (null outside the table).
+ * @returns CNY cost, or null when no tokens were billed or no rate exists.
+ */
+export declare function sessionCostCnyOf(usage: TokenUsage | undefined, rate: DeepSeekRateWindow | null | undefined): number | null;
+/**
+ * Format a CNY estimate: four decimals while it is under one cent, then two.
+ * @param cost - CNY amount.
+ * @returns the prefixed display string.
+ */
+export declare function formatCnyCost(cost: number): string;

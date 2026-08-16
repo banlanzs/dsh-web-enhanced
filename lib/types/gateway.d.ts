@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult, ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
 /** One fallback vision endpoint entry, as declared in plugin config. */
 export interface VisionFallbackConfig {
     model: string;
@@ -29,6 +29,12 @@ export interface Config {
     modelsDevCacheTtlMs?: number;
     modelsDevTimeoutMs?: number;
     pricingProviderMap?: Record<string, string>;
+    /** OpenCode Go usage endpoint (quota windows for the subscription line). */
+    opencodeGoUsageUrl?: string;
+    /** How long one OpenCode Go quota snapshot stays fresh. */
+    opencodeGoCacheTtlMs?: number;
+    /** Override of the opencode CLI auth.json path (empty = platform default). */
+    opencodeGoAuthFile?: string;
     skipDirs?: string[];
     readMaxBytes?: number;
     writeMaxBytes?: number;
@@ -81,6 +87,8 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     private readonly balance;
     private readonly board;
     private readonly pricing;
+    private readonly routeNames;
+    private readonly opencodeGo;
     /** Resolved lazily: the walk is filesystem work no other capability needs. */
     private profileDirCache;
     /** Built on first mutation, so a deployment outside a profile never makes one. */
@@ -112,6 +120,12 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     balanceGet(request: BalanceGetRequest): Promise<BalanceView>;
     /** models.dev pricing for one model route (cached, USD per 1M tokens). */
     pricingGet(request: PricingGetRequest): Promise<PricingGetResult>;
+    /** Directory display names for one model route (the model picker's names). */
+    modelRouteDescribe(request: ModelRouteDescribeRequest): Promise<ModelRouteDescribeResult>;
+    /** DeepSeek peak/off-peak clock and prices for one model id. */
+    deepseekRateGet(request: DeepSeekRateGetRequest): DeepSeekRateGetResult;
+    /** OpenCode Go quota windows (cached; last-good snapshot on failure). */
+    opencodeGoUsageGet(): Promise<OpencodeGoUsageView>;
     /**
      * Live state of the image-understanding integration: whether the admission
      * patch is active, which vision models/endpoints the transcription engine

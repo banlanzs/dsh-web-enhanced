@@ -14,6 +14,7 @@ import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import { BalanceClient } from './balance.ts'
 import { browseDirectory } from './browse.ts'
 import { balanceApplies } from './channel.ts'
+import { deepseekRateFor } from './deepseek-rate.ts'
 import { TaskBoard } from './board.ts'
 import type { BoardDeps } from './board.ts'
 import { deleteFileView, countTextLines, listDirectory, readFileView, searchFiles, writeFileView } from './files.ts'
@@ -26,10 +27,14 @@ import { PnpmRunner, pnpmFailureCode } from './pnpm.ts'
 import { ModelsDevPricing } from './pricing.ts'
 import { findProfileDir, readInventory } from './profile.ts'
 import type { PresetRoster, RunDeps } from './run-task.ts'
+import { ModelRouteNames } from './model-names.ts'
+import type { LlmNamesFace } from './model-names.ts'
+import { OpencodeGoUsageClient } from './opencode-go.ts'
 import { classifyVisionHttpError, DEFAULT_VISION_MARKER, DEFAULT_VISION_PROMPT, resolveVisionApiKey, VISION_SETTINGS_NS } from './vision.ts'
 import type { VisionSettingsValue } from './vision.ts'
 import type {
-  ApiError, BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest,
+  ApiError, BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult,
+  FsBrowseRequest, FsBrowseResult, FsDeleteRequest,
   FsListRequest, FsListResult,
   FsOfficePreviewRequest,
   FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult,
@@ -38,6 +43,7 @@ import type {
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
   ModelRetryConfigView, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
+  ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView,
   PluginListRequest, PluginListResult,
   PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
   TaskCreateRequest, TaskCreateResult,
@@ -140,6 +146,12 @@ export interface Config {
   modelsDevCacheTtlMs?: number
   modelsDevTimeoutMs?: number
   pricingProviderMap?: Record<string, string>
+  /** OpenCode Go usage endpoint (quota windows for the subscription line). */
+  opencodeGoUsageUrl?: string
+  /** How long one OpenCode Go quota snapshot stays fresh. */
+  opencodeGoCacheTtlMs?: number
+  /** Override of the opencode CLI auth.json path (empty = platform default). */
+  opencodeGoAuthFile?: string
   skipDirs?: string[]
   readMaxBytes?: number
   writeMaxBytes?: number
@@ -190,6 +202,9 @@ export const Config: z<Config> = z.object({
   modelsDevTimeoutMs: z.number().default(10_000),
   // models.dev names the official vendor `deepseek`; the route id is `deepseek-official`.
   pricingProviderMap: z.dict(z.string()).default({ 'deepseek-official': 'deepseek' }),
+  opencodeGoUsageUrl: z.string().default('https://opencode.ai/zen/go/v1/usage'),
+  opencodeGoCacheTtlMs: z.number().default(60_000),
+  opencodeGoAuthFile: z.string().default(''),
   skipDirs: z.array(z.string()).default(['node_modules']),
   readMaxBytes: z.number().default(1_048_576),
   writeMaxBytes: z.number().default(2_097_152),
@@ -256,6 +271,9 @@ export function resolveConfig(config: Config): Required<Config> {
     modelsDevCacheTtlMs: config.modelsDevCacheTtlMs ?? 21_600_000,
     modelsDevTimeoutMs: config.modelsDevTimeoutMs ?? 10_000,
     pricingProviderMap: config.pricingProviderMap ?? { 'deepseek-official': 'deepseek' },
+    opencodeGoUsageUrl: config.opencodeGoUsageUrl ?? 'https://opencode.ai/zen/go/v1/usage',
+    opencodeGoCacheTtlMs: config.opencodeGoCacheTtlMs ?? 60_000,
+    opencodeGoAuthFile: config.opencodeGoAuthFile ?? '',
     skipDirs: config.skipDirs ?? ['node_modules'],
     readMaxBytes: config.readMaxBytes ?? 1_048_576,
     writeMaxBytes: config.writeMaxBytes ?? 2_097_152,
@@ -302,6 +320,8 @@ export class WebEnhancedGateway extends TypertRemoteService {
   private readonly balance: BalanceClient
   private readonly board: TaskBoard
   private readonly pricing: ModelsDevPricing
+  private readonly routeNames: ModelRouteNames
+  private readonly opencodeGo: OpencodeGoUsageClient
   /** Resolved lazily: the walk is filesystem work no other capability needs. */
   private profileDirCache: Promise<string | undefined> | undefined
   /** Built on first mutation, so a deployment outside a profile never makes one. */
@@ -348,6 +368,27 @@ export class WebEnhancedGateway extends TypertRemoteService {
       timeoutMs: this.resolved.modelsDevTimeoutMs,
       providerMap: this.resolved.pricingProviderMap,
     })
+    this.routeNames = new ModelRouteNames(
+      ctx.get('llm' as never, false) as unknown as LlmNamesFace | undefined,
+    )
+    this.opencodeGo = new OpencodeGoUsageClient(
+      {
+        apiKeyEnv: 'OPENCODE_GO_API_KEY',
+        usageUrl: this.resolved.opencodeGoUsageUrl,
+        cacheTtlMs: this.resolved.opencodeGoCacheTtlMs,
+        timeoutMs: 15_000,
+        ...this.resolved.opencodeGoAuthFile === '' ? {} : { authFile: this.resolved.opencodeGoAuthFile },
+      },
+      async (ref) => {
+        const credentials = ctx.get('credentials')
+        if (credentials === undefined) return undefined
+        const hit = await credentials.resolve(ref as never)
+        return hit?.value
+      },
+    )
+    // Directory renames reach the balance line without a restart: drop the
+    // name caches and let the next describe re-prime them from the directory.
+    ctx.on('llm/adapters-updated', () => { this.routeNames.clear() })
   }
 
   // ── tasks ────────────────────────────────────────────────────────────────
@@ -408,6 +449,32 @@ export class WebEnhancedGateway extends TypertRemoteService {
     } catch (error) {
       return { error: this.errorOf(error, 'pricing-error') }
     }
+  }
+
+  /** Directory display names for one model route (the model picker's names). */
+  @Remote('modelRouteDescribe')
+  async modelRouteDescribe(request: ModelRouteDescribeRequest): Promise<ModelRouteDescribeResult> {
+    try {
+      return await this.routeNames.describe(request.provider, request.model)
+    } catch (error) {
+      return { error: this.errorOf(error, 'model-route-describe') }
+    }
+  }
+
+  /** DeepSeek peak/off-peak clock and prices for one model id. */
+  @Remote('deepseekRateGet')
+  deepseekRateGet(request: DeepSeekRateGetRequest): DeepSeekRateGetResult {
+    try {
+      return deepseekRateFor(request.model)
+    } catch (error) {
+      return { error: this.errorOf(error, 'deepseek-rate') }
+    }
+  }
+
+  /** OpenCode Go quota windows (cached; last-good snapshot on failure). */
+  @Remote('opencodeGoUsageGet')
+  opencodeGoUsageGet(): Promise<OpencodeGoUsageView> {
+    return this.opencodeGo.get()
   }
 
   /**

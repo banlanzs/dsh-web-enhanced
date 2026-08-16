@@ -31,7 +31,7 @@ const entry = { name: 'a', path: 'a', kind: 'file', size: 3 }
  * Methods invoked with no argument at all. Everything else takes exactly one
  * request object — see the arity guard below.
  */
-const nullaryMethods = new Set(['taskList', 'visionStatus', 'visionConfigGet', 'modelRetryGet'])
+const nullaryMethods = new Set(['taskList', 'visionStatus', 'visionConfigGet', 'modelRetryGet', 'opencodeGoUsageGet'])
 
 const visionStatusSample = {
   mounted: true,
@@ -70,6 +70,38 @@ const payloads: Record<string, unknown[]> = {
     model: 'deepseek-chat',
     pricing: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: null },
   }, errorPayload],
+  modelRouteDescribe: [{
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-flash',
+    providerName: 'DeepSeek',
+    modelName: 'DeepSeek-V4-Flash',
+  }, errorPayload],
+  deepseekRateGet: [{
+    model: 'deepseek-v4-flash',
+    mode: 'peak-valley',
+    period: 'peak',
+    currency: 'CNY',
+    prices: { inputCacheHit: 0.1, inputCacheMiss: 3, output: 9 },
+    nextSwitchAt: 1756000000000,
+    nextSwitchLabel: '12:00',
+    nextIsPeak: false,
+    now: 1755990000000,
+  }, errorPayload],
+  opencodeGoUsageGet: [
+    {
+      provider: 'opencode-go',
+      plan: 'OpenCode Go',
+      windows: [{ key: 'five_hour', usedPercent: 9, resetsAt: 1756000000000 }],
+      fetchedAt: 1755990000000,
+    },
+    {
+      provider: 'opencode-go',
+      plan: 'OpenCode Go',
+      windows: [],
+      fetchedAt: null,
+      error: { code: 'opencode-go-no-key', message: 'not configured' },
+    },
+  ],
   visionStatus: [visionStatusSample, {
     mounted: false,
     enabled: false,
@@ -261,10 +293,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 33 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 36 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(33)
+    expect(methods).toHaveLength(36)
   })
 
   it('every result schema accepts its success and error payloads', () => {
