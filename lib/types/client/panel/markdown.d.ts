@@ -62,6 +62,7 @@ export type MdBlock = {
 } | {
     readonly type: 'list';
     readonly ordered: boolean;
+    readonly start?: number;
     readonly items: readonly MdListItem[];
 } | {
     readonly type: 'quote';

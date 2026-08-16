@@ -39,7 +39,7 @@ export type MdBlock =
   | { readonly type: 'heading'; readonly level: number; readonly spans: readonly MdSpan[] }
   | { readonly type: 'paragraph'; readonly spans: readonly MdSpan[] }
   | { readonly type: 'code'; readonly lang: string; readonly code: string }
-  | { readonly type: 'list'; readonly ordered: boolean; readonly items: readonly MdListItem[] }
+  | { readonly type: 'list'; readonly ordered: boolean; readonly start?: number; readonly items: readonly MdListItem[] }
   | { readonly type: 'quote'; readonly spans: readonly MdSpan[] }
   | { readonly type: 'rule' }
   | {
@@ -367,10 +367,12 @@ function tableAlignment(line: string): MdAlign[] | undefined {
   return align.length === 0 ? undefined : align
 }
 
-/** One list-marker line: its indentation, kind, and item text. */
+/** One list-marker line: its indentation, kind, start number, and item text. */
 interface ListMarker {
   readonly indent: number
   readonly ordered: boolean
+  /** First number of an ordered marker, so a separated block keeps its count. */
+  readonly start?: number
   readonly text: string
 }
 
@@ -383,9 +385,11 @@ function indentOf(line: string): number {
 function listMarkerOf(line: string): ListMarker | undefined {
   const found = /^([ \t]*)([-*+]|\d+[.)])\s+(.*)$/u.exec(line)
   if (found === null) return undefined
+  const number = /^(\d+)[.)]$/u.exec(found[2]!)
   return {
     indent: found[1]!.length,
-    ordered: found[2] !== '-' && found[2] !== '*' && found[2] !== '+',
+    ordered: number !== null,
+    ...(number === null ? {} : { start: Number(number[1]) }),
     text: found[3]!,
   }
 }
@@ -415,7 +419,7 @@ export function parseMarkdown(source: string): MdBlock[] {
    * child lists. Items keep a shared marker style: every unordered marker
    * belongs to the same list, while an ordered marker starts a new one.
    */
-  const takeList = (baseIndent: number, ordered: boolean): MdBlock => {
+  const takeList = (baseIndent: number, ordered: boolean, start: number | undefined): MdBlock => {
     const items: MdListItem[] = []
     while (index < lines.length) {
       const marker = listMarkerOf(lines[index]!)
@@ -437,7 +441,7 @@ export function parseMarkdown(source: string): MdBlock[] {
           // A marker at or left of this item starts the next item or block;
           // one further right is a nested list under this item.
           if (nested.indent <= baseIndent) break
-          children.push(takeList(nested.indent, nested.ordered))
+          children.push(takeList(nested.indent, nested.ordered, nested.start))
           continue
         }
         // Indented prose continues the item; anything at or left of the item
@@ -452,7 +456,7 @@ export function parseMarkdown(source: string): MdBlock[] {
         children,
       })
     }
-    return { type: 'list', ordered, items }
+    return { type: 'list', ordered, ...(start === undefined ? {} : { start }), items }
   }
 
   /**
@@ -552,7 +556,7 @@ export function parseMarkdown(source: string): MdBlock[] {
     }
     const list = listMarkerOf(line)
     if (list !== undefined) {
-      blocks.push(takeList(list.indent, list.ordered))
+      blocks.push(takeList(list.indent, list.ordered, list.start))
       continue
     }
     // A paragraph runs to the next blank line or block-level marker.

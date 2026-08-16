@@ -128,7 +128,7 @@ describe('parseMarkdown', () => {
     // Soft-wrapped lines join into one paragraph.
     expect(blocks[1]).toMatchObject({ spans: [{ type: 'text', text: 'A paragraph continued on the next line.' }] })
     expect(blocks[4]).toMatchObject({ ordered: false })
-    expect(blocks[5]).toMatchObject({ ordered: true })
+    expect(blocks[5]).toMatchObject({ ordered: true, start: 1 })
   })
 
   it('reads task checkboxes and keeps nested lists under their parent item', () => {
@@ -173,6 +173,7 @@ describe('parseMarkdown', () => {
     expect(parseMarkdown('1. - [x] done\n   - detail')).toEqual([{
       type: 'list',
       ordered: true,
+      start: 1,
       items: [{
         spans: [{ type: 'text', text: 'done' }],
         task: true,
@@ -184,6 +185,27 @@ describe('parseMarkdown', () => {
         }],
       }],
     }])
+  })
+
+  it('keeps the source start number on ordered blocks separated by blank lines', () => {
+    const blocks = parseMarkdown('1. first\n\n2. second\n3. third')
+    expect(blocks).toEqual([
+      {
+        type: 'list',
+        ordered: true,
+        start: 1,
+        items: [{ spans: [{ type: 'text', text: 'first' }], children: [] }],
+      },
+      {
+        type: 'list',
+        ordered: true,
+        start: 2,
+        items: [
+          { spans: [{ type: 'text', text: 'second' }], children: [] },
+          { spans: [{ type: 'text', text: 'third' }], children: [] },
+        ],
+      },
+    ])
   })
 
   it('keeps fenced code verbatim, including an unterminated fence', () => {

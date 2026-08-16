@@ -238,7 +238,7 @@ function Blocks({ blocks }: { blocks: readonly MdBlock[] }) {
       case 'list': {
         const Tag = block.ordered ? 'ol' : 'ul'
         return (
-          <Tag key={index} data-ordered={block.ordered ? 'true' : 'false'}>
+          <Tag key={index} data-ordered={block.ordered ? 'true' : 'false'} start={block.ordered ? block.start : undefined}>
             {block.items.map((item, itemIndex) => (
               <li
                 key={itemIndex}
