@@ -47,9 +47,18 @@ body[data-ds-dark-theme] .veilDark {
 }
 
 /* The host's composer seat fades to --dsw-alias-bg-base, which the skin layer
-   makes transparent while a background is set. Repaint it with the opaque
-   overlay token then, so transcript rows never show through the stats and
-   balance rows at the bottom of the conversation. */
+   makes transparent while a background is set — without this repaint,
+   transcript rows scroll visibly through the stats and balance rows under
+   the input card. The seat's own gradient geometry is mirrored with an
+   OPAQUE token stop.
+   !important is the point, not a shortcut: the host paints the seat through
+   module-scoped selectors this cross-package rule cannot out-rank on
+   specificity (notably `.scrollBody:has(...) > .composerSeat`), and the
+   declaration lives only under this plugin's body gate. */
 :global(body[data-dsh-webenhanced-skin-bg='true'] [data-composer-seat]) {
-  background: var(--dsw-alias-bg-overlay, rgb(233 236 242));
+  background: linear-gradient(
+    180deg,
+    transparent 0px,
+    var(--dsw-alias-bg-overlay, rgb(233 236 242)) 36px
+  ) !important;
 }
