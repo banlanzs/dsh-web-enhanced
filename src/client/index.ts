@@ -20,6 +20,8 @@
  */
 
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 // SlotMap merges of the slots these registrations target, declared by the
@@ -48,6 +50,9 @@ import { BrowseOverlay } from './browse/BrowseOverlay.tsx'
 import { BranchStrip } from './git/BranchStrip.tsx'
 import { WorkspaceView } from './panel/WorkspaceView.tsx'
 import { SettingsSection } from './settings/SettingsSection.tsx'
+import { ModelCapabilitiesSection } from './model-capabilities/ModelCapabilities.tsx'
+import type { ModelCapabilitiesInjected } from './model-capabilities/ModelCapabilities.tsx'
+import { CapabilitiesStore, refreshIfLoaded } from './model-capabilities/store.ts'
 import { BalanceLine } from './balance/BalanceLine.tsx'
 
 /** Locale namespace owned by this plugin. */
@@ -182,7 +187,7 @@ function registerMentionCommands(
  * plugin's own apply through `ctx.remote.$mount`, so declaring it here would
  * deadlock the entry waiting for a service only its own apply can create.
  */
-export const inject = ['slots', 'locale', 'remote', 'sessions', 'workspaces']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'sessions', 'workspaces']
 
 /**
  * Mount the web-enhanced registrations.
@@ -195,6 +200,37 @@ export const inject = ['slots', 'locale', 'remote', 'sessions', 'workspaces']
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'web-enhanced: dictionaries')
+
+  // The Model Capabilities page joins the same three wire facts as the host
+  // Models page but edits only what that page leaves out: input modalities
+  // and reasoning efforts. It is a separate settings section on purpose —
+  // the settings shell projects raw ledger rows, so shadowing the host
+  // 'models' cell would draw a duplicate nav row instead of replacing it.
+  const connection = ctx.get('connection') as ConnectionHandle
+  const capabilities = new CapabilitiesStore(connection.api)
+  const useCapabilities = bindSnapshotSelector(capabilities.store)
+  const capabilitiesInjected = (): ModelCapabilitiesInjected => ({
+    controller: capabilities,
+    useSnapshot: useCapabilities,
+    api: connection.api,
+  })
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'model-capabilities',
+    order: 11,
+    locale: NS,
+    label: () => ctx.locale.bind(NS)('modelCapabilities.nav'),
+    inject: capabilitiesInjected,
+  }, ModelCapabilitiesSection))
+  ctx.effect(() => {
+    const refresh = (): void => { refreshIfLoaded(capabilities) }
+    const disposers = [
+      ctx.remote.$on('settings/document-updated', refresh),
+      ctx.remote.$on('llm/adapters-updated', refresh),
+      ctx.on('connection/reset', refresh),
+    ]
+    return () => { for (const dispose of disposers) dispose() }
+  }, 'web-enhanced: model capabilities invalidations')
 
   const overlay = createOverlay()
   const browse = createBrowse()
