@@ -1,0 +1,143 @@
+/* Skins tab: card grid with dual-mode swatch previews. Colors ride the
+   host's --dsw-alias-* semantic tokens except inside the swatches, whose
+   halves ARE the skin's literal palette (they preview a palette, they must
+   not inherit one). */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--dsw-alias-label-secondary, rgb(96 102 111));
+}
+
+.unavailable {
+  margin: 0;
+  font-size: 13px;
+  color: var(--dsw-alias-label-tertiary, rgb(122 128 137));
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.card,
+.cardActive {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-1, #fff);
+  color: var(--dsw-alias-label-primary, inherit);
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.card:hover,
+.cardActive:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0 0 0 / 4%));
+}
+
+.card:active,
+.cardActive:active {
+  background: var(--dsw-alias-interactive-bg-active, rgba(0 0 0 / 8%));
+}
+
+.card:focus-visible,
+.cardActive:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #4d6bfe);
+  outline-offset: 2px;
+}
+
+.cardActive {
+  border-color: var(--dsw-alias-state-business-primary, #4d6bfe);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 8px 24px rgb(0 0 0 / 12%);
+}
+
+.swatch {
+  position: relative;
+  display: flex;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.swatchHalf {
+  position: relative;
+  flex: 1;
+}
+
+.chipLayer {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 28px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.chipAccent {
+  position: absolute;
+  top: 28px;
+  left: 10px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+}
+
+/* Which preview half matches the resolved scheme: a slim underline marker
+   pinned to the bottom of that half. */
+.markerLight,
+.markerDark {
+  position: absolute;
+  bottom: 6px;
+  width: 24px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-business-primary, #4d6bfe);
+  transition: left 140ms ease;
+}
+
+.markerLight {
+  left: calc(25% - 12px);
+}
+
+.markerDark {
+  left: calc(75% - 12px);
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardTitle {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cardDesc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-tertiary, rgb(122 128 137));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .cardActive,
+  .markerLight,
+  .markerDark {
+    transition: none;
+  }
+}

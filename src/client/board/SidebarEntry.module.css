@@ -7,14 +7,15 @@
   min-width: 0;
   overflow: hidden;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   background: transparent;
   color: inherit;
   cursor: pointer;
   font: inherit;
   font-size: 13px;
-  padding: 5px 8px;
+  padding: 4px 8px;
   text-align: start;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .entry:hover {
@@ -59,7 +60,13 @@
   justify-content: center;
   gap: 0;
   padding: 0;
-  border-radius: 6px;
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0ms;
+  }
 }
 
 .entry[data-wide='false'] .glyph {

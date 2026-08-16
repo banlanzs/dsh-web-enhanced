@@ -27,7 +27,7 @@
 }
 
 .count {
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
   font-size: 12px;
   padding: 0 6px;
@@ -44,6 +44,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .row:hover {
@@ -63,6 +64,7 @@
   font-size: 13px;
   padding: 2px 0;
   text-align: start;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .name:focus-visible {
@@ -100,7 +102,8 @@
   cursor: pointer;
   font-size: 12px;
   padding: 2px 5px;
-  border-radius: 4px;
+  border-radius: 8px;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .action:hover {
@@ -133,4 +136,13 @@
 
 .error {
   color: var(--dsw-alias-state-error-primary, rgb(236 19 19));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .name,
+  .action,
+  .danger {
+    transition: none;
+  }
 }

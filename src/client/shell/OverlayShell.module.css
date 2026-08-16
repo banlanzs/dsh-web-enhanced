@@ -25,7 +25,7 @@
   border-radius: 12px;
   background: var(--dsw-alias-bg-overlay, rgb(233 236 242));
   color: var(--dsw-alias-label-primary, rgb(15 17 21));
-  box-shadow: 0 18px 48px rgb(0 0 0 / 35%);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 8px 24px rgb(0 0 0 / 12%), 0 24px 64px rgb(0 0 0 / 20%);
 }
 
 /* The panel is a focus sink (tabIndex={-1}) for Escape/arrow focus return,
@@ -67,7 +67,8 @@
   line-height: 1;
   padding: 4px 6px;
   opacity: 0.7;
-  border-radius: 4px;
+  border-radius: 8px;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .close:hover {
@@ -88,6 +89,8 @@
   overflow: auto;
   padding: 14px;
   font-size: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsw-alias-border-l3, rgba(0 0 0 / 14%)) transparent;
 }
 
 /* Fill mode: the body stops being a scrolling document and becomes the
@@ -104,4 +107,10 @@
   gap: 10px;
   min-width: 0;
   overflow: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0ms;
+  }
 }

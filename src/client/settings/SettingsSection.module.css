@@ -22,6 +22,7 @@
   font: inherit;
   font-size: 14px;
   padding: 6px 12px;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .tab {
@@ -29,6 +30,7 @@
 }
 
 .tab:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
   color: var(--dsw-alias-label-primary, rgb(15 17 21));
 }
 
@@ -53,4 +55,13 @@
   flex-direction: column;
   min-height: 0;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsw-alias-border-l3, rgba(0 0 0 / 12%)) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab,
+  .tabActive {
+    transition: none;
+  }
 }

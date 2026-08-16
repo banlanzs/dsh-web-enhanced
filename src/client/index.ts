@@ -40,6 +40,7 @@ import { applyMention, mentionOptions } from './mention.ts'
 import type { MentionDeps, MentionKind, MentionOption } from './mention.ts'
 import { workspaceOfSessionId } from './workspace.ts'
 import { createBrowse, createOverlay, createPanel, createPreview } from './stores.ts'
+import { SkinLayer } from './skins/skin-layer.ts'
 import { BrowseOverlay } from './browse/BrowseOverlay.tsx'
 import { BranchStrip } from './git/BranchStrip.tsx'
 import { WorkspaceView } from './panel/WorkspaceView.tsx'
@@ -182,6 +183,17 @@ export function apply(ctx: ClientContext): void {
   const browse = createBrowse()
   const panel = createPanel()
   const preview = createPreview()
+  // The skin layer owns its theme-service override through effects, so the
+  // stock palette returns exactly when this plugin unloads.
+  const skinLayer = new SkinLayer(ctx)
+  const skin = {
+    get available() { return skinLayer.available },
+    get current() { return skinLayer.getSkin().id },
+    get dark() { return skinLayer.isDark() },
+    apply: (id: string): string => { skinLayer.setSkin(id); return skinLayer.getSkin().id },
+    subscribe: (listener: (dark: boolean) => void): (() => void) => skinLayer.onChange(ctx, listener),
+  }
+
   // Uninjected on purpose: ui-model-selection is optional, and its absence
   // must not keep this plugin's entry from starting.
   const modelRoute = createModelRoute({
@@ -226,6 +238,7 @@ export function apply(ctx: ClientContext): void {
             panel: panel.cell,
             preview: preview.cell,
           },
+          skin,
           ...overlay.actions,
           ...browse.actions,
           ...panel.actions,

@@ -60,12 +60,14 @@
 .refresh {
   flex: none;
   border: none;
+  border-radius: 4px;
   background: transparent;
   color: inherit;
   cursor: pointer;
   font-size: 12px;
   color: var(--dsw-alias-label-secondary, rgb(97 102 107));
-  padding: 0;
+  padding: 2px 4px;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .refresh:disabled {
@@ -81,4 +83,10 @@
   outline: 2px solid transparent;
   outline-offset: 2px;
   box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0ms;
+  }
 }

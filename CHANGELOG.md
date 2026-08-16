@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.13.0] - 2026-08-16
+
+### 新增：界面皮肤系统 + 全模块 UI 美化
+
+- 新增皮肤系统（参考 DSH-Transparent-UI-Plugin 的 theme-layer 模式）：通过 `dsh-client-ui-theme` 主题服务的覆盖栈整体重着色 Web 界面，皮肤在「设置 → Web 增强 → 皮肤」标签页切换，选择持久化在浏览器 localStorage，立即生效、无需刷新，卸载/切回「原生」即完全还原宿主配色。
+- 内置 5 套皮肤：原生、深海（Ocean）、暖沙（Amber）、森林（Forest）、紫晶（Violet）；每套均按 light/dark 成对定义 `--dsw-alias-*` 覆盖层，跟随「外观」的浅色/深色偏好自动切换。
+- 皮肤卡片带双模式色板预览，当前生效模式一侧有指示标记；部署未组合主题服务时该页显示不可用提示，其余功能不受影响。
+- 全模块 UI 美化：统一圆角（卡片 12px / 控件 8px / 徽标胶囊）、140ms 过渡（含 prefers-reduced-motion 降级）、hover/active/focus-visible 状态、分层阴影、细滚动条，颜色全部走 `--dsw-alias-*` 语义 token，皮肤切换对全部模块生效；补齐 AboutPanel 缺失的 `.license` 样式。
+- 新增 `tests/skins.spec.ts`（7 例）；无接口破坏（WebEnhancedInject 新增可选场景下的 `skin` 面，仅本插件消费）。
+
 ## [0.12.1] - 2026-08-15
 
 ### 新增：识图尝试失败记录（可在界面查看每次失败原因）

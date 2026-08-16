@@ -18,13 +18,14 @@
 
 .tab {
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   background: transparent;
   color: inherit;
   cursor: pointer;
   font-size: 13px;
   padding: 4px 10px;
   color: var(--dsw-alias-label-secondary, rgb(97 102 107));
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .tab:hover {
@@ -49,6 +50,14 @@
   flex-direction: column;
   min-height: 0;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsw-alias-border-l3, rgba(0 0 0 / 12%)) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
+  }
 }
 
 .empty {

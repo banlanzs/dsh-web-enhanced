@@ -8,6 +8,7 @@
 import type { InjectFace, PropsLocale, PropsRuntime, SlotMap } from '@deepseek-ai/dsh-client-ui-slots';
 import type { BalanceGetRequest, BalanceView, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, OfficeBlock, OfficeKind, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from '../types.ts';
 import type { BrowseActions, BrowseState, Observable, OverlayActions, OverlayState, PanelActions, PanelState, PreviewActions, PreviewState } from './stores.ts';
+import type { SkinFace } from './skins/skin-layer.ts';
 /**
  * The remote facade components call. Every member mirrors one `@Remote`
  * method of `WebEnhancedGateway`, and the request types are the gateway's own
@@ -167,6 +168,8 @@ export interface WebEnhancedInject extends OverlayActions, BrowseActions, PanelA
         readonly panel: Observable<PanelState>;
         readonly preview: Observable<PreviewState>;
     };
+    /** The skin system's runtime face (the Settings page's Skins tab). */
+    readonly skin: SkinFace;
 }
 /**
  * Component-side view of {@link WebEnhancedInject}: the `hooks` compartment
