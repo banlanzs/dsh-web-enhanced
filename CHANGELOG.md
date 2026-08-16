@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.0] - 2026-08-16
+
+### 新增：Web 终端 + 可收起文件树侧边栏；预览内容留白加宽
+
+- **Web 终端**（「工作区」→「终端」标签页）：直连宿主原生 PTY 注册表（`ctx.terminals`，配套 terminal-bash 后端）。会话由当前对话的 live agent 拥有——agent 销毁即自动清理，一个用户的会话不会被别的视图触达；初始工作目录为工作区根目录，后端优先选 `shell`。支持新建/多开切换/关闭、发送命令回车执行（返回渲染后的 viewport 与等待原因：stdin_read / inferred_idle / timeout / session_exit，与模型侧 terminal 工具同一契约）、SIGINT 中断、重开标签自动重连存活会话并回读滚动历史（terminalRead）。
+- 网关新增 6 个 Remote：`terminalOpen/Send/Read/Signal/Close/List`（Typert 描述符、client facade、中英文案齐备）；宿主未组合 terminals 服务或 agent 不在场时返回类型化错误而不是失败挂载。
+- **文件树侧边栏可收起**：分隔线边缘的 ‹/› 折叠按钮，收起后留 24px 展开导轨，状态随面板状态持久化。
+- 预览内容不再贴边：源码/diff/编辑器留白 8px→12×16px，渲染视图 10×12→16×20。
+- 测试新增 9 例（终端宿主 8 + 侧边栏持久化 1），共 320。
+
 ## [0.14.0] - 2026-08-16
 
 ### 调整：工作区改为 VSCode 式布局，「文件」与「预览」合并为「资源管理器」

@@ -558,3 +558,124 @@ export interface VisionEndpointModelsView {
 }
 
 export type VisionEndpointModelsResult = VisionEndpointModelsView | { readonly error: ApiError }
+
+// ── terminal (web PTY over the host's native registry) ──────────────────────
+
+/**
+ * Top-level PTY process status on the wire: `running`, or the exit record.
+ * Member-identical to the host's `TerminalSessionStatus`.
+ */
+export type TerminalSessionStatusView =
+  | { readonly kind: 'running' }
+  | { readonly kind: 'exited'; readonly exitCode: number | null; readonly signal: string | null }
+
+/** One live PTY session as the web terminal sees it. */
+export interface TerminalSessionView {
+  /** Registry-minted PTY session id (opaque on the wire). */
+  readonly sessionId: string
+  /** Registered backend type that spawned the session. */
+  readonly type: string
+  /** Optional owner-local display name. */
+  readonly name?: string
+  /** Top-level process id when the backend has one. */
+  readonly pid?: number
+  /** Current top-level process status. */
+  readonly status: TerminalSessionStatusView
+}
+
+/** Open one PTY owned by the conversation's live agent, rooted in the workspace. */
+export interface TerminalOpenRequest {
+  /** The conversation whose agent owns (and cleans up) the session. */
+  readonly ownerSessionId: string
+  /** Workspace whose root becomes the PTY's initial working directory. */
+  readonly workspaceId: WorkspaceId
+  /** Optional owner-local display name. */
+  readonly name?: string
+}
+
+/** Open result: the published session plus its initial output. */
+export interface TerminalOpenView {
+  readonly session: TerminalSessionView
+  readonly motd: string
+}
+
+export type TerminalOpenResult = TerminalOpenView | { readonly error: ApiError }
+
+/** Send one line of input and await the backend's wait boundary. */
+export interface TerminalSendRequest {
+  /** The conversation whose agent owns the session. */
+  readonly ownerSessionId: string
+  /** PTY session id from {@link TerminalOpenResult} or {@link TerminalListResult}. */
+  readonly sessionId: string
+  /** UTF-8 text to write. */
+  readonly text: string
+  /** Whether to submit Enter after the text. */
+  readonly submit: boolean
+}
+
+/** Send result: the settled viewport and why control returned. */
+export interface TerminalSendView {
+  readonly viewport: string
+  readonly waitReason: 'stdin_read' | 'inferred_idle' | 'timeout' | 'session_exit'
+  readonly sessionStatus: TerminalSessionStatusView
+  readonly truncated: boolean
+}
+
+export type TerminalSendResult = TerminalSendView | { readonly error: ApiError }
+
+/** Read one bounded page of retained scrollback without sending input. */
+export interface TerminalReadRequest {
+  /** The conversation whose agent owns the session. */
+  readonly ownerSessionId: string
+  /** PTY session id. */
+  readonly sessionId: string
+  /** Offset from the newest retained line; defaults are backend-owned. */
+  readonly offset?: number
+  /** Requested line count; backend limits still apply. */
+  readonly count?: number
+}
+
+/** Scrollback page (newest-relative offsets). */
+export interface TerminalReadView {
+  readonly text: string
+  readonly totalLines: number
+  readonly lineBegin: number
+  readonly lineEnd: number
+  readonly truncated: boolean
+}
+
+export type TerminalReadResult = TerminalReadView | { readonly error: ApiError }
+
+/** Deliver one permitted signal to the session's foreground process group. */
+export interface TerminalSignalRequest {
+  /** The conversation whose agent owns the session. */
+  readonly ownerSessionId: string
+  /** PTY session id. */
+  readonly sessionId: string
+  /** One of the five signals the PTY surface permits. */
+  readonly signal: 'SIGINT' | 'SIGTERM' | 'SIGKILL' | 'SIGTSTP' | 'SIGHUP'
+}
+
+export type TerminalSignalResult =
+  | { readonly delivered: true; readonly targetPgid: number }
+  | { readonly error: ApiError }
+
+/** Close one session and drop it from the owner's registry. */
+export interface TerminalCloseRequest {
+  /** The conversation whose agent owns the session. */
+  readonly ownerSessionId: string
+  /** PTY session id. */
+  readonly sessionId: string
+}
+
+export type TerminalCloseResult = { readonly closed: true } | { readonly error: ApiError }
+
+/** List the conversation agent's live sessions. */
+export interface TerminalListRequest {
+  /** The conversation whose agent owns the sessions. */
+  readonly ownerSessionId: string
+}
+
+export type TerminalListResult =
+  | { readonly sessions: readonly TerminalSessionView[] }
+  | { readonly error: ApiError }

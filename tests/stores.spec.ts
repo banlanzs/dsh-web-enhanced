@@ -109,6 +109,21 @@ describe('workspace view state', () => {
     expect(cell.getSnapshot().tab).toBe('scm')
   })
 
+  it('collapses and persists the explorer sidebar', () => {
+    const { cell, actions } = createPanel()
+    expect(cell.getSnapshot().sidebarCollapsed).toBe(false)
+    actions.setSidebarCollapsed(true)
+    expect(cell.getSnapshot().sidebarCollapsed).toBe(true)
+    // A repeat write of the same value is a no-op (same reference).
+    const snapshot = cell.getSnapshot()
+    actions.setSidebarCollapsed(true)
+    expect(cell.getSnapshot()).toBe(snapshot)
+    // Restores true when persisted, false when absent.
+    localStorage.setItem('dsh.webEnhanced.panel.v2', JSON.stringify({ sidebarCollapsed: true }))
+    expect(createPanel().cell.getSnapshot().sidebarCollapsed).toBe(true)
+    expect(cell.getSnapshot().sidebarCollapsed).toBe(true)
+  })
+
   it('toggles directory expansion per workspace', () => {
     const { cell, actions } = createPanel()
     actions.toggleExpanded('w1', 'src')

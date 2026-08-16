@@ -188,6 +188,8 @@ const PANEL_PERSIST_KEY = 'dsh.webEnhanced.panel.v2'
 export interface PanelState {
   /** Active tab; shared across workspaces (a view preference, not per-project). */
   readonly tab: PanelTab
+  /** Whether the explorer's file-tree sidebar is collapsed (a view preference). */
+  readonly sidebarCollapsed: boolean
   /** Expanded directory paths per workspace id. */
   readonly expanded: Readonly<Record<string, readonly string[]>>
   /** Live file-name filter of the tree (transient, never persisted). */
@@ -198,7 +200,7 @@ export interface PanelState {
 export interface PanelActions {
   /**
    * Select the active tab.
-   * @param tab - explorer, scm, board, or graph.
+   * @param tab - explorer, scm, board, graph, or terminal.
    */
   readonly selectTab: (tab: PanelTab) => void
   /**
@@ -212,6 +214,11 @@ export interface PanelActions {
    * @param query - the raw query text.
    */
   readonly setQuery: (query: string) => void
+  /**
+   * Collapse or expand the explorer's file-tree sidebar.
+   * @param collapsed - the target state.
+   */
+  readonly setSidebarCollapsed: (collapsed: boolean) => void
 }
 
 /** Restore persisted view state, dropping anything that is not the stored shape. */
@@ -229,8 +236,9 @@ function revivePanel(raw: unknown): PanelState | undefined {
     // The pre-0.14 layout kept files and preview as separate tabs; both
     // restore onto the combined explorer surface.
     tab: tab === 'files' || tab === 'preview' ? 'explorer'
-      : tab === 'scm' || tab === 'board' || tab === 'graph' ? tab
+      : tab === 'scm' || tab === 'board' || tab === 'graph' || tab === 'terminal' ? tab
         : 'explorer',
+    sidebarCollapsed: record['sidebarCollapsed'] === true,
     expanded,
     // The filter is a live gesture, not a place: a reload starts unfiltered.
     query: '',
@@ -240,7 +248,7 @@ function revivePanel(raw: unknown): PanelState | undefined {
 /** Create the view cell and its bound actions. */
 export function createPanel(): { cell: Cell<PanelState>; actions: PanelActions } {
   const cell = createCell<PanelState>(
-    { tab: 'explorer', expanded: {}, query: '' },
+    { tab: 'explorer', sidebarCollapsed: false, expanded: {}, query: '' },
     { key: PANEL_PERSIST_KEY, revive: revivePanel },
   )
   return {
@@ -255,6 +263,9 @@ export function createPanel(): { cell: Cell<PanelState>; actions: PanelActions }
         })
       },
       setQuery: (query) => { cell.update(current => current.query === query ? current : { ...current, query }) },
+      setSidebarCollapsed: (collapsed) => {
+        cell.update(current => current.sidebarCollapsed === collapsed ? current : { ...current, sidebarCollapsed: collapsed })
+      },
     },
   }
 }

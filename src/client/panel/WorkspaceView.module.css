@@ -54,13 +54,66 @@
   min-height: 0;
 }
 
+/* Collapsed: the sidebar column shrinks to the expand rail. */
+.explorerCollapsed {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
 .sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
   border-right: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
   background: var(--dsw-alias-bg-layer-1, transparent);
+}
+
+/* Collapse/expand toggles ride the divider edge (VSCode's chevron gesture). */
+.collapse,
+.expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2, transparent);
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.collapse:hover,
+.expand:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+}
+
+.collapse:focus-visible,
+.expand:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, rgb(65 118 230));
+  outline-offset: 1px;
+}
+
+.collapse {
+  position: absolute;
+  top: 8px;
+  right: -10px;
+  z-index: 1;
+}
+
+.expand {
+  align-self: flex-start;
+  justify-self: start;
+  margin: 8px 0 0 2px;
 }
 
 .body {
@@ -74,7 +127,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tab {
+  .tab,
+  .collapse,
+  .expand {
     transition: none;
   }
 }

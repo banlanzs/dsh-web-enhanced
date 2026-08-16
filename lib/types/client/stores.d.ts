@@ -119,6 +119,8 @@ export declare function createBrowse(): {
 export interface PanelState {
     /** Active tab; shared across workspaces (a view preference, not per-project). */
     readonly tab: PanelTab;
+    /** Whether the explorer's file-tree sidebar is collapsed (a view preference). */
+    readonly sidebarCollapsed: boolean;
     /** Expanded directory paths per workspace id. */
     readonly expanded: Readonly<Record<string, readonly string[]>>;
     /** Live file-name filter of the tree (transient, never persisted). */
@@ -128,7 +130,7 @@ export interface PanelState {
 export interface PanelActions {
     /**
      * Select the active tab.
-     * @param tab - explorer, scm, board, or graph.
+     * @param tab - explorer, scm, board, graph, or terminal.
      */
     readonly selectTab: (tab: PanelTab) => void;
     /**
@@ -142,6 +144,11 @@ export interface PanelActions {
      * @param query - the raw query text.
      */
     readonly setQuery: (query: string) => void;
+    /**
+     * Collapse or expand the explorer's file-tree sidebar.
+     * @param collapsed - the target state.
+     */
+    readonly setSidebarCollapsed: (collapsed: boolean) => void;
 }
 /** Create the view cell and its bound actions. */
 export declare function createPanel(): {

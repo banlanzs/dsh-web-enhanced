@@ -20,6 +20,7 @@ import { workspaceOfSessionId } from '../workspace.ts'
 import { BoardPanel } from '../board/BoardOverlay.tsx'
 import { GraphPanel } from '../git/GraphOverlay.tsx'
 import { FileTree } from './FileTree.tsx'
+import { TerminalPane } from './TerminalPane.tsx'
 import { PreviewPane } from './PreviewPane.tsx'
 import { ScmPane } from './ScmPane.tsx'
 import css from './WorkspaceView.module.css'
@@ -30,23 +31,25 @@ export type WorkspaceViewProps = WebEnhancedProps<'conversation.view'>
 /** Tabs in display order with their dictionary keys. */
 const TABS: ReadonlyArray<{
   tab: PanelTab
-  key: 'panel.tab.explorer' | 'panel.tab.scm' | 'panel.tab.board' | 'panel.tab.graph'
+  key: 'panel.tab.explorer' | 'panel.tab.scm' | 'panel.tab.board' | 'panel.tab.graph' | 'panel.tab.terminal'
 }> = [
   { tab: 'explorer', key: 'panel.tab.explorer' },
   { tab: 'scm', key: 'panel.tab.scm' },
   { tab: 'board', key: 'panel.tab.board' },
   { tab: 'graph', key: 'panel.tab.graph' },
+  { tab: 'terminal', key: 'panel.tab.terminal' },
 ]
 
 /** The workspace view. */
 export function WorkspaceView(props: WorkspaceViewProps) {
-  const { sessionId, usePanel, useWorkspaces, selectTab, clearTabs, t } = props
+  const { sessionId, usePanel, useWorkspaces, selectTab, clearTabs, setSidebarCollapsed, t } = props
   const workspaces = useWorkspaces(state => state)
   // Session scope: this view renders for one exact session, so the workspace
   // comes from that id rather than from whichever session is current.
   const workspaceId = workspaceOfSessionId(sessionId, workspaces)?.workspaceId
 
   const tab = usePanel(state => state.tab)
+  const sidebarCollapsed = usePanel(state => state.sidebarCollapsed)
 
   // Preview tabs address paths inside one workspace root; carrying them into
   // another project would show stale files under valid-looking names.
@@ -81,13 +84,43 @@ export function WorkspaceView(props: WorkspaceViewProps) {
       </nav>
       <div className={css.body} role="tabpanel">
         {tab === 'explorer' && (
-          <div className={css.explorer} data-testid="workspace-explorer">
-            <aside className={css.sidebar}>
-              <FileTree {...props} workspaceId={String(workspaceId)} />
-            </aside>
+          <div
+            className={sidebarCollapsed ? css.explorerCollapsed : css.explorer}
+            data-testid="workspace-explorer"
+            data-sidebar={sidebarCollapsed ? 'collapsed' : 'expanded'}
+          >
+            {sidebarCollapsed
+              ? (
+                <button
+                  type="button"
+                  className={css.expand}
+                  aria-label={t('files.expand')}
+                  data-testid="workspace-sidebar-expand"
+                  title={t('files.expand')}
+                  onClick={() => { setSidebarCollapsed(false) }}
+                >
+                  <span aria-hidden="true">›</span>
+                </button>
+              )
+              : (
+                <aside className={css.sidebar}>
+                  <button
+                    type="button"
+                    className={css.collapse}
+                    aria-label={t('files.collapse')}
+                    data-testid="workspace-sidebar-collapse"
+                    title={t('files.collapse')}
+                    onClick={() => { setSidebarCollapsed(true) }}
+                  >
+                    <span aria-hidden="true">‹</span>
+                  </button>
+                  <FileTree {...props} workspaceId={String(workspaceId)} />
+                </aside>
+              )}
             <PreviewPane {...props} workspaceId={String(workspaceId)} />
           </div>
         )}
+        {tab === 'terminal' && <TerminalPane {...props} workspaceId={String(workspaceId)} />}
         {tab === 'scm' && <ScmPane {...props} workspaceId={String(workspaceId)} />}
         {tab === 'board' && (
           <BoardPanel remote={props.remote} workspaces={workspaces.items} openSession={props.openSession} t={t} />
