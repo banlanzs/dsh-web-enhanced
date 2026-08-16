@@ -127,7 +127,9 @@ export function WorkspaceView(props: WorkspaceViewProps) {
           <BoardPanel remote={props.remote} workspaces={workspaces.items} openSession={props.openSession} t={t} />
         )}
         {tab === 'graph' && (
-          <GraphPanel workspaceId={String(workspaceId)} remote={props.remote} t={t} />
+          <div className={css.graph}>
+            <GraphPanel workspaceId={String(workspaceId)} remote={props.remote} t={t} />
+          </div>
         )}
       </div>
     </section>
