@@ -13,27 +13,34 @@
   flex: none;
   gap: 4px;
   padding: 6px 12px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1, rgb(128 128 128 / 24%));
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(0 0 0 / 4%));
 }
 
 .tab {
   border: none;
-  border-radius: 5px;
+  border-radius: 4px;
   background: transparent;
   color: inherit;
   cursor: pointer;
   font-size: 13px;
   padding: 4px 10px;
-  opacity: 0.7;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
 }
 
 .tab:hover {
-  opacity: 1;
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+}
+
+.tab:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
 }
 
 .tab[data-active] {
-  background: var(--dsw-alias-interactive-bg-hover, rgb(128 128 160 / 22%));
-  opacity: 1;
+  background: var(--dsw-alias-interactive-bg-active, rgba(38 49 72 / 10%));
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
 }
 
 .body {
@@ -47,6 +54,6 @@
 .empty {
   margin: 24px auto;
   font-size: 13px;
-  opacity: 0.7;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
   text-align: center;
 }

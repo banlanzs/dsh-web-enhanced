@@ -9,7 +9,7 @@
   display: flex;
   flex: none;
   gap: 4px;
-  border-bottom: 1px solid rgb(128 128 128 / 18%);
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(0 0 0 / 4%));
 }
 
 .tab,
@@ -25,16 +25,24 @@
 }
 
 .tab {
-  opacity: 0.6;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
 }
 
 .tab:hover {
-  opacity: 0.85;
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+}
+
+.tab:focus-visible,
+.tabActive:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
 }
 
 .tabActive {
-  border-bottom-color: rgb(106 143 216 / 80%);
+  border-bottom-color: var(--dsw-alias-state-business-primary, rgb(65 118 230));
   font-weight: 600;
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
 }
 
 /* The shell's content column owns the page height; this pane stretches into

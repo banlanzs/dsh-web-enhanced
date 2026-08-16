@@ -3,19 +3,19 @@
   flex: none;
   flex-direction: column;
   gap: 6px;
-  border: 1px solid rgb(128 128 128 / 26%);
-  border-radius: 7px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 6px;
   padding: 9px 10px;
-  background: rgb(128 128 160 / 8%);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
   min-width: 0;
 }
 
 .card[data-status='running'] {
-  border-color: rgb(106 143 216 / 60%);
+  border-color: var(--dsw-alias-state-business-primary, rgb(65 118 230));
 }
 
 .card[data-status='failed'] {
-  border-color: rgb(217 83 79 / 55%);
+  border-color: var(--dsw-alias-state-error-primary, rgb(236 19 19));
 }
 
 .title {
@@ -48,10 +48,16 @@
   text-align: start;
 }
 
+.summary:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
+}
+
 .chevron {
   flex: none;
   font-size: 12px;
-  opacity: 0.6;
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
 }
 
 .summaryTitle {
@@ -68,7 +74,7 @@
   flex: none;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  opacity: 0.55;
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
 }
 
 /* No line clamp anywhere on the card: the column scrolls, so a card may grow
@@ -78,7 +84,7 @@
   margin: 0;
   font-size: 13px;
   line-height: 1.45;
-  opacity: 0.8;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -89,7 +95,7 @@
   gap: 2px;
   margin: 0;
   font-size: 12px;
-  opacity: 0.65;
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
 }
 
 .metaRow {
@@ -104,14 +110,14 @@
   font-size: 12px;
   line-height: 1.4;
   padding: 4px 6px;
-  background: rgb(128 128 160 / 16%);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
 .resultError {
-  background: rgb(217 83 79 / 18%);
-  color: #d9534f;
+  background: var(--dsw-alias-state-error-secondary, rgb(242 90 90));
+  color: var(--dsw-alias-state-error-primary, rgb(236 19 19));
 }
 
 .actions {
@@ -123,7 +129,7 @@
 .primary,
 .action,
 .danger {
-  border: 1px solid rgb(128 128 128 / 30%);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
   border-radius: 4px;
   background: transparent;
   color: inherit;
@@ -132,14 +138,30 @@
   padding: 2px 8px;
 }
 
+.action:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}
+
+.primary:focus-visible,
+.action:focus-visible,
+.danger:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
+}
+
 .primary {
-  border-color: rgb(106 143 216 / 65%);
-  background: rgb(106 143 216 / 22%);
+  border-color: var(--dsw-alias-state-business-primary, rgb(65 118 230));
+  background: var(--dsw-alias-state-business-tertiary, rgb(183 200 254));
+}
+
+.primary:hover {
+  background: var(--dsw-alias-interactive-bg-hover-accent, rgba(38 49 72 / 14%));
 }
 
 .danger {
-  color: #d9534f;
-  border-color: rgb(217 83 79 / 45%);
+  color: var(--dsw-alias-state-error-primary, rgb(236 19 19));
+  border-color: var(--dsw-alias-state-error-primary, rgb(236 19 19));
 }
 
 .field {
@@ -150,12 +172,12 @@
 
 .fieldLabel {
   font-size: 12px;
-  opacity: 0.7;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
 }
 
 .input,
 .textarea {
-  border: 1px solid rgb(128 128 128 / 32%);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
   border-radius: 4px;
   background: transparent;
   color: inherit;
@@ -164,11 +186,18 @@
   padding: 4px 6px;
 }
 
+.input:focus-visible,
+.textarea:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
+}
+
 .textarea {
   resize: vertical;
 }
 
 .hint {
   font-size: 12px;
-  opacity: 0.6;
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
 }

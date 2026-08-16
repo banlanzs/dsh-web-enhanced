@@ -154,15 +154,26 @@ export function BrowseOverlay({ useBrowse, remote, closeBrowse, appendMention, t
             </div>
           )}
           <nav className={css.crumbs} aria-label={t('browse.crumbs')}>
-            {crumbsOf(current.path).map(crumb => (
-              <button
-                type="button"
-                className={css.crumb}
-                key={crumb.path}
-                onClick={() => { setPath(crumb.path) }}
-              >
-                {crumb.name}
-              </button>
+            {/* The separator between crumbs is the path's own separator
+                (Windows `\`, POSIX `/`), resolved by crumbsOf from the path
+                string — rendered as a sibling span so the separator shown
+                matches the platform of the path, instead of a hardcoded `/`
+                that would mix styles on Windows. */}
+            {crumbsOf(current.path).map((crumb, index) => (
+              <span className={css.crumbGroup} key={crumb.path}>
+                {index > 0 && (
+                  <span className={css.crumbSep} aria-hidden="true">
+                    {crumb.path.includes('\\') && !crumb.path.startsWith('/') ? '\\' : '/'}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className={css.crumb}
+                  onClick={() => { setPath(crumb.path) }}
+                >
+                  {crumb.name}
+                </button>
+              </span>
             ))}
           </nav>
         </div>

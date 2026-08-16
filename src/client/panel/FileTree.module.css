@@ -9,11 +9,17 @@
   flex: none;
   margin: 8px;
   padding: 5px 8px;
-  border: 1px solid rgb(128 128 128 / 32%);
-  border-radius: 5px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 4px;
   background: transparent;
   color: inherit;
   font-size: 13px;
+}
+
+.search:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
 }
 
 .list {
@@ -30,6 +36,7 @@
   width: 100%;
   padding: 3px 8px;
   border: none;
+  border-radius: 4px;
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -38,14 +45,20 @@
 }
 
 .row:hover {
-  background: rgb(128 128 160 / 18%);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}
+
+.row:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
 }
 
 .glyph {
   flex: none;
   width: 10px;
-  opacity: 0.6;
   font-size: 12px;
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
 }
 
 .name {
@@ -56,12 +69,13 @@
 
 .row[data-kind='dir'] .name {
   font-weight: 500;
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
 }
 
 .path {
   margin-inline-start: auto;
-  opacity: 0.5;
   font-size: 12px;
+  color: var(--dsw-alias-label-tertiary, rgb(129 133 140));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -71,10 +85,9 @@
 .error {
   margin: 8px;
   font-size: 13px;
-  opacity: 0.7;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
 }
 
 .error {
-  color: #d9534f;
-  opacity: 1;
+  color: var(--dsw-alias-state-error-primary, rgb(236 19 19));
 }

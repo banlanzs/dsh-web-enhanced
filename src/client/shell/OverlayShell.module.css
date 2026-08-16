@@ -1,5 +1,8 @@
 /* Full-frame overlay chrome. `shell.overlay` is click-through, so the
-   backdrop is the element that opts back into pointer events. */
+   backdrop is the element that opts back into pointer events.
+   Colors ride the host's `--dsw-alias-*` semantic tokens (see the web-styling
+   guide: feature packages consume aliases, never literal palette values) so
+   the dialog tracks the host light/dark theme instead of a fixed grey. */
 
 .backdrop {
   position: fixed;
@@ -8,7 +11,7 @@
   align-items: center;
   justify-content: center;
   padding: 32px;
-  background: rgb(0 0 0 / 45%);
+  background: var(--dsw-alias-bg-mask-3, rgba(0 0 0 / 48%));
   pointer-events: auto;
 }
 
@@ -18,13 +21,17 @@
   width: min(1180px, 100%);
   height: min(760px, 100%);
   overflow: hidden;
-  border: 1px solid rgb(128 128 128 / 30%);
-  border-radius: 10px;
-  background: var(--dsh-surface, Canvas);
-  color: var(--dsh-text, CanvasText);
+  border: 1px solid var(--dsw-alias-border-l4, rgba(0 0 0 / 16%));
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-overlay, rgb(233 236 242));
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
   box-shadow: 0 18px 48px rgb(0 0 0 / 35%);
 }
 
+/* The panel is a focus sink (tabIndex={-1}) for Escape/arrow focus return,
+   not an interactive control — a persistent outline here would ring the whole
+   dialog, so the ring is suppressed on this element only and every real
+   control inside keeps its own :focus-visible. */
 .panel:focus {
   outline: none;
 }
@@ -35,7 +42,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border-bottom: 1px solid rgb(128 128 128 / 24%);
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(0 0 0 / 4%));
 }
 
 .title {
@@ -60,10 +67,19 @@
   line-height: 1;
   padding: 4px 6px;
   opacity: 0.7;
+  border-radius: 4px;
 }
 
 .close:hover {
   opacity: 1;
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}
+
+.close:focus-visible {
+  opacity: 1;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
 }
 
 .body {
