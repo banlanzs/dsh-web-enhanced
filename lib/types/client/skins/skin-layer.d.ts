@@ -16,6 +16,8 @@ import type { ThemeTokenOverrides } from '@deepseek-ai/dsh-client-ui-theme/clien
 import { type SkinDefinition } from './themes.ts';
 /** localStorage key carrying the selected skin id. */
 export declare const SKIN_STORAGE_KEY = "dsh.web-enhanced.skin";
+/** localStorage key carrying the custom background image as a data URL. */
+export declare const SKIN_BACKGROUND_KEY = "dsh.web-enhanced.skin-bg";
 /** Structural face of `ctx.theme` — everything the skin layer consumes. */
 export interface ThemeFace {
     /** Stack (or replace) one override layer keyed by source. */
@@ -35,9 +37,12 @@ export interface ThemeFace {
 export declare class SkinLayer {
     private readonly theme;
     private skin;
+    private background;
+    private backdrop;
     /**
-     * @param ctx - client root context (the override layer and the
-     * `theme/change` listener are effects, released on plugin dispose).
+     * @param ctx - client root context (the override layer, the background
+     * node, and the `theme/change` listener are effects, released on plugin
+     * dispose).
      */
     constructor(ctx: ClientContext);
     /** Whether the theme service is composed (the skin page's availability). */
@@ -49,6 +54,26 @@ export declare class SkinLayer {
      * @param id - a {@link SKIN_IDS} member.
      */
     setSkin(id: string): void;
+    /** The custom background image data URL ('' when none is set). */
+    getBackground(): string;
+    /**
+     * Set or clear the custom background: persist the choice, swap the fixed
+     * backdrop node, and re-stack the token layer (a set background makes the
+     * frame's base paint transparent so the image shows; every content surface
+     * stays opaque).
+     * @param dataUrl - the image as a data URL, or '' to clear.
+     */
+    setBackground(dataUrl: string): void;
+    /**
+     * The token layer to stack: the skin's palette, plus a transparent
+     * `--dsw-alias-bg-base` while a background is set (later spread wins over
+     * the skin's own base value).
+     */
+    private tokensOf;
+    /** (Re)build the fixed backdrop under the app frame; a no-op without one set. */
+    private mountBackdrop;
+    /** Remove the live backdrop node, if any. */
+    private unmountBackdrop;
     /** The resolved color scheme (drives the swatch preview's active half). */
     isDark(): boolean;
     /**
@@ -71,6 +96,13 @@ export interface SkinFace {
     readonly current: string;
     /** The resolved scheme is dark. */
     readonly dark: boolean;
+    /** The custom background image data URL ('' when none is set). */
+    readonly background: string;
+    /**
+     * Set ('' clears) the custom background image.
+     * @param dataUrl - the image as a data URL, or ''.
+     */
+    setBackground(dataUrl: string): void;
     /**
      * Switch the active skin and report the applied id.
      * @param id - a {@link SKIN_IDS} member.

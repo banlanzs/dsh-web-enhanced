@@ -1,0 +1,47 @@
+/* Fixed backdrop for user-set background images. The layer prepends to
+   <body> below the app frame; the frame paints --dsw-alias-bg-base, which the
+   skin layer overrides to transparent only while a background is set — every
+   content surface (layer-1/2/3, cards, panels) stays opaque, so readability
+   never depends on the picture. The veil is the uniform fade every custom
+   background gets: a high-opacity base-colored wash plus a slight blur and
+   desaturation, so any image stays behind the content, light or dark. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.veilLight,
+.veilDark {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(3px) saturate(0.9);
+}
+
+.veilLight {
+  background: rgba(250, 251, 253, 0.86);
+}
+
+.veilDark {
+  display: none;
+  background: rgba(9, 13, 20, 0.82);
+}
+
+/* The presenter owns the scheme as a body attribute; the backdrop follows it. */
+body[data-ds-dark-theme] .veilLight {
+  display: none;
+}
+
+body[data-ds-dark-theme] .veilDark {
+  display: block;
+}

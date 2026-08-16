@@ -190,6 +190,8 @@ export function apply(ctx: ClientContext): void {
     get available() { return skinLayer.available },
     get current() { return skinLayer.getSkin().id },
     get dark() { return skinLayer.isDark() },
+    get background() { return skinLayer.getBackground() },
+    setBackground: (dataUrl: string): void => { skinLayer.setBackground(dataUrl) },
     apply: (id: string): string => { skinLayer.setSkin(id); return skinLayer.getSkin().id },
     subscribe: (listener: (dark: boolean) => void): (() => void) => skinLayer.onChange(ctx, listener),
   }

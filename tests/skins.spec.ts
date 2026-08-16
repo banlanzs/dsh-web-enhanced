@@ -7,7 +7,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ThemeTokenOverrides } from '@deepseek-ai/dsh-client-ui-theme/client'
-import { SkinLayer, SKIN_STORAGE_KEY } from '../src/client/skins/skin-layer.ts'
+import { SkinLayer, SKIN_BACKGROUND_KEY, SKIN_STORAGE_KEY } from '../src/client/skins/skin-layer.ts'
 import { SKINS, skinOf } from '../src/client/skins/themes.ts'
 
 /** Recorded override-layer call. */
@@ -43,6 +43,7 @@ function stubStorage(initial?: string): { store: Map<string, string> } {
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => { store.set(key, value) },
+    removeItem: (key: string) => { store.delete(key) },
   })
   return { store }
 }
@@ -101,6 +102,46 @@ describe('SkinLayer', () => {
     layer.setSkin('amber')
     layer.setSkin('amber')
     expect(calls).toHaveLength(2)
+  })
+
+  it('a stored background makes the token layer paint the base transparent', () => {
+    vi.unstubAllGlobals()
+    stubStorage()
+    localStorage.setItem(SKIN_BACKGROUND_KEY, 'data:image/png;base64,AAA')
+    const layer = new SkinLayer(fakeContext({}))
+    expect(layer.getBackground()).toBe('data:image/png;base64,AAA')
+    const calls = (layer as unknown as { __calls: never[] }).__calls ?? fakeContext({}).__calls
+    void calls
+    const ctx = fakeContext({})
+    new SkinLayer(ctx)
+    const applied = ctx.__calls[0].tokens
+    expect(applied['--dsw-alias-bg-base']).toEqual({ light: 'transparent', dark: 'transparent' })
+    expect(Object.keys(applied).length).toBe(Object.keys(skinOf('none').tokens).length + 1)
+  })
+
+  it('setBackground persists, re-stacks with a transparent base, and clear restores', () => {
+    vi.unstubAllGlobals()
+    const { store } = stubStorage()
+    const ctx = fakeContext({})
+    const layer = new SkinLayer(ctx)
+    layer.setBackground('data:image/webp;basecode,BBB')
+    expect(store.get(SKIN_BACKGROUND_KEY)).toBe('data:image/webp;basecode,BBB')
+    expect(ctx.__calls.at(-1)?.tokens['--dsw-alias-bg-base']).toEqual({ light: 'transparent', dark: 'transparent' })
+
+    layer.setSkin('ocean')
+    const oceanCall = ctx.__calls.at(-1)
+    expect(oceanCall?.tokens['--dsw-alias-bg-base']).toEqual({ light: 'transparent', dark: 'transparent' })
+    expect(oceanCall?.tokens['--dsw-alias-bg-layer-1']).toBe(skinOf('ocean').tokens['--dsw-alias-bg-layer-1'])
+
+    layer.setBackground('')
+    expect(store.has(SKIN_BACKGROUND_KEY)).toBe(false)
+    const cleared = ctx.__calls.at(-1)?.tokens
+    expect(cleared).toBe(skinOf('ocean').tokens)
+
+    // A repeat write of the same value does not re-stack.
+    const count = ctx.__calls.length
+    layer.setBackground('')
+    expect(ctx.__calls).toHaveLength(count)
   })
 
   it('without the theme service the layer is unavailable and switches are inert', () => {

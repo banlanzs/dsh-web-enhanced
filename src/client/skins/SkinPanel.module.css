@@ -141,3 +141,126 @@
     transition: none;
   }
 }
+
+/* ── custom background section ─────────────────────────────────────────── */
+
+.bgSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-1, transparent);
+}
+
+.bgTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bgHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--dsw-alias-label-tertiary, rgb(122 128 137));
+}
+
+.bgRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* The thumbnail previews the faded result, not the raw picture: an inset
+   wash of the live base color at the veil's strength approximates what the
+   backdrop will look like under the current skin and scheme. */
+.bgThumb {
+  width: 96px;
+  height: 60px;
+  object-fit: cover;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--dsw-alias-bg-base, #fff) 84%, transparent);
+}
+
+.bgEmpty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 60px;
+  border: 1px dashed var(--dsw-alias-border-l3, rgba(0 0 0 / 16%));
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary, rgb(122 128 137));
+}
+
+.bgActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* A label-wrapped hidden file input: the label is the button. */
+.bgPick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, inherit);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.bgPick:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0 0 0 / 4%));
+}
+
+.bgPick input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.bgPick:focus-within {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #4d6bfe);
+  outline-offset: 2px;
+}
+
+.bgClear {
+  padding: 6px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-state-error-primary, rgb(236 19 19));
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.bgClear:hover {
+  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236 19 19 / 6%));
+}
+
+.bgClear:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #4d6bfe);
+  outline-offset: 2px;
+}
+
+.bgError {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dsw-alias-state-error-primary, rgb(236 19 19));
+}
