@@ -45,3 +45,11 @@ body[data-ds-dark-theme] .veilLight {
 body[data-ds-dark-theme] .veilDark {
   display: block;
 }
+
+/* The host's composer seat fades to --dsw-alias-bg-base, which the skin layer
+   makes transparent while a background is set. Repaint it with the opaque
+   overlay token then, so transcript rows never show through the stats and
+   balance rows at the bottom of the conversation. */
+:global(body[data-dsh-webenhanced-skin-bg='true'] [data-composer-seat]) {
+  background: var(--dsw-alias-bg-overlay, rgb(233 236 242));
+}
