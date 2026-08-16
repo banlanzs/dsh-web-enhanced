@@ -44,6 +44,25 @@
   color: var(--dsw-alias-label-primary, rgb(15 17 21));
 }
 
+/* VSCode-style explorer split: the tree sidebar owns a bounded column, the
+   preview side takes the rest. Both children manage their own scrolling, so
+   the split itself never scrolls. */
+.explorer {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border-right: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  background: var(--dsw-alias-bg-layer-1, transparent);
+}
+
 .body {
   display: flex;
   flex: 1;

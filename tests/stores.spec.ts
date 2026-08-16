@@ -104,7 +104,7 @@ describe('workspace view state', () => {
   it('keeps the active tab across workspaces', () => {
     // The tab is a view preference, not a per-project fact.
     const { cell, actions } = createPanel()
-    expect(cell.getSnapshot().tab).toBe('files')
+    expect(cell.getSnapshot().tab).toBe('explorer')
     actions.selectTab('scm')
     expect(cell.getSnapshot().tab).toBe('scm')
   })
@@ -132,12 +132,19 @@ describe('workspace view state', () => {
     expect(restored.query).toBe('')
   })
 
+  it('restores the pre-explorer files and preview tabs onto the explorer', () => {
+    localStorage.setItem('dsh.webEnhanced.panel.v2', JSON.stringify({ tab: 'files' }))
+    expect(createPanel().cell.getSnapshot().tab).toBe('explorer')
+    localStorage.setItem('dsh.webEnhanced.panel.v2', JSON.stringify({ tab: 'preview' }))
+    expect(createPanel().cell.getSnapshot().tab).toBe('explorer')
+  })
+
   it('drops persisted values that are not the stored shape', () => {
     localStorage.setItem('dsh.webEnhanced.panel.v2', JSON.stringify({
       tab: 'nope', expanded: { w1: [1, 'src'], w2: 'not-an-array' },
     }))
     const state = createPanel().cell.getSnapshot()
-    expect(state.tab).toBe('files')
+    expect(state.tab).toBe('explorer')
     expect(state.expanded['w1']).toEqual(['src'])
     expect(state.expanded['w2']).toBeUndefined()
   })

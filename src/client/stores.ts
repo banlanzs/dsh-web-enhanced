@@ -198,7 +198,7 @@ export interface PanelState {
 export interface PanelActions {
   /**
    * Select the active tab.
-   * @param tab - files, preview, or scm.
+   * @param tab - explorer, scm, board, or graph.
    */
   readonly selectTab: (tab: PanelTab) => void
   /**
@@ -226,7 +226,11 @@ function revivePanel(raw: unknown): PanelState | undefined {
     }
   }
   return {
-    tab: tab === 'files' || tab === 'preview' || tab === 'scm' || tab === 'board' || tab === 'graph' ? tab : 'files',
+    // The pre-0.14 layout kept files and preview as separate tabs; both
+    // restore onto the combined explorer surface.
+    tab: tab === 'files' || tab === 'preview' ? 'explorer'
+      : tab === 'scm' || tab === 'board' || tab === 'graph' ? tab
+        : 'explorer',
     expanded,
     // The filter is a live gesture, not a place: a reload starts unfiltered.
     query: '',
@@ -236,7 +240,7 @@ function revivePanel(raw: unknown): PanelState | undefined {
 /** Create the view cell and its bound actions. */
 export function createPanel(): { cell: Cell<PanelState>; actions: PanelActions } {
   const cell = createCell<PanelState>(
-    { tab: 'files', expanded: {}, query: '' },
+    { tab: 'explorer', expanded: {}, query: '' },
     { key: PANEL_PERSIST_KEY, revive: revivePanel },
   )
   return {

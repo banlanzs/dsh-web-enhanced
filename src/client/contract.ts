@@ -101,8 +101,13 @@ export type {
   VisionStatusResult, VisionStatusView,
 } from '../types.ts'
 
-/** Right-panel tab selection. */
-export type PanelTab = 'files' | 'preview' | 'scm' | 'board' | 'graph'
+/**
+ * Right-panel tab selection. `explorer` is the VSCode-style combined surface:
+ * file-tree sidebar on the left, open-file preview (source/rendered/diff) on
+ * the right — one tab, because opening a file from the tree answers where it
+ * renders, not which tab the view is on.
+ */
+export type PanelTab = 'explorer' | 'scm' | 'board' | 'graph'
 
 /**
  * How one preview tab renders. `source` is the raw editor, `view` the

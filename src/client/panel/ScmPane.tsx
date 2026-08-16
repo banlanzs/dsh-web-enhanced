@@ -77,7 +77,7 @@ export function ScmPane({ workspaceId, remote, openTab, selectTab, t }: ScmPaneP
       size: text.length,
       ...(error === undefined ? {} : { error }),
     })
-    selectTab('preview')
+    selectTab('explorer')
   }, [openTab, remote, selectTab, workspaceId])
 
   if (status.phase === 'loading') return <p className={css.empty}>{t('board.loading')}</p>

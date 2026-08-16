@@ -1,7 +1,8 @@
 /**
- * Workspace file tree: lazily expanded directories, whole-row click to
- * expand, and a file-name filter that switches the tree into a flat match
- * list. Clicking a file opens it in the preview tab.
+ * Workspace file tree sidebar: lazily expanded directories, whole-row click
+ * to expand, and a file-name filter that switches the tree into a flat match
+ * list. Clicking a file opens it in the explorer's preview side, which the
+ * combined layout keeps visible beside the tree.
  *
  * Directory contents are fetched on first expansion and cached for the life
  * of the mount: a tree that re-listed on every render would hammer the host
@@ -29,7 +30,7 @@ type Listing =
 
 /** The file tree. */
 export function FileTree({
-  workspaceId, usePanel, remote, toggleExpanded, setQuery, selectTab, openTab, t,
+  workspaceId, usePanel, remote, toggleExpanded, setQuery, openTab, t,
 }: FileTreeProps) {
   const expanded = usePanel(state => state.expanded[workspaceId] ?? [])
   const query = usePanel(state => state.query)
@@ -80,8 +81,7 @@ export function FileTree({
     const tab = await loadPreviewTab(remote, workspaceId, path)
     if (!live.current) return
     openTab(tab)
-    selectTab('preview')
-  }, [openTab, remote, selectTab, workspaceId])
+  }, [openTab, remote, workspaceId])
 
   const toggle = useCallback((path: string): void => {
     if (!expanded.includes(path) && listings.get(path) === undefined) void list(path)

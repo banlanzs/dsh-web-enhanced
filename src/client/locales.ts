@@ -242,8 +242,7 @@ export const zh = {
   'branch.failed': '切换失败：',
 
   'view.workspace': '工作区',
-  'panel.tab.files': '文件',
-  'panel.tab.preview': '预览',
+  'panel.tab.explorer': '资源管理器',
   'panel.tab.scm': '变更',
   'panel.tab.board': '任务看板',
   'panel.tab.graph': 'Git 图谱',
@@ -518,8 +517,7 @@ export const en: Record<keyof typeof zh, string> = {
   'branch.failed': 'Switch failed:',
 
   'view.workspace': 'Workspace',
-  'panel.tab.files': 'Files',
-  'panel.tab.preview': 'Preview',
+  'panel.tab.explorer': 'Explorer',
   'panel.tab.scm': 'Changes',
   'panel.tab.board': 'Task Board',
   'panel.tab.graph': 'Git Graph',

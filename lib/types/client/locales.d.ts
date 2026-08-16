@@ -235,8 +235,7 @@ export declare const zh: {
     readonly 'branch.dirtyCancel': "取消";
     readonly 'branch.failed': "切换失败：";
     readonly 'view.workspace': "工作区";
-    readonly 'panel.tab.files': "文件";
-    readonly 'panel.tab.preview': "预览";
+    readonly 'panel.tab.explorer': "资源管理器";
     readonly 'panel.tab.scm': "变更";
     readonly 'panel.tab.board': "任务看板";
     readonly 'panel.tab.graph': "Git 图谱";

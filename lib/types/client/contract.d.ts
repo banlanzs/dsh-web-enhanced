@@ -55,8 +55,13 @@ export interface WebEnhancedRemote {
 }
 /** Re-exported payload types (components, tests, and preview helpers). */
 export type { ApiError, BalanceGetRequest, BalanceView, FsBrowseEntry, FsBrowseRequest, FsBrowseResult, FsBrowseView, FsDeleteRequest, FsEntryView, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchView, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitDetailView, GitCommitFileView, GitCommitRequest, GitCommitResult, GitCommitView, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry, GitStatusRequest, GitStatusResult, GitWorkingFileView, GitWorkingRequest, GitWorkingResult, GitWorkingState, GitWorkingView, OfficeBlock, OfficeKind, PluginListRequest, PluginListResult, PluginListView, PluginMutateRequest, PluginMutateResult, PluginMutateView, PluginView, ModelPricingView, PricingGetRequest, PricingGetResult, PricingView, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskStatus, TaskUpdateRequest, TaskUpdateResult, VisionAttemptFailureView, VisionConfigGetResult, VisionConfigPatch, VisionConfigSaveRequest, VisionConfigSaveView, VisionConfigSetResult, VisionConfigView, VisionEndpointModelView, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionEndpointModelsView, VisionHarnessModelView, VisionModelOptionView, VisionProviderOptionView, VisionStatusResult, VisionStatusView, } from '../types.ts';
-/** Right-panel tab selection. */
-export type PanelTab = 'files' | 'preview' | 'scm' | 'board' | 'graph';
+/**
+ * Right-panel tab selection. `explorer` is the VSCode-style combined surface:
+ * file-tree sidebar on the left, open-file preview (source/rendered/diff) on
+ * the right — one tab, because opening a file from the tree answers where it
+ * renders, not which tab the view is on.
+ */
+export type PanelTab = 'explorer' | 'scm' | 'board' | 'graph';
 /**
  * How one preview tab renders. `source` is the raw editor, `view` the
  * rendered form, `split` shows both side by side. A format with no rendered

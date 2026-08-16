@@ -1,7 +1,8 @@
 /**
- * Workspace file tree: lazily expanded directories, whole-row click to
- * expand, and a file-name filter that switches the tree into a flat match
- * list. Clicking a file opens it in the preview tab.
+ * Workspace file tree sidebar: lazily expanded directories, whole-row click
+ * to expand, and a file-name filter that switches the tree into a flat match
+ * list. Clicking a file opens it in the explorer's preview side, which the
+ * combined layout keeps visible beside the tree.
  *
  * Directory contents are fetched on first expansion and cached for the life
  * of the mount: a tree that re-listed on every render would hammer the host
@@ -14,4 +15,4 @@ export type FileTreeProps = WebEnhancedProps<'conversation.view'> & {
     readonly workspaceId: string;
 };
 /** The file tree. */
-export declare function FileTree({ workspaceId, usePanel, remote, toggleExpanded, setQuery, selectTab, openTab, t, }: FileTreeProps): import("react").JSX.Element;
+export declare function FileTree({ workspaceId, usePanel, remote, toggleExpanded, setQuery, openTab, t, }: FileTreeProps): import("react").JSX.Element;

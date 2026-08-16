@@ -1,12 +1,14 @@
 /**
- * Workspace view: file tree, preview, SCM, the task board, and the git graph
- * for the session's project, registered as one tab in the conversation's view
- * ring beside Chat and Trajectory.
+ * Workspace view: the explorer (VSCode-style file tree sidebar plus preview
+ * of the open file), SCM, the task board, and the git graph for the session's
+ * project, registered as one tab in the conversation's view ring beside Chat
+ * and Trajectory.
  *
  * It lives in `conversation.view` rather than floating over the frame. The
  * view ring renders one entry at a time at full column width, so this surface
- * owns no geometry — no docking, no drag-to-resize, no collapse. Those belong
- * to the frame, and a tab that tried to own them would fight it.
+ * owns no geometry of its own — no docking, no collapse. The one geometry it
+ * does own is the explorer's sidebar width split, which lives entirely inside
+ * the tab.
  * @module dsh-web-enhanced/src/client/panel/WorkspaceView
  */
 
@@ -28,10 +30,9 @@ export type WorkspaceViewProps = WebEnhancedProps<'conversation.view'>
 /** Tabs in display order with their dictionary keys. */
 const TABS: ReadonlyArray<{
   tab: PanelTab
-  key: 'panel.tab.files' | 'panel.tab.preview' | 'panel.tab.scm' | 'panel.tab.board' | 'panel.tab.graph'
+  key: 'panel.tab.explorer' | 'panel.tab.scm' | 'panel.tab.board' | 'panel.tab.graph'
 }> = [
-  { tab: 'files', key: 'panel.tab.files' },
-  { tab: 'preview', key: 'panel.tab.preview' },
+  { tab: 'explorer', key: 'panel.tab.explorer' },
   { tab: 'scm', key: 'panel.tab.scm' },
   { tab: 'board', key: 'panel.tab.board' },
   { tab: 'graph', key: 'panel.tab.graph' },
@@ -79,8 +80,14 @@ export function WorkspaceView(props: WorkspaceViewProps) {
         ))}
       </nav>
       <div className={css.body} role="tabpanel">
-        {tab === 'files' && <FileTree {...props} workspaceId={String(workspaceId)} />}
-        {tab === 'preview' && <PreviewPane {...props} workspaceId={String(workspaceId)} />}
+        {tab === 'explorer' && (
+          <div className={css.explorer} data-testid="workspace-explorer">
+            <aside className={css.sidebar}>
+              <FileTree {...props} workspaceId={String(workspaceId)} />
+            </aside>
+            <PreviewPane {...props} workspaceId={String(workspaceId)} />
+          </div>
+        )}
         {tab === 'scm' && <ScmPane {...props} workspaceId={String(workspaceId)} />}
         {tab === 'board' && (
           <BoardPanel remote={props.remote} workspaces={workspaces.items} openSession={props.openSession} t={t} />
