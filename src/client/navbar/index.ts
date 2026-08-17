@@ -710,13 +710,22 @@ export function applyNavbar(ctx: ClientContext): () => void {
     else jumpToRow(hit.row)
   })
 
-  // Wheel over the strip: one node per gesture (120ms throttle).
+  // Wheel over the strip: when the bounded node set still overflows the
+  // viewport-capped container, scroll the strip itself; otherwise one gesture
+  // steps one node (120ms throttle).
   let lastWheelAt = 0
   bar.addEventListener('wheel', (event) => {
     event.preventDefault()
     const now = performance.now()
     if (now - lastWheelAt < 120) return
     lastWheelAt = now
+    if (bar.scrollHeight > bar.clientHeight) {
+      bar.scrollTop = Math.min(
+        bar.scrollHeight - bar.clientHeight,
+        Math.max(0, bar.scrollTop + event.deltaY),
+      )
+      return
+    }
     const rows = userRows()
     if (rows.length < 2) return
     const base = activeIndex >= 0 ? activeIndex : computeActive()

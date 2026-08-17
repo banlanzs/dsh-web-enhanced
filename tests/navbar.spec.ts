@@ -70,9 +70,10 @@ describe('olderNodeCount', () => {
 
 describe('olderWindow', () => {
   it('keeps the virtual-dot DOM bounded for very long sessions', () => {
-    expect(olderWindow(50)).toEqual({ hidden: 0, visible: 50 })
+    expect(olderWindow(4)).toEqual({ hidden: 0, visible: 4 })
     expect(olderWindow(MAX_OLDER_DOTS)).toEqual({ hidden: 0, visible: MAX_OLDER_DOTS })
     expect(olderWindow(MAX_OLDER_DOTS + 1)).toEqual({ hidden: 1, visible: MAX_OLDER_DOTS })
+    expect(olderWindow(50)).toEqual({ hidden: 50 - MAX_OLDER_DOTS, visible: MAX_OLDER_DOTS })
     expect(olderWindow(12_000)).toEqual({ hidden: 12_000 - MAX_OLDER_DOTS, visible: MAX_OLDER_DOTS })
     expect(olderWindow(0)).toEqual({ hidden: 0, visible: 0 })
   })

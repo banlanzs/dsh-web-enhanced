@@ -14,8 +14,15 @@ export const NAV_WINDOW = 11
 /** Nodes on either side of the active one inside a window. */
 export const NAV_HALF_WINDOW = 5
 
-/** Upper bound on per-turn virtual dots for unrendered older turns. */
-export const MAX_OLDER_DOTS = 200
+/**
+ * Upper bound on per-turn virtual dots for unrendered older turns.
+ *
+ * The materialized window already contributes up to {@link NAV_WINDOW} dots;
+ * the older-turn budget stays small so the whole strip stays within one
+ * screen (marker + virtual dots + separators + window ≈ 20 nodes). Older
+ * turns beyond the budget fold into the single "load older" marker instead.
+ */
+export const MAX_OLDER_DOTS = 6
 
 /** The visible index range of one navbar render. */
 export interface NavWindow {
