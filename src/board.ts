@@ -15,11 +15,12 @@ import type { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { nextAfter, parseCron } from './cron.ts'
 import { createTaskAgent, executeTaskAgent } from './run-task.ts'
 import type { RunDeps } from './run-task.ts'
-import { taskRecordSchema } from './schemas.ts'
+import { memoryRecordSchema, taskRecordSchema } from './schemas.ts'
 import type {
   ApiError, TaskCreateRequest, TaskCreateResult, TaskId, TaskListResult, TaskRecord,
   TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskStatus,
   TaskUpdateRequest, TaskUpdateResult,
+  MemoryId, MemoryRecord,
 } from './types.ts'
 
 /** Brand a raw id as a task id at the owning boundary. */
@@ -31,13 +32,35 @@ function taskId(value: string): TaskId {
 const taskDomainSpec = defineDomain({
   // The unit-name grammar allows letters, digits, and underscores only.
   name: 'web_enhanced',
-  version: 1,
+  version: 2,
   tables: {
     // The record schema validates at the durable boundary; TaskId is a
     // compile-time brand over the same string field.
     tasks: domainTable<TaskId, TaskRecord>(taskRecordSchema as unknown as ZodType<TaskRecord>),
+    memories: domainTable<MemoryId, MemoryRecord>(memoryRecordSchema as unknown as ZodType<MemoryRecord>),
   },
 })
+
+/** Shared open of the web-enhanced domain, keyed by the domain facility. */
+const sharedDomains = new WeakMap<object, Promise<Domain<typeof taskDomainSpec>>>()
+
+/**
+ * Open the web-enhanced domain exactly once per domain facility and cache
+ * the promise. TaskBoard and the memory feature share this handle; the
+ * storage facility rejects a second open of the same name. Keying the cache
+ * by facility keeps every test harness (one facility per context) isolated.
+ * @param ctx - owning context with the injected storageDomain service.
+ * @returns the shared domain promise.
+ */
+export function openSharedDomain(ctx: Context): Promise<Domain<typeof taskDomainSpec>> {
+  const facility = ctx.get('storageDomain')!
+  let promise = sharedDomains.get(facility)
+  if (promise === undefined) {
+    promise = facility.open(taskDomainSpec)
+    sharedDomains.set(facility, promise)
+  }
+  return promise
+}
 
 /** Board configuration (deployment config, not tunables). */
 export interface BoardConfig {
@@ -88,6 +111,11 @@ export class TaskBoard {
       void this.schedulerTick()
       return () => this.disarmScheduler()
     })
+  }
+
+  /** The opened domain promise; shared with the memory store. */
+  get domain(): Promise<Domain<typeof taskDomainSpec>> {
+    return this.ready
   }
 
   /** List every task, oldest first. */
@@ -265,7 +293,7 @@ export class TaskBoard {
 
   /** Recover interrupted runs and open the domain for the gateway. */
   private async openDomain(ctx: Context): Promise<Domain<typeof taskDomainSpec>> {
-    const domain = await ctx.get('storageDomain')!.open(taskDomainSpec)
+    const domain = await openSharedDomain(ctx)
     // Restart recovery: an interrupted run can never finish, so it settles as
     // failed with the reason the UI renders.
     const now = Date.now()

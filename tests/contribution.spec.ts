@@ -203,6 +203,8 @@ const payloads: Record<string, unknown[]> = {
     writable: false,
   }, errorPayload],
   globalPromptSet: [{ ok: true, revision: 6 }, errorPayload],
+  memoryList: [{ memories: [] }, errorPayload],
+  memoryDelete: [{ removed: true }, errorPayload],
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
   gitCommit: [{ commit: commitDetail }, errorPayload],
@@ -306,10 +308,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 39 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 41 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(39)
+    expect(methods).toHaveLength(41)
   })
 
   it('every result schema accepts its success and error payloads', () => {

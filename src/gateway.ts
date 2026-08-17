@@ -17,6 +17,7 @@ import { balanceApplies } from './channel.ts'
 import { deepseekRateFor } from './deepseek-rate.ts'
 import { TaskBoard } from './board.ts'
 import type { BoardDeps } from './board.ts'
+import { MemoryStore } from './memory-store.ts'
 import { deleteFileView, countTextLines, listDirectory, readFileView, searchFiles, writeFileView } from './files.ts'
 import type { FsLimits } from './files.ts'
 import { GitClient } from './git.ts'
@@ -46,6 +47,7 @@ import type {
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
   GlobalPromptConfigView, GlobalPromptGetResult, GlobalPromptSaveRequest, GlobalPromptSetResult,
+  MemoryDeleteRequest, MemoryDeleteResult, MemoryId, MemoryListRequest, MemoryListResult,
   ModelRetryConfigView, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
   ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView,
   PluginListRequest, PluginListResult,
@@ -323,6 +325,7 @@ export class WebEnhancedGateway extends TypertRemoteService {
   private readonly resolved: Required<Config>
   private readonly balance: BalanceClient
   private readonly board: TaskBoard
+  private readonly memoryStore: MemoryStore
   private readonly pricing: ModelsDevPricing
   private readonly routeNames: ModelRouteNames
   private readonly opencodeGo: OpencodeGoUsageClient
@@ -366,6 +369,7 @@ export class WebEnhancedGateway extends TypertRemoteService {
     this.board = new TaskBoard(ctx, this.boardDeps(ctx), {
       cronIntervalMs: this.resolved.cronIntervalMs,
     })
+    this.memoryStore = new MemoryStore(ctx, this.board.domain)
     this.pricing = new ModelsDevPricing({
       url: this.resolved.modelsDevUrl,
       ttlMs: this.resolved.modelsDevCacheTtlMs,
@@ -713,6 +717,38 @@ export class WebEnhancedGateway extends TypertRemoteService {
     } catch (error) {
       const conflict = (error as { code?: unknown }).code === 'SETTINGS_CONFLICT'
       return { error: this.errorOf(error, conflict ? 'global-prompt-config-conflict' : 'global-prompt-config-save') }
+    }
+  }
+
+  // ── memory ──────────────────────────────────────────────────────────────
+
+  /** List memory records, optionally narrowed to one workspace. */
+  @Remote('memoryList')
+  async memoryList(request: MemoryListRequest): Promise<MemoryListResult> {
+    try {
+      const workspaceId = request.workspaceId === undefined || request.workspaceId === null
+        ? undefined
+        : this.resolveWorkspaceId(request.workspaceId)
+      if (request.workspaceId !== undefined && request.workspaceId !== null && workspaceId === null) {
+        return { error: { code: 'workspace-not-found', message: `workspace '${request.workspaceId}' does not exist` } }
+      }
+      const memories = await this.memoryStore.list(workspaceId)
+      return { memories }
+    } catch (error) {
+      return { error: this.errorOf(error, 'memory-list') }
+    }
+  }
+
+  /** Delete one memory record by id. */
+  @Remote('memoryDelete')
+  async memoryDelete(request: MemoryDeleteRequest): Promise<MemoryDeleteResult> {
+    try {
+      const id = request.id
+      if (id === '') return { error: { code: 'invalid-id', message: 'memory id must not be empty' } }
+      const removed = await this.memoryStore.delete(id as MemoryId)
+      return { removed }
+    } catch (error) {
+      return { error: this.errorOf(error, 'memory-delete') }
     }
   }
 

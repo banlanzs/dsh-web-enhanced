@@ -11,6 +11,8 @@ export { applyGlobalPrompt, GLOBAL_PROMPT_ORDER, GLOBAL_PROMPT_SECTION, GlobalPr
 export type { GlobalPromptSettingsValue } from './global-prompt.ts';
 export { VisionInterceptor, VisionTranscriber, VISION_SETTINGS_NS, VisionSettingsSchema } from './vision.ts';
 export type { VisionConfigSource, VisionSettings, VisionSettingsScopeFace, VisionSettingsServiceFace, VisionSettingsValue, } from './vision.ts';
+export { applyMemory, MEMORY_ORDER, MEMORY_SECTION, MEMORY_SETTINGS_NS, MemorySettingsSchema } from './memory.ts';
+export type { MemorySettingsValue } from './memory.ts';
 /** Cordis plugin name (the loader row references the package, this is the entry name). */
 export declare const name = "web-enhanced";
 /**

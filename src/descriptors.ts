@@ -27,6 +27,7 @@
 
 import { z } from 'zod'
 import type { InvocationDescriptor, TypertCodec } from '@deepseek-ai/dsh-typert-protocol'
+import { memoryRecordSchema } from './schemas.ts'
 
 /** Wire namespace and Cordis service key of the gateway. */
 export const WEB_ENHANCED_NAMESPACE = 'webEnhanced'
@@ -390,6 +391,11 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
     ok: z.literal(true),
     revision: z.number(),
   }))),
+  // ── memory ─────────────────────────────────────────────────────
+  unary('memoryList', 'MemoryListRequest', 'MemoryListResult',
+    okOrError(z.object({ memories: z.array(memoryRecordSchema) }))),
+  unary('memoryDelete', 'MemoryDeleteRequest', 'MemoryDeleteResult',
+    okOrError(z.object({ removed: z.boolean() }))),
   unary('gitBranches', 'GitBranchesRequest', 'GitBranchesResult', okOrError(z.object({ branches: z.array(gitBranchViewSchema) }))),
   unary('gitLog', 'GitLogRequest', 'GitLogResult', okOrError(z.object({ commits: z.array(gitCommitViewSchema) }))),
   unary('gitCommit', 'GitCommitRequest', 'GitCommitResult', okOrError(z.object({ commit: gitCommitDetailSchema }))),

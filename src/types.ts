@@ -701,3 +701,30 @@ export interface GlobalPromptSaveView {
 }
 
 export type GlobalPromptSetResult = GlobalPromptSaveView | { readonly error: ApiError }
+
+/** Identifies one memory record. */
+export type MemoryId = Branded<'MemoryId'>
+
+/** Memory classification aligned with the Claude Code memory system. */
+export type MemoryKind = 'user' | 'feedback' | 'project' | 'reference'
+
+/** Durable memory record (storage-domain table value). */
+export interface MemoryRecord {
+  readonly id: MemoryId
+  readonly workspaceId: WorkspaceId | null
+  readonly kind: MemoryKind
+  readonly summary: string
+  readonly body: string
+  readonly sourceSessionId: SessionId | null
+  readonly createdAt: number
+  readonly updatedAt: number
+}
+
+/** Memory list Remote result. */
+export type MemoryListResult = { readonly memories: readonly MemoryRecord[] } | { readonly error: ApiError }
+
+/** Memory delete Remote result. */
+export type MemoryDeleteResult = { readonly removed: boolean } | { readonly error: ApiError }
+
+export interface MemoryListRequest { readonly workspaceId?: string | null }
+export interface MemoryDeleteRequest { readonly id: string }

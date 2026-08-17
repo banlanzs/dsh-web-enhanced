@@ -5,9 +5,28 @@
  * @module dsh-web-enhanced/src/board
  */
 import type { Context } from '@deepseek-ai/cordis';
+import type { Domain } from '@deepseek-ai/dsh-storage-domain';
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace';
 import type { RunDeps } from './run-task.ts';
-import type { TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult } from './types.ts';
+import type { TaskCreateRequest, TaskCreateResult, TaskId, TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, MemoryId, MemoryRecord } from './types.ts';
+/** The web-enhanced task domain: one validated tasks table. */
+declare const taskDomainSpec: {
+    name: string;
+    version: number;
+    tables: {
+        tasks: import("@deepseek-ai/dsh-storage-domain").DomainTableSpec<TaskId, TaskRecord>;
+        memories: import("@deepseek-ai/dsh-storage-domain").DomainTableSpec<MemoryId, MemoryRecord>;
+    };
+};
+/**
+ * Open the web-enhanced domain exactly once per domain facility and cache
+ * the promise. TaskBoard and the memory feature share this handle; the
+ * storage facility rejects a second open of the same name. Keying the cache
+ * by facility keeps every test harness (one facility per context) isolated.
+ * @param ctx - owning context with the injected storageDomain service.
+ * @returns the shared domain promise.
+ */
+export declare function openSharedDomain(ctx: Context): Promise<Domain<typeof taskDomainSpec>>;
 /** Board configuration (deployment config, not tunables). */
 export interface BoardConfig {
     /**
@@ -50,6 +69,8 @@ export declare class TaskBoard {
      * @param config - board configuration.
      */
     constructor(ctx: Context, deps: BoardDeps, config: BoardConfig);
+    /** The opened domain promise; shared with the memory store. */
+    get domain(): Promise<Domain<typeof taskDomainSpec>>;
     /** List every task, oldest first. */
     list(): Promise<TaskListResult>;
     /** Create a task; a cron expression is validated and its next run computed. */
@@ -82,3 +103,4 @@ export declare class TaskBoard {
     private completeRun;
     private errorOf;
 }
+export {};

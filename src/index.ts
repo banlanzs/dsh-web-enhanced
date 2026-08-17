@@ -11,6 +11,7 @@ import { WEB_ENHANCED_DESCRIPTORS, WEB_ENHANCED_PACKAGE } from './descriptors.ts
 import { WebEnhancedGateway, Config } from './gateway.ts'
 import { VisionInterceptor } from './vision.ts'
 import { applyGlobalPrompt } from './global-prompt.ts'
+import { applyMemory } from './memory.ts'
 
 export { WebEnhancedGateway, Config }
 export {
@@ -23,6 +24,8 @@ export type {
   VisionConfigSource, VisionSettings, VisionSettingsScopeFace, VisionSettingsServiceFace,
   VisionSettingsValue,
 } from './vision.ts'
+export { applyMemory, MEMORY_ORDER, MEMORY_SECTION, MEMORY_SETTINGS_NS, MemorySettingsSchema } from './memory.ts'
+export type { MemorySettingsValue } from './memory.ts'
 
 /**
  * One package contribution as `TypertRegistry.register` accepts it.
@@ -97,6 +100,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     invocations: WEB_ENHANCED_DESCRIPTORS,
   }), 'web-enhanced: Remote definitions')
   applyGlobalPrompt(ctx)
+  applyMemory(ctx)
   ctx.plugin(VisionInterceptor, config)
   ctx.plugin(WebEnhancedGateway, config)
 }

@@ -10,16 +10,19 @@ import { defineDomain, DomainFacility, domainTable } from '@deepseek-ai/dsh-stor
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
 import { MemoryMediaPool, MemoryStorageBackend } from './helpers/memory-backend.ts'
-import { taskRecordSchema } from '../src/schemas.ts'
-import type { TaskId, TaskRecord, VisionConfigPatch } from '../src/types.ts'
+import { memoryRecordSchema, taskRecordSchema } from '../src/schemas.ts'
+import type { MemoryRecord, TaskId, TaskRecord, VisionConfigPatch } from '../src/types.ts'
 import { GLOBAL_PROMPT_SETTINGS_NS } from '../src/types.ts'
 import { WebEnhancedGateway } from '../src/index.ts'
 import { FakeSubprocess } from './helpers/fake-subprocess.ts'
 
 const DOMAIN_SPEC = defineDomain({
   name: 'web_enhanced',
-  version: 1,
-  tables: { tasks: domainTable<TaskId, TaskRecord>(taskRecordSchema as never) },
+  version: 2,
+  tables: {
+    tasks: domainTable<TaskId, TaskRecord>(taskRecordSchema as never),
+    memories: domainTable<string, MemoryRecord>(memoryRecordSchema as never),
+  },
 })
 
 const contexts: Context[] = []
@@ -230,7 +233,7 @@ describe('WebEnhancedGateway', () => {
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet', 'pricingGet',
       'modelRouteDescribe', 'deepseekRateGet', 'opencodeGoUsageGet',
       'visionStatus', 'visionConfigGet', 'visionConfigSet', 'modelRetryGet', 'modelRetrySet',
-      'globalPromptGet', 'globalPromptSet', 'visionEndpointModels',
+      'globalPromptGet', 'globalPromptSet', 'memoryList', 'memoryDelete', 'visionEndpointModels',
       'gitBranches', 'gitLog', 'gitCommit', 'gitCommitDiff', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',

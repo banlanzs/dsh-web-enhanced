@@ -35,3 +35,19 @@ export declare const taskRecordSchema: z.ZodObject<{
     updatedAt: z.ZodNumber;
     lastRunAt: z.ZodNullable<z.ZodNumber>;
 }, z.core.$strip>;
+/** Durable memory record schema; validates every stored record at load and write. */
+export declare const memoryRecordSchema: z.ZodObject<{
+    id: z.ZodString;
+    workspaceId: z.ZodNullable<z.ZodString>;
+    kind: z.ZodEnum<{
+        user: "user";
+        feedback: "feedback";
+        project: "project";
+        reference: "reference";
+    }>;
+    summary: z.ZodString;
+    body: z.ZodString;
+    sourceSessionId: z.ZodNullable<z.ZodString>;
+    createdAt: z.ZodNumber;
+    updatedAt: z.ZodNumber;
+}, z.core.$strip>;
