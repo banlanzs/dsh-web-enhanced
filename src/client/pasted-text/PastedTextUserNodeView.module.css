@@ -128,3 +128,23 @@
 .copy:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
 }
+
+.copyAction {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border: none;
+  border-radius: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dsw-alias-label-tertiary, rgb(143 148 155));
+  background: transparent;
+  cursor: pointer;
+}
+
+.copyAction:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
+}

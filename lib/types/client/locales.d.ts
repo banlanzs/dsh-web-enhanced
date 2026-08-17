@@ -54,6 +54,12 @@ export declare const zh: {
     readonly 'pastedText.remove': "移除该粘贴文本";
     readonly 'pastedText.copy': "复制";
     readonly 'pastedText.copied': "已复制";
+    readonly 'pastedText.image': "图片";
+    readonly 'pastedText.imageOpen': "点击查看原图";
+    readonly 'pastedText.imageLoading': "图片加载中…";
+    readonly 'pastedText.imageLoadFailed': "图片加载失败，点击重试";
+    readonly 'pastedText.lightboxDialog': "图片预览";
+    readonly 'pastedText.lightboxClose': "关闭";
     readonly 'pastedText.removeChip': "移除";
     readonly 'graph.entry': "Git 图谱";
     readonly 'graph.title': "Git 图谱";

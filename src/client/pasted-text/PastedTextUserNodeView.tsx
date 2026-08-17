@@ -13,10 +13,14 @@
  * @module dsh-web-enhanced/src/client/pasted-text/PastedTextUserNodeView
  */
 
-import { memo, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ChatNodeViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { ImageGallery } from '@deepseek-ai/dsh-client-ui-attachment'
+import type { ImageGalleryLabelsFace } from '@deepseek-ai/dsh-client-ui-attachment'
+import {
+  Button, IconCheckOutline16, IconCopyOutline16, Modal, Tooltip, writeClipboard,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import type { Translate } from '../locale-keys.ts'
 import { pastedTextHitOfDraft } from './apply.ts'
@@ -43,41 +47,50 @@ export type PastedTextUserNodeProps =
   & InjectFace<PastedTextUserNodeInjected>
   & { readonly t: Translate }
 
-/** Image block with an async loader, rendered as a small thumbnail. */
-function TranscriptImage({ attachment, loadImage }: {
-  attachment: unknown
-  loadImage: ChatNodeViewProps<'user'>['loadImage']
-}) {
-  const [src, setSrc] = useState<string | null>(null)
-  useEffect(() => {
-    let live = true
-    void loadImage(attachment as never).then(next => { if (live) setSrc(next) })
-    return () => { live = false }
-  }, [attachment, loadImage])
-  if (src === null) return null
-  // Anchor the loaded source so the image stays clickable/openable exactly
-  // like the host gallery, without re-importing the host's private renderer.
-  return (
-    <a className={css.imageLink} href={src} target="_blank" rel="noreferrer">
-      <img className={css.image} src={src} alt="" />
-    </a>
-  )
+/** Host-style image group: the same attachment gallery the original user bubble used. */
+function imageLabels(t: Translate): ImageGalleryLabelsFace {
+  return {
+    image: t('pastedText.image'),
+    open: t('pastedText.imageOpen'),
+    openNamed: label => label || t('pastedText.image'),
+    loading: t('pastedText.imageLoading'),
+    loadFailed: t('pastedText.imageLoadFailed'),
+    lightbox: { dialog: t('pastedText.lightboxDialog'), close: t('pastedText.lightboxClose') },
+  }
 }
 
-/** Small copy action replacing the host MessageIconActions copy button. */
+/** Host-style copy action: outline icon with the same success-check swap. */
 function CopyButton({ text, t }: { text: string; t: Translate }) {
   const [copied, setCopied] = useState(false)
-  const copy = (): void => {
-    if (text === '') return
-    void navigator.clipboard?.writeText(text).then(() => {
+  const pending = useRef(false)
+  const timer = useRef<number | null>(null)
+  const epoch = useRef(0)
+  useEffect(() => () => {
+    epoch.current += 1
+    pending.current = false
+    if (timer.current !== null) clearTimeout(timer.current)
+  }, [])
+  const onCopy = useCallback(() => {
+    if (copied || pending.current) return
+    const current = epoch.current
+    pending.current = true
+    void writeClipboard(text).then((ok) => {
+      if (current !== epoch.current) return
+      pending.current = false
+      if (!ok) return
       setCopied(true)
-      window.setTimeout(() => { setCopied(false) }, 1500)
+      timer.current = window.setTimeout(() => {
+        timer.current = null
+        setCopied(false)
+      }, 1000)
     })
-  }
+  }, [copied, text])
   return (
-    <button type="button" className={css.copy} title={t('pastedText.copy')} onClick={copy}>
-      {copied ? t('pastedText.copied') : t('pastedText.copy')}
-    </button>
+    <Tooltip label={copied ? t('pastedText.copied') : t('pastedText.copy')} side="bottom">
+      <button type="button" className={css.copyAction} aria-label={copied ? t('pastedText.copied') : t('pastedText.copy')} onClick={onCopy}>
+        {copied ? <IconCheckOutline16 /> : <IconCopyOutline16 />}
+      </button>
+    </Tooltip>
   )
 }
 
@@ -138,16 +151,22 @@ function PastedTextChip({ hit, store, t }: {
   )
 }
 
-/** Text/block projection shared by the two transcript presentations. */
-function contentOf(content: readonly unknown[]): { text: string; blocks: readonly unknown[] } {
+/** Text/image/other projection shared by the two transcript presentations. */
+function contentParts(content: readonly unknown[]): {
+  text: string
+  images: readonly { attachment: unknown }[]
+  rest: readonly unknown[]
+} {
   let text = ''
-  const blocks: unknown[] = []
+  const images: { attachment: unknown }[] = []
+  const rest: unknown[] = []
   for (const raw of content) {
     const block = raw as ContentBlockFace
     if (block.type === 'text' && typeof block.text === 'string') text += block.text
-    else blocks.push(raw)
+    else if (block.type === 'image' && block.attachment !== undefined) images.push({ attachment: block.attachment })
+    else rest.push(raw)
   }
-  return { text, blocks }
+  return { text, images, rest }
 }
 
 /** Plain fallback bubble for user messages that contain no pasted-text span. */
@@ -156,17 +175,13 @@ function PlainUserBubble({ content, loadImage, t }: {
   loadImage: ChatNodeViewProps<'user'>['loadImage']
   t: Translate
 }): ReactNode {
-  const { text, blocks } = contentOf(content)
+  const { text, images, rest } = contentParts(content)
   return (
     <div className={css.userRow} data-time-hover-root>
       <div className={css.userStack}>
-        {blocks.map((block, index) => {
-          const face = block as { type?: unknown; attachment?: unknown }
-          return face.type === 'image'
-            ? <TranscriptImage key={index} attachment={face.attachment} loadImage={loadImage} />
-            : <pre key={index} className={css.extraBlock}>{JSON.stringify(block, null, 2)}</pre>
-        })}
+        <ImageGallery images={images} load={loadImage as never} align="end" labels={imageLabels(t)} />
         {text !== '' && <div className={css.bubble}>{text}</div>}
+        {rest.map((block, index) => <pre key={index} className={css.extraBlock}>{JSON.stringify(block, null, 2)}</pre>)}
       </div>
       <CopyButton text={text} t={t} />
     </div>
@@ -178,7 +193,7 @@ export const PastedTextUserNodeView = memo(function PastedTextUserNodeView({
   node, loadImage, store, t,
 }: PastedTextUserNodeProps): ReactNode {
   const content = node.data.content as readonly unknown[]
-  const { text, blocks } = contentOf(content)
+  const { text, images, rest } = contentParts(content)
   const hit = pastedTextHitOfDraft(store, text)
   if (hit === undefined) {
     return <PlainUserBubble content={content} loadImage={loadImage} t={t} />
@@ -186,12 +201,7 @@ export const PastedTextUserNodeView = memo(function PastedTextUserNodeView({
   return (
     <div className={css.userRow} data-time-hover-root>
       <div className={css.userStack}>
-        {blocks.map((block, index) => {
-          const face = block as { type?: unknown; attachment?: unknown }
-          return face.type === 'image'
-            ? <TranscriptImage key={index} attachment={face.attachment} loadImage={loadImage} />
-            : <pre key={index} className={css.extraBlock}>{JSON.stringify(block, null, 2)}</pre>
-        })}
+        <ImageGallery images={images} load={loadImage as never} align="end" labels={imageLabels(t)} />
         {text !== '' && (
           <div className={css.bubble}>
             {hit.start > 0 ? <span>{text.slice(0, hit.start)}</span> : null}
@@ -199,6 +209,7 @@ export const PastedTextUserNodeView = memo(function PastedTextUserNodeView({
             {hit.end < text.length ? <span>{text.slice(hit.end)}</span> : null}
           </div>
         )}
+        {rest.map((block, index) => <pre key={index} className={css.extraBlock}>{JSON.stringify(block, null, 2)}</pre>)}
       </div>
       <CopyButton text={text} t={t} />
     </div>
