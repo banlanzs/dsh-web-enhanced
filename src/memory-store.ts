@@ -20,6 +20,38 @@ function memoryId(raw: string): MemoryId {
   return raw as MemoryId
 }
 
+/** CJK-script characters that participate in bigram tokenization. */
+const CJK = /\p{Script=Han}/u
+
+/**
+ * Split one natural-language query into searchable terms.
+ *
+ * Latin/digit runs behave like ordinary whitespace-separated words. A run
+ * containing CJK characters is split into overlapping character bigrams
+ * (`发布前检查` → `发布` `布前` `前检` `检查`), because Chinese has no word
+ * boundaries and a whole-sentence term would never match a stored summary.
+ * @param query - the raw question text.
+ * @returns unique lowercase terms, longest-first-independent insertion order.
+ */
+export function memorySearchTerms(query: string): readonly string[] {
+  const terms: string[] = []
+  for (const raw of query.toLowerCase().split(/\s+/)) {
+    if (raw === '') continue
+    // Latin/digit chunks stay whole words even inside a mixed CJK run.
+    for (const match of raw.match(/[a-z0-9]+/g) ?? []) terms.push(match)
+    const cjk = raw.replace(/[^\p{Script=Han}]/gu, '')
+    const chars = [...cjk]
+    if (chars.length === 1) {
+      terms.push(chars[0]!)
+    } else {
+      for (let index = 0; index + 1 < chars.length; index += 1) {
+        terms.push(chars[index]! + chars[index + 1]!)
+      }
+    }
+  }
+  return [...new Set(terms)]
+}
+
 /** Per-workspace record cap; the oldest records fall past it. */
 const WORKSPACE_MEMORY_CAP = 200
 
@@ -142,11 +174,13 @@ export class MemoryStore {
   /**
    * Search one workspace's memories by terms in their summary or body.
    * @param workspaceId - the workspace to search.
-   * @param query - whitespace-separated terms; empty matches nothing.
+   * @param query - a natural-language question; Latin runs stay whole words,
+   *   CJK runs become overlapping bigrams so a Chinese sentence can match
+   *   stored summaries without requiring the exact full phrase.
    * @returns the top three records by matching term count, most relevant first.
    */
   async search(workspaceId: WorkspaceId | null, query: string): Promise<readonly MemoryRecord[]> {
-    const terms = query.toLowerCase().split(/\s+/).filter(term => term.length > 0)
+    const terms = memorySearchTerms(query)
     if (terms.length === 0) return []
     const records = await this.list(workspaceId)
     return [...records]

@@ -19,7 +19,7 @@ import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import { MemoryMediaPool, MemoryStorageBackend } from './helpers/memory-backend.ts'
 import { migrateJsonDomainV1ToV2 } from '../src/board.ts'
-import { MemoryStore } from '../src/memory-store.ts'
+import { MemoryStore, memorySearchTerms } from '../src/memory-store.ts'
 import { applyMemory, MEMORY_ORDER, MEMORY_SECTION, MEMORY_SETTINGS_NS, MemorySettingsSchema } from '../src/memory.ts'
 import type { WorkspaceId } from '../src/types.ts'
 
@@ -46,6 +46,24 @@ async function mountStoreContext(): Promise<Context> {
   ctx.provide('storageDomain', facility)
   return ctx
 }
+
+describe('memorySearchTerms', () => {
+  it('turns a Chinese question into overlapping bigrams without keeping the whole sentence', () => {
+    const terms = memorySearchTerms('这个项目的发布前检查命令是什么？')
+    expect(terms).toEqual(expect.arrayContaining(['发布', '检查', '命令']))
+    expect(terms).not.toContain('这个项目的发布前检查命令是什么')
+  })
+
+  it('keeps Latin words whole inside a mixed query', () => {
+    const terms = memorySearchTerms('pnpm check 是什么')
+    expect(terms).toEqual(expect.arrayContaining(['pnpm', 'check', '是什', '什么']))
+  })
+
+  it('returns an empty list for blank input', () => {
+    expect(memorySearchTerms('')).toEqual([])
+    expect(memorySearchTerms('   ')).toEqual([])
+  })
+})
 
 describe('MemoryStore', () => {
   it('saves a new record with the expected fields and id prefix', async () => {
@@ -197,6 +215,21 @@ describe('MemoryStore', () => {
     expect(reactHits[0]!.summary).toContain('react hooks pattern')
     const noneHits = await store.search('ws-1' as WorkspaceId, 'zzz')
     expect(noneHits).toEqual([])
+  })
+
+  it('search matches a Chinese natural-language question against a stored summary', async () => {
+    const ctx = await mountStoreContext()
+    const store = new MemoryStore(ctx)
+    await store.save({
+      workspaceId: 'ws-1' as WorkspaceId,
+      kind: 'project',
+      summary: '发布前必须运行 pnpm check',
+      body: '这个项目的发布前检查命令是 pnpm check。',
+      sourceSessionId: null,
+    })
+    const hits = await store.search('ws-1' as WorkspaceId, '这个项目的发布前检查命令是什么？')
+    expect(hits).toHaveLength(1)
+    expect(hits[0]!.summary).toContain('pnpm check')
   })
 
   it('search returns empty for an empty query', async () => {

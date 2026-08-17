@@ -9,6 +9,17 @@
 import type { Context } from '@deepseek-ai/cordis';
 import type { Domain } from '@deepseek-ai/dsh-storage-domain';
 import type { MemoryId, MemoryKind, MemoryRecord, WorkspaceId } from './types.ts';
+/**
+ * Split one natural-language query into searchable terms.
+ *
+ * Latin/digit runs behave like ordinary whitespace-separated words. A run
+ * containing CJK characters is split into overlapping character bigrams
+ * (`发布前检查` → `发布` `布前` `前检` `检查`), because Chinese has no word
+ * boundaries and a whole-sentence term would never match a stored summary.
+ * @param query - the raw question text.
+ * @returns unique lowercase terms, longest-first-independent insertion order.
+ */
+export declare function memorySearchTerms(query: string): readonly string[];
 /** One memory save request. */
 export interface MemorySaveInput {
     readonly workspaceId: WorkspaceId | null;
@@ -68,7 +79,9 @@ export declare class MemoryStore {
     /**
      * Search one workspace's memories by terms in their summary or body.
      * @param workspaceId - the workspace to search.
-     * @param query - whitespace-separated terms; empty matches nothing.
+     * @param query - a natural-language question; Latin runs stay whole words,
+     *   CJK runs become overlapping bigrams so a Chinese sentence can match
+     *   stored summaries without requiring the exact full phrase.
      * @returns the top three records by matching term count, most relevant first.
      */
     search(workspaceId: WorkspaceId | null, query: string): Promise<readonly MemoryRecord[]>;

@@ -8,6 +8,7 @@
 - 新增远程 `memoryList` / `memoryDelete`（方法 39 → 41）；保存按 workspace+summary 24 小时内去重更新，每 workspace 上限 200 条；搜索按词命中数取 top 3。
 - 修复：`save_memory` 的 `parameters` 从字段简写改为完整 JSON Schema（`type:'object'+properties+required`），修复模型调用时 `type: null` 报错。
 - 修复：domain v1 → v2 自动迁移——打开 domain 前把既有 `web_enhanced.json` 的 `unit.version` 升为 2 并补空 `memories` 表，旧任务存储不会在记忆功能启用时报 `stored version 1 != expected 2`。
+- 修复：中文自然语言问句无法召回——检索词改为拉丁词保持整词、CJK 段落拆成重叠二元组（`发布前检查` → `发布` `布前` `前检` `检查`），因此“这个项目的发布前检查命令是什么？”现在能命中保存过的 `发布前必须运行 pnpm check`。
 
 ### 修复：对话节点导航条不再把所有轮次铺满页面
 
