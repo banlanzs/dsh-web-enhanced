@@ -55,7 +55,30 @@ function TranscriptImage({ attachment, loadImage }: {
     return () => { live = false }
   }, [attachment, loadImage])
   if (src === null) return null
-  return <img className={css.image} src={src} alt="" />
+  // Anchor the loaded source so the image stays clickable/openable exactly
+  // like the host gallery, without re-importing the host's private renderer.
+  return (
+    <a className={css.imageLink} href={src} target="_blank" rel="noreferrer">
+      <img className={css.image} src={src} alt="" />
+    </a>
+  )
+}
+
+/** Small copy action replacing the host MessageIconActions copy button. */
+function CopyButton({ text, t }: { text: string; t: Translate }) {
+  const [copied, setCopied] = useState(false)
+  const copy = (): void => {
+    if (text === '') return
+    void navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true)
+      window.setTimeout(() => { setCopied(false) }, 1500)
+    })
+  }
+  return (
+    <button type="button" className={css.copy} title={t('pastedText.copy')} onClick={copy}>
+      {copied ? t('pastedText.copied') : t('pastedText.copy')}
+    </button>
+  )
 }
 
 /** One collapsed pasted-text chip in the transcript, with a preview/edit modal. */
@@ -128,9 +151,10 @@ function contentOf(content: readonly unknown[]): { text: string; blocks: readonl
 }
 
 /** Plain fallback bubble for user messages that contain no pasted-text span. */
-function PlainUserBubble({ content, loadImage }: {
+function PlainUserBubble({ content, loadImage, t }: {
   content: readonly unknown[]
   loadImage: ChatNodeViewProps<'user'>['loadImage']
+  t: Translate
 }): ReactNode {
   const { text, blocks } = contentOf(content)
   return (
@@ -144,6 +168,7 @@ function PlainUserBubble({ content, loadImage }: {
         })}
         {text !== '' && <div className={css.bubble}>{text}</div>}
       </div>
+      <CopyButton text={text} t={t} />
     </div>
   )
 }
@@ -156,7 +181,7 @@ export const PastedTextUserNodeView = memo(function PastedTextUserNodeView({
   const { text, blocks } = contentOf(content)
   const hit = pastedTextHitOfDraft(store, text)
   if (hit === undefined) {
-    return <PlainUserBubble content={content} loadImage={loadImage} />
+    return <PlainUserBubble content={content} loadImage={loadImage} t={t} />
   }
   return (
     <div className={css.userRow} data-time-hover-root>
@@ -175,6 +200,7 @@ export const PastedTextUserNodeView = memo(function PastedTextUserNodeView({
           </div>
         )}
       </div>
+      <CopyButton text={text} t={t} />
     </div>
   )
 })

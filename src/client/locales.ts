@@ -54,6 +54,8 @@ export const zh = {
   'pastedText.cancel': '取消',
   'pastedText.save': '保存',
   'pastedText.remove': '移除该粘贴文本',
+  'pastedText.copy': '复制',
+  'pastedText.copied': '已复制',
   'pastedText.removeChip': '移除',
 
   'graph.entry': 'Git 图谱',
@@ -493,6 +495,8 @@ export const en: Record<keyof typeof zh, string> = {
   'pastedText.cancel': 'Cancel',
   'pastedText.save': 'Save',
   'pastedText.remove': 'Remove this pasted text',
+  'pastedText.copy': 'Copy',
+  'pastedText.copied': 'Copied',
   'pastedText.removeChip': 'Remove',
 
   'graph.entry': 'Git graph',

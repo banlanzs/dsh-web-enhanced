@@ -108,3 +108,23 @@
   outline-offset: 2px;
   box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
 }
+
+.imageLink {
+  display: inline-block;
+}
+
+.copy {
+  flex: none;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 9%));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, rgb(143 148 155));
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+.copy:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}

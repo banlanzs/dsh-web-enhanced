@@ -52,6 +52,8 @@ export declare const zh: {
     readonly 'pastedText.cancel': "取消";
     readonly 'pastedText.save': "保存";
     readonly 'pastedText.remove': "移除该粘贴文本";
+    readonly 'pastedText.copy': "复制";
+    readonly 'pastedText.copied': "已复制";
     readonly 'pastedText.removeChip': "移除";
     readonly 'graph.entry': "Git 图谱";
     readonly 'graph.title': "Git 图谱";
