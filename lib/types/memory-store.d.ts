@@ -20,6 +20,8 @@ import type { MemoryId, MemoryKind, MemoryRecord, WorkspaceId } from './types.ts
  * @returns unique lowercase terms, longest-first-independent insertion order.
  */
 export declare function memorySearchTerms(query: string): readonly string[];
+/** How many records one recall returns when the caller names no limit. */
+export declare const DEFAULT_SEARCH_LIMIT = 3;
 /** One memory save request. */
 export interface MemorySaveInput {
     readonly workspaceId: WorkspaceId | null;
@@ -53,6 +55,10 @@ export declare class MemoryStore {
      * Save one memory record. A record with the same workspace and summary
      * updated within the last day is refreshed in place instead of creating a
      * new one; otherwise a new record is written and the workspace cap applied.
+     *
+     * The summary is truncated to the length the durable schema accepts: the
+     * tool asks the model for at most {@link SUMMARY_MAX_CHARS} characters, and
+     * a model that overshoots must not fail the save at the storage boundary.
      * @param input - the memory to save.
      * @returns the saved record id and whether an existing record was updated.
      */
@@ -71,20 +77,30 @@ export declare class MemoryStore {
      */
     delete(id: MemoryId): Promise<boolean>;
     /**
-     * List one workspace's memories, most recently updated first.
-     * @param workspaceId - the workspace to list.
-     * @returns the matching records sorted by updatedAt descending.
+     * List the memories VISIBLE to one workspace, most recently updated first.
+     *
+     * Visibility matches {@link MemoryStore.search}: the workspace's own records
+     * plus the global pool, so the standing prompt and the recall agree on which
+     * memories exist.
+     * @param workspaceId - the workspace to list for; `null` lists the global pool only.
+     * @returns the visible records sorted by updatedAt descending.
      */
-    byWorkspace(workspaceId: WorkspaceId | null): Promise<readonly MemoryRecord[]>;
+    visibleTo(workspaceId: WorkspaceId | null): Promise<readonly MemoryRecord[]>;
     /**
-     * Search one workspace's memories by terms in their summary or body.
-     * @param workspaceId - the workspace to search.
+     * Search the memories visible to one workspace, most relevant first.
+     *
+     * The candidate set is the workspace's own records PLUS the global pool
+     * (`workspaceId === null`): a memory saved while no workspace matched the
+     * session cwd would otherwise be unreachable forever. Project-scoped hits
+     * outrank cross-project ones at equal relevance.
+     * @param workspaceId - the workspace to search; `null` searches the global pool only.
      * @param query - a natural-language question; Latin runs stay whole words,
      *   CJK runs become overlapping bigrams so a Chinese sentence can match
      *   stored summaries without requiring the exact full phrase.
-     * @returns the top three records by matching term count, most relevant first.
+     * @param limit - how many records to return at most.
+     * @returns the top records by relevance, most relevant first.
      */
-    search(workspaceId: WorkspaceId | null, query: string): Promise<readonly MemoryRecord[]>;
+    search(workspaceId: WorkspaceId | null, query: string, limit?: number): Promise<readonly MemoryRecord[]>;
     /**
      * Enforce the per-workspace record cap: delete the oldest records while
      * the workspace's count exceeds it.

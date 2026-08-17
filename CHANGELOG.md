@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### 优化：长期记忆的召回命中与工作区归属
+
+- 修复：**跨项目记忆永远召不回**——`search` 只在当前 workspace 内检索，落在全局池（`workspaceId: null`）的记忆不参与召回；现在候选集为「当前 workspace + 全局池」，同分时项目记忆优先。
+- 修复：**会话 cwd 到 workspace 的归属只做路径精确匹配**——在子目录里开的会话一律解析成 `null`（全局池），叠加上一条缺陷后这些记忆存了就再也召不回；现改为最长前缀匹配（分隔符与 Windows 大小写归一化），子目录会话归属到拥有它的 workspace。
+- 修复：**常驻提示词段与召回内容完全重复**——记忆总数不超过常驻上限（10 条）时，召回注入的正是常驻段已经写过的同一批记忆；现在常驻段记录已写入的记忆 id，召回跳过它们。常驻段本身也从「仅当前 workspace」扩展为「当前 workspace + 全局池」，与召回的可见范围一致。
+- 修复：回忆命中在对话流里退化成展开的全文块——插件声明的 `form: 'recall'` 在宿主语义中是**跨会话日志回放**，要求 `references[{label,retainedMessages,omittedMessages,truncated}]`，字段对不上会静默回落到 opaque 呈现；现改用 `form: 'notice'` + `summary`，折叠行直接显示「记忆召回 · 命中 N 条」。
+- 优化：召回评分从「命中词计数」改为归一化加权——按 query 词数归一化，摘要命中权重 1.6× 正文，分类权重 user 1.2 / feedback 1.15 / project 1.0 / reference 0.85，同分按最近更新排序；返回条数由调用方指定（默认 3）。
+- 优化：新增最小命中门槛——query 产生 3 个及以上检索词时要求命中 ≥2 个不同词，避免「检查」「什么」这类高频二元组单独把无关记忆拉进上下文；query 只有 1~2 个词时仍按命中 1 个放行。
+- 修复：`save_memory` 摘要超过 120 字符会被持久化 schema 拒绝、整次保存失败，现按上限截断；去重更新时同步刷新 `kind`（此前只更新正文，分类停留在首次保存的值）。
+- 修复：同一毫秒写入的多条记忆在「最近 N 条」里退化成插入顺序（最旧优先），现按逆插入序稳定排序。
+- 修复：召回去重表按 session 无上限增长，现限制在 64 条；`updateStanding` 由 fire-and-forget 改为 await（召回需要读到已结算的常驻 id 集合）；插件重挂载不再继承上一次挂载的常驻文本与 settings scope。
+
 ### 新增：持久化记忆（save_memory 工具 + 自动召回）
 
 - 新增 settings 命名空间 `dsh-web-enhanced-memory`、常驻系统提示词段 `web-enhanced:memory`（order 60）、`save_memory` 工具，以及 `agent/pre-step` 召回钩子：每轮从会话最后一条 user 文本搜索项目记忆，命中时注入 `[回忆] …` 用户消息；记忆表与任务看板共用 `web_enhanced` domain（v2 新增 `memories` 表）。

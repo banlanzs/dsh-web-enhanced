@@ -789,6 +789,8 @@ export interface GlobalPromptSaveView {
 export type GlobalPromptSetResult = GlobalPromptSaveView | {
     readonly error: ApiError;
 };
+/** Settings namespace owning the memory feature switch. */
+export declare const MEMORY_SETTINGS_NS: "dsh-web-enhanced-memory";
 /** Identifies one memory record. */
 export type MemoryId = Branded<'MemoryId'>;
 /** Memory classification aligned with the Claude Code memory system. */
@@ -822,3 +824,27 @@ export interface MemoryListRequest {
 export interface MemoryDeleteRequest {
     readonly id: string;
 }
+/** Resolved view of the memory settings namespace. */
+export interface MemoryConfigView {
+    readonly enabled: boolean;
+    /** CAS token for the next save; null when the namespace reports none. */
+    readonly revision: number | null;
+    /** Whether the settings provider accepts writes at all. */
+    readonly writable: boolean;
+}
+/** Memory config read Remote result. */
+export type MemoryConfigGetResult = MemoryConfigView | {
+    readonly error: ApiError;
+};
+/** One memory config write. */
+export interface MemoryConfigSaveRequest {
+    readonly enabled: boolean;
+    readonly expectedRevision?: number;
+}
+/** Memory config write Remote result. */
+export type MemoryConfigSetResult = {
+    readonly ok: true;
+    readonly revision: number;
+} | {
+    readonly error: ApiError;
+};

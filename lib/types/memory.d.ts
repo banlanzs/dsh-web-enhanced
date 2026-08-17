@@ -10,16 +10,22 @@
  *
  * The pre-step listener is a Cordis waterfall: it MUST call `next()` first
  * and return its resolved decision, otherwise downstream listeners never run.
- * After `next()`, when the model is about to enter the step, the hook walks
- * the session's derived messages, locates the latest user-role text query,
- * searches the memory store for matches, and injects a user message carrying
- * the hits so the model can recall them without a tool call.
+ * After `next()`, when the model is about to enter the step, the hook reads
+ * the latest user-role text query out of the claimed inbox messages, searches
+ * the memory store for matches, drops whatever the standing section already
+ * carries, and appends the survivors to THIS step's messages as a
+ * `notice`-form plugin context, which the transcript renders as one collapsed
+ * row naming the hit count.
  * @module dsh-web-enhanced/src/memory
  */
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
-/** Settings namespace owning the memory feature switch. */
-export declare const MEMORY_SETTINGS_NS = "dsh-web-enhanced-memory";
+import { MEMORY_SETTINGS_NS } from './types.ts';
+/**
+ * Settings namespace owning the memory feature switch. Declared in `types.ts`
+ * so the gateway can name it without importing this module's runtime.
+ */
+export { MEMORY_SETTINGS_NS };
 /** Standing prompt section name, unique across every prompt registration. */
 export declare const MEMORY_SECTION = "web-enhanced:memory";
 /**

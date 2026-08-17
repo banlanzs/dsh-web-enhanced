@@ -10,10 +10,12 @@
  *
  * The pre-step listener is a Cordis waterfall: it MUST call `next()` first
  * and return its resolved decision, otherwise downstream listeners never run.
- * After `next()`, when the model is about to enter the step, the hook walks
- * the session's derived messages, locates the latest user-role text query,
- * searches the memory store for matches, and injects a user message carrying
- * the hits so the model can recall them without a tool call.
+ * After `next()`, when the model is about to enter the step, the hook reads
+ * the latest user-role text query out of the claimed inbox messages, searches
+ * the memory store for matches, drops whatever the standing section already
+ * carries, and appends the survivors to THIS step's messages as a
+ * `notice`-form plugin context, which the transcript renders as one collapsed
+ * row naming the hit count.
  * @module dsh-web-enhanced/src/memory
  */
 
@@ -22,10 +24,14 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import z from '@deepseek-ai/schemastery'
 import { openSharedDomain } from './board.ts'
 import { MemoryStore } from './memory-store.ts'
+import { MEMORY_SETTINGS_NS } from './types.ts'
 import type { MemoryKind, WorkspaceId } from './types.ts'
 
-/** Settings namespace owning the memory feature switch. */
-export const MEMORY_SETTINGS_NS = 'dsh-web-enhanced-memory'
+/**
+ * Settings namespace owning the memory feature switch. Declared in `types.ts`
+ * so the gateway can name it without importing this module's runtime.
+ */
+export { MEMORY_SETTINGS_NS }
 
 /** Standing prompt section name, unique across every prompt registration. */
 export const MEMORY_SECTION = 'web-enhanced:memory'
@@ -39,6 +45,9 @@ export const MEMORY_ORDER = 60
 
 /** How many recent memories the standing prompt section lists. */
 const STANDING_MEMORY_CAP = 10
+
+/** How many sessions the recall de-duplication table remembers. */
+const INJECTED_CACHE_CAP = 64
 
 /** Shape of the `dsh-web-enhanced-memory` settings value. */
 export interface MemorySettingsValue {
@@ -121,6 +130,8 @@ interface PreStepPayloadLike {
 
 /** Module state: standing prompt text, store, settings scope, registry. */
 let standingText = ''
+/** Ids already carried by the standing section; the recall skips them. */
+let standingIds: ReadonlySet<string> = new Set()
 let store: MemoryStore | undefined
 let settingsScope: MemorySettingsScopeFace | undefined
 let registry: WorkspaceRegistryFace | undefined
@@ -140,8 +151,28 @@ function memoryEnabled(): boolean {
 }
 
 /**
+ * Normalize one filesystem path for prefix comparison.
+ *
+ * Windows paths mix separators and case, and a workspace root and a session
+ * cwd may be recorded by different producers; without normalization the two
+ * spellings of the same directory compare unequal.
+ * @param value - a raw filesystem path.
+ * @returns the path with forward slashes, no trailing slash, lowercased on Windows.
+ */
+function normalizePath(value: string): string {
+  const forward = value.replace(/\\/gu, '/').replace(/\/+$/u, '')
+  return process.platform === 'win32' ? forward.toLowerCase() : forward
+}
+
+/**
  * Resolve the workspace id that owns the cwd of a session, when one is
  * registered; otherwise return `null` so saves land in the global pool.
+ *
+ * A session opened in a SUBDIRECTORY of a registered workspace belongs to
+ * that workspace: an exact-path match dropped every such session into the
+ * global pool, where its memories mixed with genuinely cross-project ones.
+ * The longest matching root wins, so a workspace nested inside another one
+ * still claims its own sessions.
  * @param registry - workspace registry face; `undefined` skips resolution.
  * @param cwd - session working directory; `null` skips resolution.
  * @returns the matching workspace id, or `null` when none matches.
@@ -151,15 +182,23 @@ function resolveWorkspaceId(
   cwd: string | null,
 ): WorkspaceId | null {
   if (registry === undefined || cwd === null) return null
+  const target = normalizePath(cwd)
+  if (target === '') return null
+  let bestId: WorkspaceId | undefined
+  let bestLength = -1
   try {
-    const workspaces = registry.list()
-    for (const workspace of workspaces) {
-      if (workspace.path === cwd) return workspace.id
+    for (const workspace of registry.list()) {
+      const root = normalizePath(workspace.path)
+      if (root === '') continue
+      if (target !== root && !target.startsWith(`${root}/`)) continue
+      if (root.length <= bestLength) continue
+      bestId = workspace.id
+      bestLength = root.length
     }
   } catch {
     return null
   }
-  return null
+  return bestId ?? null
 }
 
 /**
@@ -218,23 +257,32 @@ export function lastUserText(messages: readonly unknown[]): string {
 }
 
 /**
- * Refresh the standing prompt text from the latest memories of one workspace.
+ * Refresh the standing prompt text from the latest memories visible to one
+ * workspace (its own plus the global pool).
+ *
+ * The ids that made it into the section are recorded so the recall hook can
+ * skip them: a memory already standing in the system prompt does not need to
+ * be injected a second time as turn context.
  * On error the standing text is cleared so a broken store cannot leave stale
  * instructions in the prompt.
- * @param workspaceId - workspace to list; `null` lists the global pool.
+ * @param workspaceId - workspace to list for; `null` lists the global pool.
  */
 async function updateStanding(workspaceId: WorkspaceId | null): Promise<void> {
   if (store === undefined) return
   try {
-    const records = await store.byWorkspace(workspaceId)
+    const records = await store.visibleTo(workspaceId)
     const lines: string[] = []
+    const ids = new Set<string>()
     for (const record of records) {
       if (lines.length >= STANDING_MEMORY_CAP) break
       lines.push(`[记忆 ${record.kind}] ${record.summary}：${record.body}`)
+      ids.add(String(record.id))
     }
     standingText = lines.join('\n')
+    standingIds = ids
   } catch {
     standingText = ''
+    standingIds = new Set()
   }
 }
 
@@ -317,10 +365,18 @@ const memoryToolDefinition = {
  * @param domain - optional pre-opened web-enhanced storage domain.
  */
 export function applyMemory(ctx: Context, domain?: Promise<any>): void {
+  // Module state is process-wide; a remount must not inherit the previous
+  // mount's standing text or its id set.
+  standingText = ''
+  standingIds = new Set()
   store = new MemoryStore(ctx, domain ?? openSharedDomain(ctx))
   registry = ctx.get('workspaceRegistry' as never, false) as unknown as WorkspaceRegistryFace | undefined
 
   const settings = ctx.get('settings' as never, false) as unknown as MemorySettingsServiceFace | undefined
+  // Cleared first: a remount into a deployment WITHOUT the settings service
+  // must not keep resolving the previous mount's scope, which would leave the
+  // feature switch reading a dead namespace.
+  settingsScope = undefined
   if (settings !== undefined && typeof settings.register === 'function') {
     try {
       settingsScope = settings.register(MEMORY_SETTINGS_NS, MemorySettingsSchema, {
@@ -368,30 +424,52 @@ export function applyMemory(ctx: Context, domain?: Promise<any>): void {
     const sessionKey = session.id === undefined ? '' : String(session.id)
     const cwd = typeof session.header?.cwd === 'string' ? session.header.cwd : null
     const workspaceId = resolveWorkspaceId(registry, cwd)
-    void updateStanding(workspaceId)
+    // Awaited, not fire-and-forget: the recall below skips whatever the
+    // standing section already carries, so it must read a settled id set.
+    await updateStanding(workspaceId)
 
     // The claimed inbox messages are the authoritative latest user query;
     // the derived-history scan only catches harnesses with no claimed list.
     const query = lastUserText(payload.messages ?? []) || lastUserQuery(session)
     if (query === '') return decision as never
 
-    const hits = await store.search(workspaceId, query)
+    const found = await store.search(workspaceId, query)
+    // A memory already standing in the system prompt is in front of the model
+    // either way; injecting it again would spend tokens to say it twice.
+    const hits = found.filter(hit => !standingIds.has(String(hit.id)))
     if (hits.length === 0) return decision as never
 
     const content = '[回忆] 基于你正在处理的工作，以下是项目记忆中可能相关的内容：\n'
       + hits.map(hit => `[${hit.kind}] ${hit.summary}：${hit.body}`).join('\n')
     if (injectedContent.get(sessionKey) === content) return decision as never
     injectedContent.set(sessionKey, content)
+    // Bounded: one entry per live session would otherwise outlive every
+    // session the process ever ran. Map iteration is insertion-ordered, so
+    // the oldest key is the first one.
+    while (injectedContent.size > INJECTED_CACHE_CAP) {
+      const oldest = injectedContent.keys().next()
+      if (oldest.done === true) break
+      injectedContent.delete(oldest.value)
+    }
 
     // Append the notice to THIS step's messages instead of `agent.inject()`.
     // `agent.inject` queues a next-step message, which splits one user turn
     // into two model steps and renders the recall as an ordinary user
-    // message. Same-step appending keeps the reply contiguous, and the
-    // plugin-produced `form: 'recall'` source renders as a collapsed
-    // context-recall row rather than a user bubble.
+    // message. Same-step appending keeps the reply contiguous.
+    //
+    // `form: 'notice'` with a `summary` is what the host's context disclosure
+    // renders as a collapsed row carrying that one-line account — the reader
+    // sees the hit count without expanding. The durable `recall` form is NOT
+    // this: it means material lifted out of another SESSION's log and requires
+    // a `references` list, so declaring it here degrades to the opaque body.
     const recall = createUserMessage({
       content: [{ type: 'text', text: content }],
-      source: { kind: 'plugin', plugin: 'dsh-web-enhanced', form: 'recall' },
+      source: {
+        kind: 'plugin',
+        plugin: 'dsh-web-enhanced',
+        form: 'notice',
+        summary: `记忆召回 · 命中 ${String(hits.length)} 条`,
+      },
     })
     return {
       ...decision,

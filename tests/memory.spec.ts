@@ -18,7 +18,7 @@ import { Context } from '@deepseek-ai/cordis'
 import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import { MemoryMediaPool, MemoryStorageBackend } from './helpers/memory-backend.ts'
-import { migrateJsonDomainV1ToV2 } from '../src/board.ts'
+import { migrateJsonDomainV1ToV2, openSharedDomain } from '../src/board.ts'
 import { MemoryStore, memorySearchTerms } from '../src/memory-store.ts'
 import { applyMemory, lastUserText, MEMORY_ORDER, MEMORY_SECTION, MEMORY_SETTINGS_NS, MemorySettingsSchema, textOfMessageContent } from '../src/memory.ts'
 import type { WorkspaceId } from '../src/types.ts'
@@ -180,17 +180,152 @@ describe('MemoryStore', () => {
     expect(await store.delete('memory-not-real' as never)).toBe(false)
   })
 
-  it('byWorkspace sorts records by updatedAt descending', async () => {
+  it('visibleTo returns the workspace records plus the global pool, newest first', async () => {
     const ctx = await mountStoreContext()
     const store = new MemoryStore(ctx)
     await store.save({ workspaceId: 'ws-1' as WorkspaceId, kind: 'project', summary: 'first', body: '1', sourceSessionId: null })
     await new Promise(resolve => setTimeout(resolve, 5))
+    await store.save({ workspaceId: null, kind: 'user', summary: 'global one', body: 'g', sourceSessionId: null })
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await store.save({ workspaceId: 'ws-2' as WorkspaceId, kind: 'project', summary: 'other project', body: 'o', sourceSessionId: null })
+    await new Promise(resolve => setTimeout(resolve, 5))
     await store.save({ workspaceId: 'ws-1' as WorkspaceId, kind: 'project', summary: 'second', body: '2', sourceSessionId: null })
-    const ordered = await store.byWorkspace('ws-1' as WorkspaceId)
-    expect(ordered).toHaveLength(2)
-    expect(ordered[0]!.summary).toBe('second')
-    expect(ordered[1]!.summary).toBe('first')
+    const ordered = await store.visibleTo('ws-1' as WorkspaceId)
+    // ws-2 is another project; the global pool is visible from everywhere.
+    expect(ordered.map(record => record.summary)).toEqual(['second', 'global one', 'first'])
     expect(ordered[0]!.updatedAt).toBeGreaterThanOrEqual(ordered[1]!.updatedAt)
+  })
+
+  it('search reaches the global pool and ranks workspace records first', async () => {
+    const ctx = await mountStoreContext()
+    const store = new MemoryStore(ctx)
+    await store.save({
+      workspaceId: null,
+      kind: 'project',
+      summary: 'react hooks pattern',
+      body: 'Use hooks for component state.',
+      sourceSessionId: null,
+    })
+    await store.save({
+      workspaceId: 'ws-1' as WorkspaceId,
+      kind: 'project',
+      summary: 'react hooks pattern',
+      body: 'Use hooks for component state.',
+      sourceSessionId: null,
+    })
+    const hits = await store.search('ws-1' as WorkspaceId, 'react hooks')
+    expect(hits).toHaveLength(2)
+    // Same text and kind on both sides, so only the scope bonus can order them.
+    expect(hits[0]!.workspaceId).toBe('ws-1')
+    expect(hits[1]!.workspaceId).toBeNull()
+  })
+
+  it('search ignores records owned by another workspace', async () => {
+    const ctx = await mountStoreContext()
+    const store = new MemoryStore(ctx)
+    await store.save({
+      workspaceId: 'ws-2' as WorkspaceId,
+      kind: 'project',
+      summary: 'react hooks pattern',
+      body: 'Use hooks for component state.',
+      sourceSessionId: null,
+    })
+    expect(await store.search('ws-1' as WorkspaceId, 'react hooks')).toEqual([])
+  })
+
+  it('search requires two distinct terms so one common bigram cannot recall an unrelated memory', async () => {
+    const ctx = await mountStoreContext()
+    const store = new MemoryStore(ctx)
+    await store.save({
+      workspaceId: 'ws-1' as WorkspaceId,
+      kind: 'project',
+      summary: '部署脚本需要检查环境变量',
+      body: '部署前确认 .env 已配置。',
+      sourceSessionId: null,
+    })
+    // '检查' is the only term this record shares with the question, and the
+    // question is about something else entirely.
+    expect(await store.search('ws-1' as WorkspaceId, '帮我检查这段排序算法的时间复杂度')).toEqual([])
+  })
+
+  it('search ranks a user preference above a reference at equal coverage', async () => {
+    const ctx = await mountStoreContext()
+    const store = new MemoryStore(ctx)
+    await store.save({
+      workspaceId: 'ws-1' as WorkspaceId,
+      kind: 'reference',
+      summary: 'react hooks pattern',
+      body: '',
+      sourceSessionId: null,
+    })
+    await store.save({
+      workspaceId: 'ws-1' as WorkspaceId,
+      kind: 'user',
+      // A distinct summary: same workspace + same summary would deduplicate
+      // into one record instead of leaving two to rank.
+      summary: 'react hooks guide',
+      body: '',
+      sourceSessionId: null,
+    })
+    const hits = await store.search('ws-1' as WorkspaceId, 'react hooks')
+    expect(hits.map(hit => hit.kind)).toEqual(['user', 'reference'])
+  })
+
+  it('deduplication refreshes the classification along with the body', async () => {
+    const ctx = await mountStoreContext()
+    const store = new MemoryStore(ctx)
+    const first = await store.save({
+      workspaceId: 'ws-1' as WorkspaceId,
+      kind: 'reference',
+      summary: 'commit messages are bilingual',
+      body: 'old body',
+      sourceSessionId: null,
+    })
+    const second = await store.save({
+      workspaceId: 'ws-1' as WorkspaceId,
+      kind: 'project',
+      summary: 'commit messages are bilingual',
+      body: 'new body',
+      sourceSessionId: null,
+    })
+    expect(second.deduplicated).toBe(true)
+    expect(second.id).toBe(first.id)
+    const records = await store.list('ws-1' as WorkspaceId)
+    expect(records).toHaveLength(1)
+    expect(records[0]!.kind).toBe('project')
+    expect(records[0]!.body).toBe('new body')
+  })
+
+  it('search honours the caller-supplied limit', async () => {
+    const ctx = await mountStoreContext()
+    const store = new MemoryStore(ctx)
+    for (const index of [1, 2, 3, 4]) {
+      await store.save({
+        workspaceId: 'ws-1' as WorkspaceId,
+        kind: 'project',
+        summary: `react hooks pattern ${String(index)}`,
+        body: '',
+        sourceSessionId: null,
+      })
+    }
+    expect(await store.search('ws-1' as WorkspaceId, 'react hooks')).toHaveLength(3)
+    expect(await store.search('ws-1' as WorkspaceId, 'react hooks', 1)).toHaveLength(1)
+    expect(await store.search('ws-1' as WorkspaceId, 'react hooks', 0)).toEqual([])
+  })
+
+  it('save truncates an over-long summary to the length the durable schema accepts', async () => {
+    const ctx = await mountStoreContext()
+    const store = new MemoryStore(ctx)
+    const result = await store.save({
+      workspaceId: 'ws-1' as WorkspaceId,
+      kind: 'project',
+      summary: 'x'.repeat(200),
+      body: 'body',
+      sourceSessionId: null,
+    })
+    expect(result.ok).toBe(true)
+    const records = await store.list('ws-1' as WorkspaceId)
+    expect(records[0]!.summary).toHaveLength(120)
   })
 
   it('search returns top hits and ignores unrelated queries', async () => {
@@ -447,5 +582,134 @@ describe('applyMemory wiring', () => {
     expect(() => applyMemory(ctx)).not.toThrow()
     expect(register).toHaveBeenCalled()
     expect(section).toHaveBeenCalled()
+  })
+})
+
+describe('memory recall injection', () => {
+  /** The save_memory tool signature the wiring registers. */
+  interface SaveTool {
+    execute: (
+      args: { kind: string; summary: string; body: string },
+      exec: { agent: unknown },
+    ) => Promise<unknown>
+  }
+
+  /** One fake agent carrying just the session fields the hook reads. */
+  function fakeAgent(cwd: string, sessionId = 'sess-1'): unknown {
+    return { id: 'agent-1', session: { id: sessionId, header: { cwd }, deriveMessages: () => [] } }
+  }
+
+  /**
+   * Mount the orchestrator over a real domain with a workspace registry that
+   * owns `root`, and hand back the registered tool plus a pre-step driver.
+   */
+  async function mountRecall(root: string): Promise<{
+    readonly store: MemoryStore
+    readonly tool: SaveTool
+    readonly fire: (agent: unknown, text: string) => Promise<{
+      kind: string
+      messages: readonly { source?: { form?: string; summary?: string }; content?: unknown }[]
+    }>
+  }> {
+    const ctx = await mountStoreContext()
+    const toolsRegister = vi.fn()
+    ctx.provide('settings' as never, { register: () => ({ get: () => ({ enabled: true }) }) } as never)
+    ctx.provide('systemPrompt' as never, { section: () => () => {} } as never)
+    ctx.provide('tools' as never, { register: toolsRegister } as never)
+    ctx.provide('workspaceRegistry' as never, { list: () => [{ id: 'ws-1' as WorkspaceId, path: root }] } as never)
+    // One shared domain handle: the facility refuses a second open of the same
+    // domain name, so the orchestrator and the assertion store must share it.
+    const domain = openSharedDomain(ctx)
+    applyMemory(ctx, domain)
+    const tool = toolsRegister.mock.calls[0]![0] as SaveTool
+    // The orchestrator registers with a plain `ctx.on`, so the plain waterfall
+    // reaches it; the agent-scoped dispatcher is the runtime's concern.
+    const waterfall = (ctx as unknown as {
+      waterfall: (name: string, payload: unknown, next: () => Promise<unknown>) => Promise<unknown>
+    }).waterfall.bind(ctx)
+    const fire = async (agent: unknown, text: string): Promise<never> => await waterfall(
+      'agent/pre-step',
+      {
+        agent,
+        messages: [{ role: 'user', content: [{ type: 'text', text }] }],
+        turn: 1,
+        step: 1,
+        signal: new AbortController().signal,
+      },
+      () => Promise.resolve({ kind: 'enter', messages: [] }),
+    ) as never
+    return { store: new MemoryStore(ctx, domain), tool, fire }
+  }
+
+  it('resolves a cwd inside a registered workspace to that workspace', async () => {
+    const { store, tool } = await mountRecall('/repo/project')
+    await tool.execute(
+      { kind: 'project', summary: 'commit messages are bilingual', body: 'one line each' },
+      { agent: fakeAgent('/repo/project/src/client') },
+    )
+    const records = await store.list()
+    expect(records).toHaveLength(1)
+    // An exact-path match would have dropped this into the global pool.
+    expect(records[0]!.workspaceId).toBe('ws-1')
+  })
+
+  it('leaves a cwd outside every registered workspace in the global pool', async () => {
+    const { store, tool } = await mountRecall('/repo/project')
+    await tool.execute(
+      { kind: 'user', summary: 'replies in chinese', body: 'always' },
+      { agent: fakeAgent('/elsewhere/other') },
+    )
+    const records = await store.list()
+    expect(records[0]!.workspaceId).toBeNull()
+  })
+
+  it('injects a notice-form context message naming the hit count', async () => {
+    const { tool, fire } = await mountRecall('/repo/project')
+    const agent = fakeAgent('/repo/project')
+    // The standing section carries the ten most recent memories, so the hit
+    // has to sit outside that window for the recall to have anything to add.
+    await tool.execute(
+      { kind: 'project', summary: 'react hooks pattern', body: 'Use hooks for local state.' },
+      { agent },
+    )
+    for (let index = 0; index < 11; index += 1) {
+      await tool.execute(
+        { kind: 'reference', summary: `unrelated note ${String(index)}`, body: 'filler' },
+        { agent },
+      )
+    }
+    const decision = await fire(agent, 'how do react hooks work here')
+    expect(decision.kind).toBe('enter')
+    expect(decision.messages).toHaveLength(1)
+    const injected = decision.messages[0]!
+    expect(injected.source?.form).toBe('notice')
+    expect(injected.source?.summary).toBe('记忆召回 · 命中 1 条')
+    expect(JSON.stringify(injected.content)).toContain('react hooks pattern')
+  })
+
+  it('skips a memory the standing prompt section already carries', async () => {
+    const { tool, fire } = await mountRecall('/repo/project')
+    const agent = fakeAgent('/repo/project')
+    await tool.execute(
+      { kind: 'project', summary: 'react hooks pattern', body: 'Use hooks for local state.' },
+      { agent },
+    )
+    // One memory total: it is in the standing section, so injecting it again
+    // would spend tokens to tell the model the same thing twice.
+    const decision = await fire(agent, 'how do react hooks work here')
+    expect(decision.messages).toEqual([])
+  })
+
+  it('injects nothing when no memory matches the question', async () => {
+    const { tool, fire } = await mountRecall('/repo/project')
+    const agent = fakeAgent('/repo/project')
+    for (let index = 0; index < 12; index += 1) {
+      await tool.execute(
+        { kind: 'reference', summary: `unrelated note ${String(index)}`, body: 'filler' },
+        { agent },
+      )
+    }
+    const decision = await fire(agent, 'how do react hooks work here')
+    expect(decision.messages).toEqual([])
   })
 })
