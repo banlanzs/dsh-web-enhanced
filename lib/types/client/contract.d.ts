@@ -6,6 +6,7 @@
  * @module dsh-web-enhanced/src/client/contract
  */
 import type { InjectFace, PropsLocale, PropsRuntime, SlotMap } from '@deepseek-ai/dsh-client-ui-slots';
+import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client';
 import type { BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitDiffRequest, GitCommitDiffResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult, ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView, OfficeBlock, OfficeKind, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from '../types.ts';
 import type { BrowseActions, BrowseState, Observable, OverlayActions, OverlayState, PanelActions, PanelState, PreviewActions, PreviewState } from './stores.ts';
 import type { SkinFace } from './skins/skin-layer.ts';
@@ -156,6 +157,11 @@ export interface ModelRouteFace {
 export interface WebEnhancedInject extends OverlayActions, BrowseActions, PanelActions, PreviewActions {
     /** Host capabilities of this plugin's Typert namespace. */
     readonly remote: WebEnhancedRemote;
+    /**
+     * Settings wire face for pages that edit their own namespaces directly
+     * (the Global Prompt tab) through the standard settings RPCs.
+     */
+    readonly api: Pick<IApiClient, 'settings'>;
     /**
      * Make one session current (the task board's "jump to the run" gesture).
      * @param sessionId - a session id the host minted.

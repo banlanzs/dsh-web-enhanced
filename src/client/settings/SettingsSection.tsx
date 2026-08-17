@@ -8,10 +8,11 @@
  * shell's own id allowlist (an unknown id gets the generic one) and nothing
  * else about the nav is ours to decide.
  *
- * The page carries its own tabs because it hosts five unrelated things:
+ * The page carries its own tabs because it hosts six unrelated things:
  * managing what the profile has installed, general settings (model-request
- * retry), configuring image understanding, switching the interface skin, and
- * describing what this plugin is. None deserves a separate nav row.
+ * retry), the global system prompt, configuring image understanding,
+ * switching the interface skin, and describing what this plugin is. None
+ * deserves a separate nav row.
  * @module dsh-web-enhanced/src/client/settings/SettingsSection
  */
 
@@ -25,20 +26,22 @@ import { AboutPanel } from './AboutPanel.tsx'
 import { GeneralSettingsPanel } from './GeneralSettingsPanel.tsx'
 import { PluginManager } from './PluginManager.tsx'
 import { VisionStatusPanel } from './VisionStatusPanel.tsx'
+import { GlobalPromptPanel } from '../global-prompt/GlobalPromptPanel.tsx'
 import css from './SettingsSection.module.css'
 
 /** Full composed props of the settings section. */
 export type SettingsSectionProps = WebEnhancedProps<'settings.section'>
 
 /** Which page of the section is showing. */
-type Tab = 'plugins' | 'general' | 'vision' | 'skins' | 'about'
+type Tab = 'plugins' | 'general' | 'globalPrompt' | 'vision' | 'skins' | 'about'
 
 /** The web-enhanced settings page. */
-export function SettingsSection({ remote, t, skin }: SettingsSectionProps) {
+export function SettingsSection({ remote, api, t, skin }: SettingsSectionProps) {
   const [tab, setTab] = useState<Tab>('plugins')
   const tabs: ReadonlyArray<{ id: Tab; label: string }> = [
     { id: 'plugins', label: t('settings.tab.plugins') },
     { id: 'general', label: t('settings.tab.general') },
+    { id: 'globalPrompt', label: t('settings.tab.globalPrompt') },
     { id: 'vision', label: t('settings.tab.vision') },
     { id: 'skins', label: t('settings.tab.skins') },
     { id: 'about', label: t('settings.tab.about') },
@@ -62,6 +65,7 @@ export function SettingsSection({ remote, t, skin }: SettingsSectionProps) {
       <div className={css.body}>
         {tab === 'plugins' && <PluginManager remote={remote} t={t} />}
         {tab === 'general' && <GeneralSettingsPanel remote={remote} t={t} />}
+        {tab === 'globalPrompt' && <GlobalPromptPanel api={api} t={t} />}
         {tab === 'vision' && <VisionStatusPanel remote={remote} t={t} />}
         {tab === 'skins' && <SkinPanel skin={skin} t={t} />}
         {tab === 'about' && <AboutPanel t={t} />}

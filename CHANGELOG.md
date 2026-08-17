@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### 新增：全局系统提示词（设置 → Web 增强 → 全局提示词）
+
+- 新增 settings 命名空间 `dsh-web-enhanced-global-prompt`（`enabled` / `text`，宿主注册 schema 并热生效）；设置页新增「全局提示词」标签：开关 + 大文本框，保存走标准 `settings.mutate` CAS（冲突提示 + 重新加载当前值）。
+- 宿主注册全局 `systemPrompt` section `web-enhanced:global-prompt`（order 50：所选模式 persona 之后、工具说明之前），text provider 每次装配实时读 settings，所以保存后**下一轮请求生效、无需重启**；对所有 Agent 模式、会话与子代理生效。关闭开关或留空即不注入（极简模式把 persona 声明为 complete，按内核规则会整段替换系统提示词，此时不追加）。
+- 测试 413 passed + 2 skipped（新增 global-prompt 8 个）。
+
 ### 新增：长文本粘贴自动挂载为“已粘贴文本”
 
 - composer 内粘贴 ≥2000 字符的纯文本时，插件在原生 paste 之前拦截：原文存 `PastedTextStore`（localStorage，单条 ≤200K / 最多 12 条），经 `slash/input-insert-reference` 在草稿里插入一个 `@pasted-text` 引用 chip，不再把整段灌进输入框；发送时由注册的 input-trigger codec 把 chip 还原为完整文本交给模型。

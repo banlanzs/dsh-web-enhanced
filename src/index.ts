@@ -10,8 +10,14 @@ import type { InvocationDescriptor } from '@deepseek-ai/dsh-typert-protocol'
 import { WEB_ENHANCED_DESCRIPTORS, WEB_ENHANCED_PACKAGE } from './descriptors.ts'
 import { WebEnhancedGateway, Config } from './gateway.ts'
 import { VisionInterceptor } from './vision.ts'
+import { applyGlobalPrompt } from './global-prompt.ts'
 
 export { WebEnhancedGateway, Config }
+export {
+  applyGlobalPrompt, GLOBAL_PROMPT_ORDER, GLOBAL_PROMPT_SECTION, GlobalPromptSettingsSchema,
+  globalPromptTextOf,
+} from './global-prompt.ts'
+export type { GlobalPromptSettingsValue } from './global-prompt.ts'
 export { VisionInterceptor, VisionTranscriber, VISION_SETTINGS_NS, VisionSettingsSchema } from './vision.ts'
 export type {
   VisionConfigSource, VisionSettings, VisionSettingsScopeFace, VisionSettingsServiceFace,
@@ -90,6 +96,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     model: { services: [], events: [], objects: [] },
     invocations: WEB_ENHANCED_DESCRIPTORS,
   }), 'web-enhanced: Remote definitions')
+  applyGlobalPrompt(ctx)
   ctx.plugin(VisionInterceptor, config)
   ctx.plugin(WebEnhancedGateway, config)
 }
