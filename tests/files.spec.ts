@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   compareFsEntries, countTextLines, deleteFileView, entryName, listDirectory, readFileView, resolveWithin, searchFiles, writeFileView,
@@ -28,14 +28,18 @@ afterEach(async () => {
 })
 
 describe('resolveWithin', () => {
+  // A canonical ABSOLUTE root, spelled per platform: `join('C:', 'ws')` reads
+  // as drive-relative on Windows but is a plain RELATIVE path on Linux, where
+  // resolve() prefixes the cwd and the containment check then reports the
+  // result as escaping. Callers only ever pass an absolute workspace root.
+  const root = resolve('/ws')
+
   it('resolves the root and nested relative paths', () => {
-    const root = join('C:', 'ws')
     expect(resolveWithin(root, '')).toBe(root)
     expect(resolveWithin(root, 'a/b.txt')).toBe(join(root, 'a', 'b.txt'))
   })
 
   it('rejects backslashes, absolute paths, and dot segments', () => {
-    const root = join('C:', 'ws')
     expect(() => resolveWithin(root, 'a\\b')).toThrow(/forward slashes/)
     expect(() => resolveWithin(root, '/abs')).toThrow(/must be relative/)
     expect(() => resolveWithin(root, 'C:/abs')).toThrow(/must be relative/)
@@ -44,7 +48,7 @@ describe('resolveWithin', () => {
   })
 
   it('rejects traversal paths at the segment check', () => {
-    expect(() => resolveWithin(join('C:', 'ws'), 'a/../../other')).toThrow(/must not contain/)
+    expect(() => resolveWithin(root, 'a/../../other')).toThrow(/must not contain/)
   })
 })
 
