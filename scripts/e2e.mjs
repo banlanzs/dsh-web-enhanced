@@ -202,13 +202,29 @@ try {
   log(`✓ client.js ${clientRes.status}`)
 
   // ── 断言 1: 侧边栏入口 ──────────────────────────────────────────────────
-  const boardEntry = await waitForText(page, UI.boardEntry, 30000)
+  // testid 优先，文案回退：侧边栏收起成 56px 轨道时入口只剩图标，label 根本
+  // 不进 DOM（见 SidebarEntry 的 rail 分支），此时文案匹配必然落空，而入口
+  // 其实渲染正常。覆盖层/悬浮面板/余额行早已按 testid 断言，这里保持一致。
+  const boardEntry = await waitForEntry(page, 'web-enhanced-board-entry', UI.boardEntry, 30000)
   if (boardEntry === null) {
     await screenshot('e2e-fail-sidebar.png')
     await logTail()
+    const diag = await page.evaluate(() => {
+      const ours = [...document.querySelectorAll('[data-testid]')]
+        .map(el => el.getAttribute('data-testid'))
+        .filter(id => id !== null && id.includes('web-enhanced'))
+      const styles = [...document.querySelectorAll('style[data-plugin]')]
+        .map(el => el.getAttribute('data-plugin'))
+      return {
+        ours,
+        styles: [...new Set(styles)],
+        testIds: [...document.querySelectorAll('[data-testid]')].length,
+      }
+    }).catch(() => null)
+    log(`诊断：插件 testid=${JSON.stringify(diag?.ours ?? 'n/a')} 注入样式=${JSON.stringify(diag?.styles ?? 'n/a')} 页面 testid 总数=${String(diag?.testIds ?? 'n/a')}`)
     fail(`侧边栏 30s 内未出现「任务看板」入口（pageerrors: ${pageErrors.slice(0, 3).join(' | ') || '无'}）`)
   }
-  const graphEntry = await waitForText(page, UI.graphEntry, 10000)
+  const graphEntry = await waitForEntry(page, 'web-enhanced-graph-entry', UI.graphEntry, 10000)
   if (graphEntry === null) {
     await screenshot('e2e-fail-sidebar.png')
     await logTail()
@@ -354,6 +370,32 @@ try {
 async function waitForText(page, variants, timeoutMs) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
+    for (const v of variants) {
+      const loc = page.getByText(v, { exact: false }).first()
+      if (await loc.isVisible().catch(() => false)) return loc
+    }
+    await new Promise(r => setTimeout(r, 500))
+  }
+  return null
+}
+
+/**
+ * 等待一个侧边栏入口出现：先按 testid，再按文案回退。
+ *
+ * 入口在收起的 56px 轨道里只渲染图标（label 不进 DOM），所以文案匹配会漏报
+ * 一个其实正常的入口；testid 两种形态都在。文案回退保留，是为了兼容还没有
+ * testid 的旧构建。
+ * @param page - playwright page。
+ * @param testId - 入口按钮的 data-testid。
+ * @param variants - 中英文案，testid 落空时回退匹配。
+ * @param timeoutMs - 总超时。
+ * @returns 命中的 locator，超时返回 null。
+ */
+async function waitForEntry(page, testId, variants, timeoutMs) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const byId = page.locator(`[data-testid="${testId}"]`).first()
+    if (await byId.isVisible().catch(() => false)) return byId
     for (const v of variants) {
       const loc = page.getByText(v, { exact: false }).first()
       if (await loc.isVisible().catch(() => false)) return loc
