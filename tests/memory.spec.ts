@@ -10,19 +10,25 @@
  * @module dsh-web-enhanced/tests/memory
  */
 
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import { MemoryMediaPool, MemoryStorageBackend } from './helpers/memory-backend.ts'
+import { migrateJsonDomainV1ToV2 } from '../src/board.ts'
 import { MemoryStore } from '../src/memory-store.ts'
 import { applyMemory, MEMORY_ORDER, MEMORY_SECTION, MEMORY_SETTINGS_NS, MemorySettingsSchema } from '../src/memory.ts'
 import type { WorkspaceId } from '../src/types.ts'
 
 const contexts: Context[] = []
+const roots: string[] = []
 
 afterEach(async () => {
   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
+  await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
 
 /**
@@ -227,6 +233,43 @@ describe('MemoryStore', () => {
     const byUpdatedAt = [...records].sort((left, right) => left.updatedAt - right.updatedAt)
     expect(byUpdatedAt[0]!.summary).toBe('summary-5')
     expect(byUpdatedAt[byUpdatedAt.length - 1]!.summary).toBe('summary-204')
+  })
+})
+
+describe('migrateJsonDomainV1ToV2', () => {
+  it('stamps an existing v1 web_enhanced file to v2 and adds an empty memories table', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'web-enhanced-memory-migration-'))
+    roots.push(root)
+    await writeFile(join(root, 'web_enhanced.json'), JSON.stringify({
+      unit: { name: 'web_enhanced', version: 1 },
+      global: null,
+      tables: { tasks: {} },
+    }, null, 2) + '\n', 'utf8')
+    const ctx = new Context()
+    contexts.push(ctx)
+    ctx.provide('storage' as never, { backend: { get: () => ({ root }) } } as never)
+    ctx.provide('storageDomain' as never, { config: { backend: 'json' } } as never)
+    await migrateJsonDomainV1ToV2(ctx)
+    const migrated = JSON.parse(await readFile(join(root, 'web_enhanced.json'), 'utf8'))
+    expect(migrated.unit).toEqual({ name: 'web_enhanced', version: 2 })
+    expect(migrated.tables.memories).toEqual({})
+  })
+
+  it('leaves an already-v2 or non-web-enhanced file untouched', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'web-enhanced-memory-migration-'))
+    roots.push(root)
+    const already = JSON.stringify({
+      unit: { name: 'web_enhanced', version: 2 },
+      global: null,
+      tables: { tasks: {}, memories: {} },
+    }, null, 2) + '\n'
+    await writeFile(join(root, 'web_enhanced.json'), already, 'utf8')
+    const ctx = new Context()
+    contexts.push(ctx)
+    ctx.provide('storage' as never, { backend: { get: () => ({ root }) } } as never)
+    ctx.provide('storageDomain' as never, { config: { backend: 'json' } } as never)
+    await migrateJsonDomainV1ToV2(ctx)
+    expect(await readFile(join(root, 'web_enhanced.json'), 'utf8')).toBe(already)
   })
 })
 

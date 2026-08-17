@@ -6,6 +6,8 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
@@ -41,6 +43,73 @@ const taskDomainSpec = defineDomain({
   },
 })
 
+/** The storage hub face the v1→v2 migration needs, structurally. */
+interface StorageBackendFace {
+  /** JSON backend root; absent on other backends (no file to migrate). */
+  readonly root?: unknown
+}
+
+interface StorageHubFace {
+  readonly backend: {
+    get(name: string): StorageBackendFace | undefined
+  }
+}
+
+/** The domain facility face the migration needs, structurally. */
+interface DomainFacilityFace {
+  readonly config: {
+    readonly backend: string
+    readonly routes?: Record<string, string>
+  }
+}
+
+/** Migrations already started per domain facility (same key as sharedDomains). */
+const sharedMigrations = new WeakMap<object, Promise<void>>()
+
+/**
+ * Upgrade an existing v1 `web_enhanced.json` to the v2 layout before the
+ * domain opens. The memory feature added the `memories` table to a domain
+ * whose tasks already live on users' disks; the JSON backend rejects a
+ * version mismatch at open, so the file must be stamped to v2 (and gain an
+ * empty `memories` table) first. The rewrite only touches a document whose
+ * header is exactly `{ name: 'web_enhanced', version: 1 }`; malformed or
+ * already-current files are left for the backend's own diagnostics.
+ * @param ctx - owning context with storage + storageDomain services.
+ */
+export async function migrateJsonDomainV1ToV2(ctx: Context): Promise<void> {
+  const facility = ctx.get('storageDomain' as never, false) as unknown as DomainFacilityFace | undefined
+  const hub = ctx.get('storage' as never, false) as unknown as StorageHubFace | undefined
+  if (facility === undefined || hub === undefined) return
+  const backendName = facility.config.routes?.['web_enhanced'] ?? facility.config.backend
+  const root = hub.backend.get(backendName)?.root
+  if (typeof root !== 'string') return
+  const path = join(root, 'web_enhanced.json')
+  let document: unknown
+  try {
+    document = JSON.parse(await readFile(path, 'utf8'))
+  } catch {
+    // No file, unreadable, or not JSON: the normal open reports its own error.
+    return
+  }
+  if (typeof document !== 'object' || document === null) return
+  const record = document as Record<string, unknown>
+  const unit = record['unit']
+  if (typeof unit !== 'object' || unit === null) return
+  const header = unit as Record<string, unknown>
+  if (header['name'] !== 'web_enhanced' || header['version'] !== 1) return
+  const tables = record['tables']
+  if (typeof tables !== 'object' || tables === null || Array.isArray(tables)) return
+  header['version'] = 2
+  const tableRecord = tables as Record<string, unknown>
+  if (tableRecord['memories'] === undefined) tableRecord['memories'] = {}
+  try {
+    await writeFile(path, `${JSON.stringify(document, null, 2)}
+`, 'utf8')
+  } catch {
+    // The open below reports the version mismatch; keep the original error path.
+  }
+}
+
 /** Shared open of the web-enhanced domain, keyed by the domain facility. */
 const sharedDomains = new WeakMap<object, Promise<Domain<typeof taskDomainSpec>>>()
 
@@ -49,11 +118,19 @@ const sharedDomains = new WeakMap<object, Promise<Domain<typeof taskDomainSpec>>
  * the promise. TaskBoard and the memory feature share this handle; the
  * storage facility rejects a second open of the same name. Keying the cache
  * by facility keeps every test harness (one facility per context) isolated.
+ * A one-time JSON-medium migration runs before the first open so existing
+ * v1 task stores upgrade to the v2 layout with the memories table.
  * @param ctx - owning context with the injected storageDomain service.
  * @returns the shared domain promise.
  */
-export function openSharedDomain(ctx: Context): Promise<Domain<typeof taskDomainSpec>> {
+export async function openSharedDomain(ctx: Context): Promise<Domain<typeof taskDomainSpec>> {
   const facility = ctx.get('storageDomain')!
+  let migration = sharedMigrations.get(facility)
+  if (migration === undefined) {
+    migration = migrateJsonDomainV1ToV2(ctx)
+    sharedMigrations.set(facility, migration)
+  }
+  await migration
   let promise = sharedDomains.get(facility)
   if (promise === undefined) {
     promise = facility.open(taskDomainSpec)

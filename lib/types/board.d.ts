@@ -19,10 +19,23 @@ declare const taskDomainSpec: {
     };
 };
 /**
+ * Upgrade an existing v1 `web_enhanced.json` to the v2 layout before the
+ * domain opens. The memory feature added the `memories` table to a domain
+ * whose tasks already live on users' disks; the JSON backend rejects a
+ * version mismatch at open, so the file must be stamped to v2 (and gain an
+ * empty `memories` table) first. The rewrite only touches a document whose
+ * header is exactly `{ name: 'web_enhanced', version: 1 }`; malformed or
+ * already-current files are left for the backend's own diagnostics.
+ * @param ctx - owning context with storage + storageDomain services.
+ */
+export declare function migrateJsonDomainV1ToV2(ctx: Context): Promise<void>;
+/**
  * Open the web-enhanced domain exactly once per domain facility and cache
  * the promise. TaskBoard and the memory feature share this handle; the
  * storage facility rejects a second open of the same name. Keying the cache
  * by facility keeps every test harness (one facility per context) isolated.
+ * A one-time JSON-medium migration runs before the first open so existing
+ * v1 task stores upgrade to the v2 layout with the memories table.
  * @param ctx - owning context with the injected storageDomain service.
  * @returns the shared domain promise.
  */

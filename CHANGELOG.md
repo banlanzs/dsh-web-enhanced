@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### 新增：持久化记忆（save_memory 工具 + 自动召回）
+
+- 新增 settings 命名空间 `dsh-web-enhanced-memory`、常驻系统提示词段 `web-enhanced:memory`（order 60）、`save_memory` 工具，以及 `agent/pre-step` 召回钩子：每轮从会话最后一条 user 文本搜索项目记忆，命中时注入 `[回忆] …` 用户消息；记忆表与任务看板共用 `web_enhanced` domain（v2 新增 `memories` 表）。
+- 新增远程 `memoryList` / `memoryDelete`（方法 39 → 41）；保存按 workspace+summary 24 小时内去重更新，每 workspace 上限 200 条；搜索按词命中数取 top 3。
+- 修复：`save_memory` 的 `parameters` 从字段简写改为完整 JSON Schema（`type:'object'+properties+required`），修复模型调用时 `type: null` 报错。
+- 修复：domain v1 → v2 自动迁移——打开 domain 前把既有 `web_enhanced.json` 的 `unit.version` 升为 2 并补空 `memories` 表，旧任务存储不会在记忆功能启用时报 `stored version 1 != expected 2`。
+
 ### 修复：对话节点导航条不再把所有轮次铺满页面
 
 - 宿主只把会话尾部窗口渲染进 DOM；导航条此前会给**每一个未渲染的更早轮次**画一个虚拟点（上限 200），长会话里 200 个虚拟点 + 11 个实体点几乎必然超过一屏。现在更早轮次的独立虚拟点上限降到 **6 个**，更早的折叠为单个「加载更早」标记——导航条总节点数稳定在 20 个以内，装在既有的 `max-height + overflow` 容器里；点击标记仍会正常翻页加载历史，受限制的只是导航条本身的点数，不是历史加载。
