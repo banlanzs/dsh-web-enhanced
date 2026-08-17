@@ -55,7 +55,6 @@ const GIT_URL = 'git+https://github.com/banlanzs/dsh-web-enhanced.git'
 // ── 文案（产品语言 zh，en 镜像；断言同时接受两者）─────────────────────────
 const UI = {
   workspaceView: ['工作区', 'Workspace'],
-  newSession: ['新会话', 'New session'],
   boardColumns: [
     ['待规划', 'Planned'], ['待办', 'To do'], ['进行中', 'Running'],
     ['已完成', 'Done'], ['已失败', 'Failed'],
@@ -185,7 +184,17 @@ try {
   browser = await chromium.launch({ channel: 'chrome', headless: true })
   page = await browser.newPage({ viewport: { width: 1440, height: 1200 } })
   const pageErrors = []
+  const consoleErrors = []
+  const responseErrors = []
   page.on('pageerror', e => pageErrors.push(String(e)))
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text())
+  })
+  page.on('response', (response) => {
+    if (response.status() >= 400 && response.url().includes('/api/')) {
+      responseErrors.push(`${response.status()} ${response.url()}`)
+    }
+  })
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 })
   await page.waitForTimeout(5000)
 
@@ -199,20 +208,24 @@ try {
   log(`✓ client.js ${clientRes.status}`)
 
   // ── 断言 1: 新会话进入工作区视图 ────────────────────────────────────────
-  const newSession = await waitForText(page, UI.newSession, 10000)
-  if (newSession === null) {
+  // 与宿主自己的浏览器 e2e 使用同一 accessible-name 契约。页面可能同时有
+  // 侧边栏新建按钮和工作区里的空白会话行，文本 first() 会命中错误节点。
+  const newSession = page.getByRole('button', { name: /^(?:New session|新.*会话)$/ }).last()
+  await newSession.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {})
+  if (!(await newSession.isVisible().catch(() => false))) {
     await screenshot('e2e-fail-newsession.png')
     await logTail()
     fail('首页未出现「新会话」入口')
   }
-  await newSession.click().catch(() => {})
+  await newSession.click()
   await page.waitForTimeout(1500)
+  log('✓ 新会话入口已点击')
 
   const workspaceTab = await waitForTab(page, UI.workspaceView, 30000)
   if (workspaceTab === null) {
     await screenshot('e2e-fail-workspace-tab.png')
     await logTail()
-    await logPluginDiagnostics(page, pageErrors)
+    await logPluginDiagnostics(page, pageErrors, consoleErrors, responseErrors)
     fail('新会话 30s 内未出现「工作区」视图标签')
   }
   await workspaceTab.click()
@@ -333,19 +346,6 @@ try {
 
 // ── 工具函数 ────────────────────────────────────────────────────────────────
 
-/** 轮询等待任一文案出现，返回 locator（zh/en 任一），超时返回 null。 */
-async function waitForText(page, variants, timeoutMs) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    for (const v of variants) {
-      const loc = page.getByText(v, { exact: false }).first()
-      if (await loc.isVisible().catch(() => false)) return loc
-    }
-    await new Promise(r => setTimeout(r, 500))
-  }
-  return null
-}
-
 /** 轮询等待任一命名的 tab 出现，返回 locator（zh/en 任一），超时返回 null。 */
 async function waitForTab(page, variants, timeoutMs) {
   const deadline = Date.now() + timeoutMs
@@ -360,16 +360,20 @@ async function waitForTab(page, variants, timeoutMs) {
 }
 
 /** 输出插件加载诊断，区分 bundle 未执行、apply 未完成和 UI 选择器漂移。 */
-async function logPluginDiagnostics(page, pageErrors) {
+async function logPluginDiagnostics(page, pageErrors, consoleErrors, responseErrors) {
   const diag = await page.evaluate(() => {
     const testIds = [...document.querySelectorAll('[data-testid]')]
       .map(el => el.getAttribute('data-testid'))
       .filter(id => id !== null && (id.includes('web-enhanced') || id.includes('workspace-view')))
     const styles = [...document.querySelectorAll('style[data-plugin]')]
       .map(el => el.getAttribute('data-plugin'))
-    return { testIds, styles: [...new Set(styles)] }
+    const tabs = [...document.querySelectorAll('[role="tab"]')]
+      .filter(el => el instanceof HTMLElement && el.offsetParent !== null)
+      .map(el => el.textContent?.trim() ?? '')
+      .filter(Boolean)
+    return { testIds, styles: [...new Set(styles)], tabs, url: location.href }
   }).catch(() => null)
-  log(`诊断：插件 testid=${JSON.stringify(diag?.testIds ?? 'n/a')} 注入样式=${JSON.stringify(diag?.styles ?? 'n/a')} pageerrors=${JSON.stringify(pageErrors.slice(0, 3))}`)
+  log(`诊断：url=${JSON.stringify(diag?.url ?? 'n/a')} tabs=${JSON.stringify(diag?.tabs ?? 'n/a')} 插件 testid=${JSON.stringify(diag?.testIds ?? 'n/a')} 注入样式=${JSON.stringify(diag?.styles ?? 'n/a')} pageerrors=${JSON.stringify(pageErrors.slice(0, 3))} consoleErrors=${JSON.stringify(consoleErrors.slice(0, 5))} apiErrors=${JSON.stringify(responseErrors.slice(0, 5))}`)
 }
 
 /** 容器内是否出现任一文案（最多轮询 timeoutMs）。 */
