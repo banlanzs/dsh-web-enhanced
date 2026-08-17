@@ -30,6 +30,9 @@ import type {
   TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigPatch,
   VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelView,
   VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult,
+  MemoryConfigGetResult, MemoryConfigSaveRequest, MemoryConfigSetResult, MemoryConfigView,
+  MemoryDeleteRequest, MemoryDeleteResult, MemoryKind, MemoryListRequest, MemoryListResult,
+  MemoryRecord,
 } from '../types.ts'
 import type {
   BrowseActions, BrowseState, Observable, OverlayActions, OverlayState, PanelActions, PanelState,
@@ -88,6 +91,10 @@ export interface WebEnhancedRemote {
   pluginList(request: PluginListRequest): Promise<PluginListResult>
   pluginRemove(request: PluginMutateRequest): Promise<PluginMutateResult>
   pluginUpdate(request: PluginMutateRequest): Promise<PluginMutateResult>
+  memoryList(request: MemoryListRequest): Promise<MemoryListResult>
+  memoryDelete(request: MemoryDeleteRequest): Promise<MemoryDeleteResult>
+  memoryConfigGet(): Promise<MemoryConfigGetResult>
+  memoryConfigSet(request: MemoryConfigSaveRequest): Promise<MemoryConfigSetResult>
 }
 
 /** Re-exported payload types (components, tests, and preview helpers). */
@@ -112,6 +119,9 @@ export type {
   OpencodeGoUsageView, OpencodeGoWindow,
   OfficeBlock, OfficeKind, PluginListRequest, PluginListResult,
   PluginListView, PluginMutateRequest, PluginMutateResult, PluginMutateView, PluginView,
+  MemoryConfigGetResult, MemoryConfigSaveRequest, MemoryConfigSetResult, MemoryConfigView,
+  MemoryDeleteRequest, MemoryDeleteResult, MemoryKind, MemoryListRequest, MemoryListResult,
+  MemoryRecord,
   ModelPricingView, PricingGetRequest, PricingGetResult, PricingView, TaskCreateRequest,
   TaskCreateResult,
   TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,

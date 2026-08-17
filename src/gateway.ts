@@ -34,7 +34,7 @@ import { OpencodeGoUsageClient } from './opencode-go.ts'
 import { classifyVisionHttpError, DEFAULT_VISION_MARKER, DEFAULT_VISION_PROMPT, resolveVisionApiKey, VISION_SETTINGS_NS } from './vision.ts'
 import type { VisionSettingsValue } from './vision.ts'
 import type { GlobalPromptSettingsValue } from './global-prompt.ts'
-import { GLOBAL_PROMPT_MAX_CHARS, GLOBAL_PROMPT_SETTINGS_NS } from './types.ts'
+import { GLOBAL_PROMPT_MAX_CHARS, GLOBAL_PROMPT_SETTINGS_NS, MEMORY_SETTINGS_NS } from './types.ts'
 import type {
   ApiError, BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult,
   FsBrowseRequest, FsBrowseResult, FsDeleteRequest,
@@ -47,6 +47,7 @@ import type {
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
   GlobalPromptConfigView, GlobalPromptGetResult, GlobalPromptSaveRequest, GlobalPromptSetResult,
+  MemoryConfigGetResult, MemoryConfigSaveRequest, MemoryConfigSetResult,
   MemoryDeleteRequest, MemoryDeleteResult, MemoryId, MemoryListRequest, MemoryListResult,
   ModelRetryConfigView, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
   ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView,
@@ -753,6 +754,63 @@ export class WebEnhancedGateway extends TypertRemoteService {
   }
 
   /**
+   * Read the memory settings namespace. Served through this plugin's own
+   * gateway for the same reason as the global prompt: a plugin-owned
+   * namespace is not on the api-proxy settings allowlist.
+   */
+  @Remote('memoryConfigGet')
+  async memoryConfigGet(): Promise<MemoryConfigGetResult> {
+    try {
+      const settings = this.memorySettings()
+      if (settings === undefined) {
+        return { error: { code: 'memory-settings-unavailable', message: 'the settings service is not mounted in this deployment' } }
+      }
+      const raw = settings.get(MEMORY_SETTINGS_NS as never) as { readonly enabled?: unknown } | undefined
+      if (raw === undefined || typeof raw !== 'object') {
+        return { error: { code: 'memory-settings-unmanaged', message: `settings namespace '${MEMORY_SETTINGS_NS}' is not registered` } }
+      }
+      const descriptor = settings.describe().find(entry => entry.ns === MEMORY_SETTINGS_NS)
+      return {
+        enabled: raw.enabled === true,
+        revision: descriptor?.revision ?? null,
+        writable: settings.writable,
+      }
+    } catch (error) {
+      return { error: this.errorOf(error, 'memory-config') }
+    }
+  }
+
+  /**
+   * Save the memory feature switch. The standing section and the recall hook
+   * both read the resolved value per step, so a successful save reaches the
+   * next model request without a restart.
+   */
+  @Remote('memoryConfigSet')
+  async memoryConfigSet(request: MemoryConfigSaveRequest): Promise<MemoryConfigSetResult> {
+    try {
+      if (typeof request.enabled !== 'boolean') {
+        return { error: { code: 'memory-config-invalid', message: 'enabled must be a boolean' } }
+      }
+      const settings = this.memorySettings()
+      if (settings === undefined) {
+        return { error: { code: 'memory-settings-unavailable', message: 'the settings service is not mounted in this deployment' } }
+      }
+      if (!settings.writable) {
+        return { error: { code: 'memory-settings-readonly', message: 'the settings provider is read-only' } }
+      }
+      if (settings.get(MEMORY_SETTINGS_NS as never) === undefined) {
+        return { error: { code: 'memory-settings-unmanaged', message: `settings namespace '${MEMORY_SETTINGS_NS}' is not registered` } }
+      }
+      await settings.update(MEMORY_SETTINGS_NS as never, { enabled: request.enabled }, request.expectedRevision)
+      const revision = settings.describe().find(entry => entry.ns === MEMORY_SETTINGS_NS)?.revision ?? 0
+      return { ok: true, revision }
+    } catch (error) {
+      const conflict = (error as { code?: unknown }).code === 'SETTINGS_CONFLICT'
+      return { error: this.errorOf(error, conflict ? 'memory-config-conflict' : 'memory-config-save') }
+    }
+  }
+
+  /**
    * Fetch the dedicated endpoint's `/models` listing. A typed key is one-shot
    * for this call; otherwise the SAVED key (or its env fallback) is used. The
    * key is never stored, logged, or returned.
@@ -1078,6 +1136,11 @@ export class WebEnhancedGateway extends TypertRemoteService {
 
   /** The settings provider the global-prompt remotes read and write. */
   private globalPromptSettings(): SettingsVisionFace | undefined {
+    return this.ctx.get('settings' as never, false) as unknown as SettingsVisionFace | undefined
+  }
+
+  /** The settings service backing the memory feature switch, when composed. */
+  private memorySettings(): SettingsVisionFace | undefined {
     return this.ctx.get('settings' as never, false) as unknown as SettingsVisionFace | undefined
   }
 

@@ -31,7 +31,7 @@ const entry = { name: 'a', path: 'a', kind: 'file', size: 3 }
  * Methods invoked with no argument at all. Everything else takes exactly one
  * request object — see the arity guard below.
  */
-const nullaryMethods = new Set(['taskList', 'visionStatus', 'visionConfigGet', 'modelRetryGet', 'globalPromptGet', 'opencodeGoUsageGet'])
+const nullaryMethods = new Set(['taskList', 'visionStatus', 'visionConfigGet', 'modelRetryGet', 'globalPromptGet', 'memoryConfigGet', 'opencodeGoUsageGet'])
 
 const visionStatusSample = {
   mounted: true,
@@ -205,6 +205,12 @@ const payloads: Record<string, unknown[]> = {
   globalPromptSet: [{ ok: true, revision: 6 }, errorPayload],
   memoryList: [{ memories: [] }, errorPayload],
   memoryDelete: [{ removed: true }, errorPayload],
+  memoryConfigGet: [
+    { enabled: true, revision: 3, writable: true },
+    { enabled: false, revision: null, writable: false },
+    errorPayload,
+  ],
+  memoryConfigSet: [{ ok: true, revision: 4 }, errorPayload],
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
   gitCommit: [{ commit: commitDetail }, errorPayload],
@@ -308,10 +314,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 41 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 43 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(41)
+    expect(methods).toHaveLength(43)
   })
 
   it('every result schema accepts its success and error payloads', () => {

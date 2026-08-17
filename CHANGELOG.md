@@ -14,6 +14,10 @@
 - 修复：同一毫秒写入的多条记忆在「最近 N 条」里退化成插入顺序（最旧优先），现按逆插入序稳定排序。
 - 修复：召回去重表按 session 无上限增长，现限制在 64 条；`updateStanding` 由 fire-and-forget 改为 await（召回需要读到已结算的常驻 id 集合）；插件重挂载不再继承上一次挂载的常驻文本与 settings scope。
 
+### 新增：记忆开关的读写端点
+
+- 新增远程 `memoryConfigGet` / `memoryConfigSet`（方法 39 → 43），把 `dsh-web-enhanced-memory` 命名空间的启用开关接到插件自己的 Typert 网关上（带 revision CAS、只读与未注册命名空间的显式错误码）——插件自有命名空间不在 api-proxy 的 settings 白名单里，浏览器端的通用 settings RPC 永远列不到它，此前这个开关只能靠改配置文件切换。
+
 ### 新增：持久化记忆（save_memory 工具 + 自动召回）
 
 - 新增 settings 命名空间 `dsh-web-enhanced-memory`、常驻系统提示词段 `web-enhanced:memory`（order 60）、`save_memory` 工具，以及 `agent/pre-step` 召回钩子：每轮从会话最后一条 user 文本搜索项目记忆，命中时注入 `[回忆] …` 用户消息；记忆表与任务看板共用 `web_enhanced` domain（v2 新增 `memories` 表）。

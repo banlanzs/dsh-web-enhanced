@@ -116,5 +116,9 @@ export function createRemoteFacade(
     pluginList: async request => open(await raw.pluginList(request)),
     pluginRemove: async request => open(await raw.pluginRemove(request)),
     pluginUpdate: async request => open(await raw.pluginUpdate(request)),
+    memoryList: async request => open(await raw.memoryList(request)),
+    memoryDelete: async request => open(await raw.memoryDelete(request)),
+    memoryConfigGet: async () => open(await raw.memoryConfigGet()),
+    memoryConfigSet: async request => open(await raw.memoryConfigSet(request)),
   }
 }
