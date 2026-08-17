@@ -18,6 +18,11 @@
 
 - 新增远程 `memoryConfigGet` / `memoryConfigSet`（方法 39 → 43），把 `dsh-web-enhanced-memory` 命名空间的启用开关接到插件自己的 Typert 网关上（带 revision CAS、只读与未注册命名空间的显式错误码）——插件自有命名空间不在 api-proxy 的 settings 白名单里，浏览器端的通用 settings RPC 永远列不到它，此前这个开关只能靠改配置文件切换。
 
+### 新增：设置页「记忆」标签
+
+- 新增设置页「记忆」标签：列出模型通过 `save_memory` 保存的全部记忆，支持按分类（用户/反馈/项目/引用）与作用域（全部/项目记忆/全局记忆）过滤、按摘要与正文关键词搜索、长正文折叠展开、逐条确认删除，并在页首提供长期记忆的启用开关（关闭后不再写入常驻提示词、也不再召回，已保存的记忆不受影响）。
+- 列表刻意不按 workspace 过滤：workspace 范围的读取会隐藏那些 cwd 已解析不到已注册 workspace 的记忆——而它们恰恰是用户最需要清理的。
+
 ### 新增：持久化记忆（save_memory 工具 + 自动召回）
 
 - 新增 settings 命名空间 `dsh-web-enhanced-memory`、常驻系统提示词段 `web-enhanced:memory`（order 60）、`save_memory` 工具，以及 `agent/pre-step` 召回钩子：每轮从会话最后一条 user 文本搜索项目记忆，命中时注入 `[回忆] …` 用户消息；记忆表与任务看板共用 `web_enhanced` domain（v2 新增 `memories` 表）。

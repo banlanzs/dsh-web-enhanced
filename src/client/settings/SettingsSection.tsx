@@ -24,6 +24,7 @@ import { SkinPanel } from '../skins/SkinPanel.tsx'
 import type { SkinFace } from '../skins/skin-layer.ts'
 import { AboutPanel } from './AboutPanel.tsx'
 import { GeneralSettingsPanel } from './GeneralSettingsPanel.tsx'
+import { MemoryPanel } from './MemoryPanel.tsx'
 import { PluginManager } from './PluginManager.tsx'
 import { VisionStatusPanel } from './VisionStatusPanel.tsx'
 import { GlobalPromptPanel } from '../global-prompt/GlobalPromptPanel.tsx'
@@ -33,7 +34,7 @@ import css from './SettingsSection.module.css'
 export type SettingsSectionProps = WebEnhancedProps<'settings.section'>
 
 /** Which page of the section is showing. */
-type Tab = 'plugins' | 'general' | 'globalPrompt' | 'vision' | 'skins' | 'about'
+type Tab = 'plugins' | 'general' | 'globalPrompt' | 'memory' | 'vision' | 'skins' | 'about'
 
 /** The web-enhanced settings page. */
 export function SettingsSection({ remote, t, skin }: SettingsSectionProps) {
@@ -42,6 +43,7 @@ export function SettingsSection({ remote, t, skin }: SettingsSectionProps) {
     { id: 'plugins', label: t('settings.tab.plugins') },
     { id: 'general', label: t('settings.tab.general') },
     { id: 'globalPrompt', label: t('settings.tab.globalPrompt') },
+    { id: 'memory', label: t('settings.tab.memory') },
     { id: 'vision', label: t('settings.tab.vision') },
     { id: 'skins', label: t('settings.tab.skins') },
     { id: 'about', label: t('settings.tab.about') },
@@ -66,6 +68,7 @@ export function SettingsSection({ remote, t, skin }: SettingsSectionProps) {
         {tab === 'plugins' && <PluginManager remote={remote} t={t} />}
         {tab === 'general' && <GeneralSettingsPanel remote={remote} t={t} />}
         {tab === 'globalPrompt' && <GlobalPromptPanel remote={remote} t={t} />}
+        {tab === 'memory' && <MemoryPanel remote={remote} t={t} />}
         {tab === 'vision' && <VisionStatusPanel remote={remote} t={t} />}
         {tab === 'skins' && <SkinPanel skin={skin} t={t} />}
         {tab === 'about' && <AboutPanel t={t} />}
