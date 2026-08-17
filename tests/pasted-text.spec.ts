@@ -55,6 +55,13 @@ describe('pastedTextHitOfDraft', () => {
     })
   })
 
+  it('matches the trimmed projection restored after a failed send', () => {
+    const store = new PastedTextStore()
+    store.set('trailing', '长文本内容  ')
+    const hit = pastedTextHitOfDraft(store, '长文本内容')
+    expect(hit).toMatchObject({ entry: { id: 'trailing' }, start: 0, end: 5 })
+  })
+
   it('returns undefined when no stored text is present', () => {
     const store = new PastedTextStore()
     store.set('x', 'abcdef')

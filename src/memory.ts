@@ -106,6 +106,8 @@ interface MessageLike {
 /** Loose shape of the pre-step decision returned by `next()`. */
 interface PreStepDecisionLike {
   readonly kind?: unknown
+  /** Messages entering this step; the memory notice is appended here. */
+  readonly messages?: readonly unknown[]
   readonly [key: string]: unknown
 }
 
@@ -381,20 +383,19 @@ export function applyMemory(ctx: Context, domain?: Promise<any>): void {
     if (injectedContent.get(sessionKey) === content) return decision as never
     injectedContent.set(sessionKey, content)
 
-    if (typeof agent?.inject === 'function') {
-      try {
-        agent.inject(createUserMessage({
-          content: [{ type: 'text', text: content }],
-          source: { kind: 'user' },
-        }))
-      } catch (error) {
-        ctx.logger.warn(
-          `dsh-web-enhanced memory: agent context injection failed: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        )
-      }
-    }
-    return decision as never
+    // Append the notice to THIS step's messages instead of `agent.inject()`.
+    // `agent.inject` queues a next-step message, which splits one user turn
+    // into two model steps and renders the recall as an ordinary user
+    // message. Same-step appending keeps the reply contiguous, and the
+    // plugin-produced `form: 'recall'` source renders as a collapsed
+    // context-recall row rather than a user bubble.
+    const recall = createUserMessage({
+      content: [{ type: 'text', text: content }],
+      source: { kind: 'plugin', plugin: 'dsh-web-enhanced', form: 'recall' },
+    })
+    return {
+      ...decision,
+      messages: [...(decision.messages ?? []), recall],
+    } as never
   }) as never)
 }

@@ -11,6 +11,7 @@
 - 修复：中文自然语言问句无法召回——检索词改为拉丁词保持整词、CJK 段落拆成重叠二元组（`发布前检查` → `发布` `布前` `前检` `检查`），因此“这个项目的发布前检查命令是什么？”现在能命中保存过的 `发布前必须运行 pnpm check`。
 - 修复：召回钩子取“最后一轮用户文本”时只识别字符串 content——实际会话消息是 `[{type:'text',text:…}]` 块数组，导致查询恒为空、永远不注入；现提取 text 块拼接后检索。
 - 修复：召回查询改读 `agent/pre-step` payload 里本步 **claim 到的 inbox messages**（真正的用户问题），不再从 `session.deriveMessages()` 取——后者在运行时往往已经追加了 runtime-context / skill-catalog 等 plugin user 消息，取到的“最后一条 user 文本”不是用户问题，仍会 0 命中。
+- 修复：回忆命中不再 `agent.inject()` 成下一条用户消息——那会把一轮回复割成两个 step，并以普通 user 气泡展示。现在把召回内容作为 `form:'recall'` 的 plugin context **追加进本步 decision.messages**：一次回复完整输出，界面按可折叠的「上下文召回」行展示，不再显示成用户消息。
 
 ### 修复：对话节点导航条不再把所有轮次铺满页面
 
@@ -29,7 +30,7 @@
 - composer 内粘贴 ≥2000 字符的纯文本时，插件在原生 paste 之前拦截：原文存 `PastedTextStore`（localStorage，单条 ≤200K / 最多 12 条），经 `slash/input-insert-reference` 在草稿里插入一个 `@pasted-text` 引用 chip，不再把整段灌进输入框；发送时由注册的 input-trigger codec 把 chip 还原为完整文本交给模型。
 - 新增 `conversation.input.dock` 的 PastedTextDock：chip 点击打开 Modal 预览 / 编辑 / 保存；移除 chip 经 `slash/input-consume-token` 同步删除草稿引用。卸载插件恢复原生粘贴行为。
 - 修复：insert/consume 事件的 span 补齐输入机 CAS 必需的 `draftRev`——缺失时 CAS 失败会退化为纯文本 `[已粘贴文本xxx]`，现在会正确渲染为可点击 chip。
-- 修复：发送失败时宿主会把序列化后的**完整长文本**恢复回草稿、输入框被重新撑开；现在插件监听输入机状态，发现草稿中重新出现某条已存原文时自动把它换回 `已粘贴文本` chip（原 ref 保留，可继续预览/编辑/移除）。
+- 修复：发送失败时宿主会把序列化后的**完整长文本**恢复回草稿、输入框被重新撑开；现在插件监听输入机状态，发现草稿中重新出现某条已存原文时自动把它换回 `已粘贴文本` chip（原 ref 保留，可继续预览/编辑/移除）。匹配同时接受原文与 `draft.trim()` 后的投影，避免原文末尾换行/空格被宿主 trim 后识别不到。
 
 ### 新增：Git 图谱文件可点击查看 diff（含历史提交）
 
