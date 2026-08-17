@@ -275,16 +275,22 @@ describe('applyMemory wiring', () => {
     }))
   })
 
-  it('registers the save_memory tool with the expected three parameters and an execute function', async () => {
+  it('registers save_memory with a full JSON-Schema parameters object and an execute function', async () => {
     const { toolsRegister } = await mountOrchestrator({})
     expect(toolsRegister).toHaveBeenCalledTimes(1)
     const definition = toolsRegister.mock.calls[0]![0] as {
       name: string
-      parameters: Record<string, { type: string; required: boolean }>
+      parameters: {
+        type: string
+        properties: Record<string, { type: string }>
+        required: string[]
+      }
       execute: (...args: unknown[]) => unknown
     }
     expect(definition.name).toBe('save_memory')
-    expect(Object.keys(definition.parameters).sort()).toEqual(['body', 'kind', 'summary'])
+    expect(definition.parameters.type).toBe('object')
+    expect(Object.keys(definition.parameters.properties).sort()).toEqual(['body', 'kind', 'summary'])
+    expect(definition.parameters.required).toEqual(['kind', 'summary', 'body'])
     expect(typeof definition.execute).toBe('function')
   })
 

@@ -197,27 +197,37 @@ async function updateStanding(workspaceId: WorkspaceId | null): Promise<void> {
   }
 }
 
-/** The save-memory tool definition, structured as a literal object. */
+/**
+ * The save-memory tool definition.
+ *
+ * `parameters` is the FULL JSON Schema object the registry sends to the
+ * model (`{ type: 'object', properties, required }`), not the per-field
+ * shorthand accepted by `@deepseek-ai/dsh-tools`' `defineTool` — this
+ * plugin does not depend on that package, so the literal is written in the
+ * registry-ready shape directly.
+ */
 const memoryToolDefinition = {
   name: 'save_memory',
   description: 'Save a durable long-term memory for the current project so future sessions can recall it. Use for user preferences, project conventions, important decisions, and non-obvious fixes. Memories are recalled automatically in future sessions.',
   parameters: {
-    kind: {
-      type: 'string',
-      enum: ['user', 'feedback', 'project', 'reference'],
-      required: true,
-      description: 'Memory classification: user = who the user is and what they prefer; feedback = guidance on how work should be done; project = project conventions and constraints; reference = pointers to external resources.',
+    type: 'object',
+    properties: {
+      kind: {
+        type: 'string',
+        enum: ['user', 'feedback', 'project', 'reference'],
+        description: 'Memory classification: user = who the user is and what they prefer; feedback = guidance on how work should be done; project = project conventions and constraints; reference = pointers to external resources.',
+      },
+      summary: {
+        type: 'string',
+        description: 'One-sentence summary, at most 120 characters.',
+      },
+      body: {
+        type: 'string',
+        description: 'The complete memory content.',
+      },
     },
-    summary: {
-      type: 'string',
-      required: true,
-      description: 'One-sentence summary, at most 120 characters.',
-    },
-    body: {
-      type: 'string',
-      required: true,
-      description: 'The complete memory content.',
-    },
+    required: ['kind', 'summary', 'body'],
+    additionalProperties: false,
   },
   output: {
     schema: {
@@ -227,7 +237,8 @@ const memoryToolDefinition = {
         id: { type: 'string' },
         deduplicated: { type: 'boolean' },
       },
-      additionalProperties: true,
+      required: ['ok', 'id', 'deduplicated'],
+      additionalProperties: false,
     },
     render(_args: unknown, value: { readonly ok?: unknown; readonly id?: unknown; readonly deduplicated?: unknown }): readonly { readonly type: string; readonly text: string }[] {
       return [{
