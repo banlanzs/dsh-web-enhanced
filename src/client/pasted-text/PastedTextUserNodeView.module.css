@@ -1,0 +1,110 @@
+.userRow {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  max-width: var(--dsh-chat-content-width);
+  margin: 0 auto;
+}
+
+.userStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.bubble {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  border-radius: 14px;
+  background: var(--dsw-alias-bg-user-bubble, rgb(229 239 255));
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 8px 12px;
+}
+
+.transcriptChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 9%));
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-card, rgba(255 255 255 / 70%));
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.transcriptChip:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+}
+
+.icon {
+  flex: none;
+  font-size: 14px;
+}
+
+.label {
+  flex: none;
+  font-weight: 600;
+}
+
+.preview {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-tertiary, rgb(143 148 155));
+}
+
+.image {
+  max-width: min(280px, 70vw);
+  max-height: 220px;
+  border-radius: 12px;
+}
+
+.extraBlock {
+  margin: 0;
+  max-width: 100%;
+  overflow: auto;
+  font: 12px/1.5 ui-monospace, Consolas, monospace;
+}
+
+.dialog {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.dialogContent {
+  padding: 0;
+}
+
+.editor {
+  box-sizing: border-box;
+  width: 100%;
+  height: 50vh;
+  min-height: 280px;
+  max-height: 560px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 9%));
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base, rgb(255 255 255));
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px;
+  resize: vertical;
+}
+
+.editor:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary, rgb(65 118 230));
+}

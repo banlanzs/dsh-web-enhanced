@@ -55,6 +55,8 @@ import type { ModelCapabilitiesInjected } from './model-capabilities/ModelCapabi
 import { CapabilitiesStore, refreshIfLoaded } from './model-capabilities/store.ts'
 import { PastedTextDock } from './pasted-text/PastedTextDock.tsx'
 import type { PastedTextDockInjected } from './pasted-text/PastedTextDock.tsx'
+import { PastedTextUserNodeView } from './pasted-text/PastedTextUserNodeView.tsx'
+import type { PastedTextUserNodeInjected } from './pasted-text/PastedTextUserNodeView.tsx'
 import { applyPastedText, removePastedText } from './pasted-text/apply.ts'
 import { PastedTextStore } from './pasted-text/store.ts'
 import { BalanceLine } from './balance/BalanceLine.tsx'
@@ -253,6 +255,16 @@ export function apply(ctx: ClientContext): void {
       remove: (span) => { removePastedText(ctx, String(sessionId), span) },
     }),
   }, PastedTextDock))
+  // Transcript side: the host stores the SERIALIZED full text in the sent
+  // user message, so shadow the host `user` chat renderer at a lower priority
+  // and keep stored pasted-text spans collapsed as chips in the record too.
+  ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
+    name: 'conversation.chat.node',
+    key: 'user',
+    priority: -1,
+    locale: NS,
+    inject: (): PastedTextUserNodeInjected => ({ store: pastedText }),
+  }, PastedTextUserNodeView))
 
   const overlay = createOverlay()
   const browse = createBrowse()

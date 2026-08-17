@@ -31,6 +31,7 @@
 - 新增 `conversation.input.dock` 的 PastedTextDock：chip 点击打开 Modal 预览 / 编辑 / 保存；移除 chip 经 `slash/input-consume-token` 同步删除草稿引用。卸载插件恢复原生粘贴行为。
 - 修复：insert/consume 事件的 span 补齐输入机 CAS 必需的 `draftRev`——缺失时 CAS 失败会退化为纯文本 `[已粘贴文本xxx]`，现在会正确渲染为可点击 chip。
 - 修复：发送失败时宿主会把序列化后的**完整长文本**恢复回草稿、输入框被重新撑开；现在插件监听输入机状态，发现草稿中重新出现某条已存原文时自动把它换回 `已粘贴文本` chip（原 ref 保留，可继续预览/编辑/移除）。匹配同时接受原文与 `draft.trim()` 后的投影，避免原文末尾换行/空格被宿主 trim 后识别不到。
+- 修复：**对话记录里的展开**——宿主会把序列化后的全文写进已发送 user 消息，插件现在以 `priority:-1` shadow 宿主 `conversation.chat.node` 的 `user` 渲染器：含已存粘贴文本的已发送消息只显示折叠的「已粘贴文本」chip（点击仍可预览/编辑），其余用户消息保持普通右对齐气泡，并保留导航条依赖的 `data-time-hover-root` 锚点。
 
 ### 新增：Git 图谱文件可点击查看 diff（含历史提交）
 
