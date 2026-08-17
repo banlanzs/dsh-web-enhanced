@@ -12,7 +12,7 @@
 
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { pastedTextClipboard, PASTED_TEXT_SOURCE } from './store.ts'
-import type { PastedTextStore } from './store.ts'
+import type { PastedTextEntry, PastedTextStore } from './store.ts'
 
 /** Pastes at least this many characters become a chip instead of draft text. */
 export const PASTED_TEXT_THRESHOLD = 2_000
@@ -30,14 +30,63 @@ export interface PastedTextSpan {
   readonly draftRev: number
 }
 
+/** One occurrence the machine publishes, narrowed to what the watcher reads. */
+interface InputOccurrenceFace {
+  readonly source?: string
+}
+
+/** One published input-machine snapshot, narrowed to the watcher's fields. */
+interface InputStateFace {
+  readonly draft: string
+  readonly draftRev: number
+  readonly occurrences?: readonly InputOccurrenceFace[]
+}
+
 /** The conversation input face (see the mention pipeline for the same shape). */
 interface ConversationInputFace {
   input: {
     for(actx: unknown): {
       setDraft(text: string): void
-      state: { getSnapshot(): { readonly draft: string; readonly draftRev: number } }
+      state: {
+        getSnapshot(): InputStateFace
+        subscribe(listener: () => void): () => void
+      }
     }
   }
+}
+
+/** One stored entry found verbatim inside a restored draft. */
+export interface PastedTextDraftHit {
+  readonly entry: PastedTextEntry
+  /** Inclusive start offset of the full text inside the draft. */
+  readonly start: number
+  /** Exclusive end offset. */
+  readonly end: number
+}
+
+/**
+ * Find a stored pasted-text entry whose full text appears verbatim in a
+ * draft. The longest match wins so a longer entry is preferred over a
+ * shorter one it contains.
+ * @param store - pasted-text content store.
+ * @param draft - the draft to scan.
+ * @returns the match, or undefined when none of the stored texts appear.
+ */
+export function pastedTextHitOfDraft(
+  store: PastedTextStore,
+  draft: string,
+): PastedTextDraftHit | undefined {
+  if (draft === '') return undefined
+  let best: PastedTextDraftHit | undefined
+  for (const entry of store.list()) {
+    if (entry.text === '') continue
+    const start = draft.indexOf(entry.text)
+    if (start < 0) continue
+    if (best === undefined || entry.text.length > best.entry.text.length) {
+      best = { entry, start, end: start + entry.text.length }
+    }
+  }
+  return best
 }
 
 /** One session-scope context with the scoped input bail dispatcher. */
@@ -91,7 +140,49 @@ export function applyPastedText(
   chipLabel: () => string,
 ): () => void {
   const disposers: Array<() => void> = []
+  const draftWatchers = new Map<string, () => void>()
   const inputTriggers = ctx.get('inputTriggers' as never, false) as unknown as InputTriggerRegistryFace | undefined
+
+  /**
+   * Watch one session's input machine and re-mount a chip when the FULL text
+   * comes back into the draft (the host restores the serialized prompt on a
+   * failed send). The watcher is idle while any pasted-text occurrence is
+   * already present, so the chip-only draft and the sent message never loop.
+   */
+  const watchDraft = (
+    sessionId: string,
+    actx: unknown,
+    conversation: ConversationInputFace,
+  ): void => {
+    if (draftWatchers.has(sessionId)) return
+    const input = conversation.input.for(actx)
+    const stop = input.state.subscribe(() => {
+      const snapshot = input.state.getSnapshot()
+      if ((snapshot.occurrences ?? []).some(occurrence => occurrence.source === PASTED_TEXT_SOURCE)) return
+      const hit = pastedTextHitOfDraft(store, snapshot.draft)
+      if (hit === undefined) return
+      const inserted = (actx as ScopedInputFace).bail(
+        actx,
+        'slash/input-insert-reference',
+        {
+          reference: {
+            source: PASTED_TEXT_SOURCE,
+            ref: hit.entry.id,
+            label: chipLabel(),
+            clipboardText: pastedTextClipboard(hit.entry.id),
+          },
+          span: {
+            start: hit.start,
+            end: hit.end,
+            draftRev: snapshot.draftRev,
+          },
+        },
+      )
+      if (inserted !== true) return
+      // Keep the watcher for future failed sends of the same session.
+    })
+    draftWatchers.set(sessionId, stop)
+  }
   if (inputTriggers !== undefined) {
     const unregister = inputTriggers.registerSource({
       trigger: '@',
@@ -148,7 +239,10 @@ export function applyPastedText(
       'slash/input-insert-reference',
       { reference, span },
     )
-    if (inserted === true) return
+    if (inserted === true) {
+      watchDraft(sessionId, actx, conversation)
+      return
+    }
     // The trigger pipeline was absent or refused the span: fall back to a
     // short marker so the content is not lost and the chip row can still open
     // the stored text.
@@ -156,6 +250,7 @@ export function applyPastedText(
       const draft = snapshot.draft
       const marker = `[已粘贴文本:${id.slice(0, 8)}] `
       input.setDraft(`${draft.slice(0, start)}${marker}${draft.slice(end)}`)
+      watchDraft(sessionId, actx, conversation)
     } catch {
       // Leave the paste cancelled; the stored entry is still reachable via the
       // dock only when an occurrence exists, so this is a true last resort.
@@ -164,6 +259,8 @@ export function applyPastedText(
   document.addEventListener('paste', onPaste, true)
   disposers.push(() => { document.removeEventListener('paste', onPaste, true) })
   return () => {
+    for (const stop of [...draftWatchers.values()]) stop()
+    draftWatchers.clear()
     for (const dispose of disposers.reverse()) dispose()
   }
 }

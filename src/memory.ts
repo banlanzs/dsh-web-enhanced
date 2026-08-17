@@ -112,6 +112,8 @@ interface PreStepDecisionLike {
 /** Loose shape of the pre-step payload. */
 interface PreStepPayloadLike {
   readonly agent?: unknown
+  /** Inbox messages claimed for this step; the actual latest user query. */
+  readonly messages?: readonly unknown[]
   readonly [key: string]: unknown
 }
 
@@ -188,11 +190,26 @@ export function textOfMessageContent(content: unknown): string {
 function lastUserQuery(session: SessionFace): string {
   const messages = session.deriveMessages?.()
   if (messages === undefined) return ''
+  return lastUserText(messages)
+}
+
+/**
+ * Reverse-scan a message list for the latest user-role text.
+ *
+ * The pre-step waterfall receives the inbox messages CLAIMED for this step —
+ * that is the user's actual query. The session-derived list is only a
+ * fallback (it may still contain plugin context, reminders, or skill
+ * catalogs that were appended after the real question).
+ * @param messages - message list to scan.
+ * @returns the latest user-role text trimmed to 500 characters, or `''`.
+ */
+export function lastUserText(messages: readonly unknown[]): string {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
-    if (message === undefined) continue
-    if (message.role !== 'user') continue
-    const text = textOfMessageContent(message.content)
+    if (typeof message !== 'object' || message === null) continue
+    const record = message as { readonly role?: unknown; readonly content?: unknown }
+    if (record.role !== 'user') continue
+    const text = textOfMessageContent(record.content)
     if (text !== '') return text.slice(0, 500)
   }
   return ''
@@ -351,7 +368,9 @@ export function applyMemory(ctx: Context, domain?: Promise<any>): void {
     const workspaceId = resolveWorkspaceId(registry, cwd)
     void updateStanding(workspaceId)
 
-    const query = lastUserQuery(session)
+    // The claimed inbox messages are the authoritative latest user query;
+    // the derived-history scan only catches harnesses with no claimed list.
+    const query = lastUserText(payload.messages ?? []) || lastUserQuery(session)
     if (query === '') return decision as never
 
     const hits = await store.search(workspaceId, query)

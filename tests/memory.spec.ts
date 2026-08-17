@@ -20,7 +20,7 @@ import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import { MemoryMediaPool, MemoryStorageBackend } from './helpers/memory-backend.ts'
 import { migrateJsonDomainV1ToV2 } from '../src/board.ts'
 import { MemoryStore, memorySearchTerms } from '../src/memory-store.ts'
-import { applyMemory, MEMORY_ORDER, MEMORY_SECTION, MEMORY_SETTINGS_NS, MemorySettingsSchema, textOfMessageContent } from '../src/memory.ts'
+import { applyMemory, lastUserText, MEMORY_ORDER, MEMORY_SECTION, MEMORY_SETTINGS_NS, MemorySettingsSchema, textOfMessageContent } from '../src/memory.ts'
 import type { WorkspaceId } from '../src/types.ts'
 
 const contexts: Context[] = []
@@ -266,6 +266,28 @@ describe('MemoryStore', () => {
     const byUpdatedAt = [...records].sort((left, right) => left.updatedAt - right.updatedAt)
     expect(byUpdatedAt[0]!.summary).toBe('summary-5')
     expect(byUpdatedAt[byUpdatedAt.length - 1]!.summary).toBe('summary-204')
+  })
+})
+
+describe('lastUserText', () => {
+  it('picks the latest user text from claimed block messages', () => {
+    expect(lastUserText([
+      { role: 'user', content: [{ type: 'text', text: '第一条' }] },
+      { role: 'assistant', content: [{ type: 'text', text: '回答' }] },
+      { role: 'user', content: [{ type: 'text', text: '这个项目的发布前检查命令是什么？' }] },
+    ])).toBe('这个项目的发布前检查命令是什么？')
+  })
+
+  it('skips plugin context until it finds the real user question', () => {
+    expect(lastUserText([
+      { role: 'user', content: [{ type: 'text', text: '这个项目的发布前检查命令是什么？' }] },
+      { role: 'user', content: [{ type: 'text', text: 'runtime context' }] },
+    ])).toBe('runtime context')
+  })
+
+  it('returns empty for no user messages', () => {
+    expect(lastUserText([])).toBe('')
+    expect(lastUserText([{ role: 'assistant', content: 'x' }])).toBe('')
   })
 })
 

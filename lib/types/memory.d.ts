@@ -45,6 +45,17 @@ export declare const MemorySettingsSchema: z<MemorySettingsValue>;
  */
 export declare function textOfMessageContent(content: unknown): string;
 /**
+ * Reverse-scan a message list for the latest user-role text.
+ *
+ * The pre-step waterfall receives the inbox messages CLAIMED for this step —
+ * that is the user's actual query. The session-derived list is only a
+ * fallback (it may still contain plugin context, reminders, or skill
+ * catalogs that were appended after the real question).
+ * @param messages - message list to scan.
+ * @returns the latest user-role text trimmed to 500 characters, or `''`.
+ */
+export declare function lastUserText(messages: readonly unknown[]): string;
+/**
  * Mount the memory orchestrator: open the store, register the settings
  * namespace, install the standing prompt section, register the `save_memory`
  * tool, and wire the recall hook.

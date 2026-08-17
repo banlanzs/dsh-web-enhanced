@@ -4,9 +4,8 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import {
-  pastedTextClipboard, pastedTextPreview, revivePastedText,
-} from '../src/client/pasted-text/store.ts'
+import { pastedTextHitOfDraft } from '../src/client/pasted-text/apply.ts'
+import { PastedTextStore, pastedTextClipboard, pastedTextPreview, revivePastedText } from '../src/client/pasted-text/store.ts'
 
 describe('revivePastedText', () => {
   it('drops malformed, duplicate, and empty entries', () => {
@@ -36,5 +35,30 @@ describe('pastedTextPreview', () => {
 describe('pastedTextClipboard', () => {
   it('names the chip with a short id prefix', () => {
     expect(pastedTextClipboard('01234567-aaaa')).toBe('[已粘贴文本:01234567]')
+  })
+})
+
+describe('pastedTextHitOfDraft', () => {
+  it('finds the longest stored text restored verbatim into a draft', () => {
+    const store = new PastedTextStore()
+    store.set('short', 'abc')
+    store.set('long', 'abcdef')
+    expect(pastedTextHitOfDraft(store, '前缀 abcdef 后缀')).toMatchObject({
+      entry: { id: 'long', text: 'abcdef' },
+      start: 3,
+      end: 9,
+    })
+    expect(pastedTextHitOfDraft(store, 'abcxyz')).toMatchObject({
+      entry: { id: 'short' },
+      start: 0,
+      end: 3,
+    })
+  })
+
+  it('returns undefined when no stored text is present', () => {
+    const store = new PastedTextStore()
+    store.set('x', 'abcdef')
+    expect(pastedTextHitOfDraft(store, '')).toBeUndefined()
+    expect(pastedTextHitOfDraft(store, 'no match')).toBeUndefined()
   })
 })
