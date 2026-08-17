@@ -35,6 +35,16 @@ export interface MemorySettingsValue {
 /** Schema of the `dsh-web-enhanced-memory` settings namespace. */
 export declare const MemorySettingsSchema: z<MemorySettingsValue>;
 /**
+ * Flatten one message content value into queryable text.
+ *
+ * The wire message shape carries content as an array of blocks
+ * (`[{ type: 'text', text: … }, …]`), not a raw string; only text blocks
+ * contribute. A raw string is accepted for tests and minimal harnesses.
+ * @param content - the message's content field.
+ * @returns joined text, or `''`.
+ */
+export declare function textOfMessageContent(content: unknown): string;
+/**
  * Mount the memory orchestrator: open the store, register the settings
  * namespace, install the standing prompt section, register the `save_memory`
  * tool, and wire the recall hook.

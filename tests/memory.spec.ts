@@ -20,7 +20,7 @@ import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import { MemoryMediaPool, MemoryStorageBackend } from './helpers/memory-backend.ts'
 import { migrateJsonDomainV1ToV2 } from '../src/board.ts'
 import { MemoryStore, memorySearchTerms } from '../src/memory-store.ts'
-import { applyMemory, MEMORY_ORDER, MEMORY_SECTION, MEMORY_SETTINGS_NS, MemorySettingsSchema } from '../src/memory.ts'
+import { applyMemory, MEMORY_ORDER, MEMORY_SECTION, MEMORY_SETTINGS_NS, MemorySettingsSchema, textOfMessageContent } from '../src/memory.ts'
 import type { WorkspaceId } from '../src/types.ts'
 
 const contexts: Context[] = []
@@ -266,6 +266,23 @@ describe('MemoryStore', () => {
     const byUpdatedAt = [...records].sort((left, right) => left.updatedAt - right.updatedAt)
     expect(byUpdatedAt[0]!.summary).toBe('summary-5')
     expect(byUpdatedAt[byUpdatedAt.length - 1]!.summary).toBe('summary-204')
+  })
+})
+
+describe('textOfMessageContent', () => {
+  it('reads raw strings and joins text blocks while ignoring non-text blocks', () => {
+    expect(textOfMessageContent('plain question')).toBe('plain question')
+    expect(textOfMessageContent([
+      { type: 'text', text: '这个项目的' },
+      { type: 'text', text: '发布前检查命令是什么？' },
+    ])).toBe('这个项目的 发布前检查命令是什么？')
+    expect(textOfMessageContent([
+      { type: 'text', text: 'x' },
+      { type: 'image', attachment: {} },
+      { type: 'tool-result', content: [] },
+    ])).toBe('x')
+    expect(textOfMessageContent(undefined)).toBe('')
+    expect(textOfMessageContent({ type: 'text', text: 'x' })).toBe('')
   })
 })
 

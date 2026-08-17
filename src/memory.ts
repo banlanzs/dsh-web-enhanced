@@ -159,6 +159,28 @@ function resolveWorkspaceId(
 }
 
 /**
+ * Flatten one message content value into queryable text.
+ *
+ * The wire message shape carries content as an array of blocks
+ * (`[{ type: 'text', text: … }, …]`), not a raw string; only text blocks
+ * contribute. A raw string is accepted for tests and minimal harnesses.
+ * @param content - the message's content field.
+ * @returns joined text, or `''`.
+ */
+export function textOfMessageContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  const parts: string[] = []
+  for (const block of content) {
+    if (typeof block !== 'object' || block === null) continue
+    const record = block as { readonly type?: unknown; readonly text?: unknown }
+    if (record.type !== 'text') continue
+    if (typeof record.text === 'string' && record.text !== '') parts.push(record.text)
+  }
+  return parts.join(' ')
+}
+
+/**
  * Reverse-scan the session's derived messages for the latest user-role text.
  * @param session - session face with optional `deriveMessages`.
  * @returns the latest user message text trimmed to 500 characters, or `''`.
@@ -170,8 +192,8 @@ function lastUserQuery(session: SessionFace): string {
     const message = messages[index]
     if (message === undefined) continue
     if (message.role !== 'user') continue
-    const content = message.content
-    if (typeof content === 'string') return content.slice(0, 500)
+    const text = textOfMessageContent(message.content)
+    if (text !== '') return text.slice(0, 500)
   }
   return ''
 }
