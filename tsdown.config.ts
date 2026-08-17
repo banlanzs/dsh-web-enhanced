@@ -5,11 +5,36 @@
  * hand-declared src-json contribution, so no typert generation step exists.
  */
 import { readFile } from 'node:fs/promises'
-import { basename, dirname, resolve, sep } from 'node:path'
+import { basename, dirname, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig, type UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
 
 const ID = 'dsh-web-enhanced'
+
+/**
+ * Package root, derived from this config's own location rather than
+ * `process.cwd()`, so the ids below do not depend on where the build was
+ * invoked from.
+ */
+const ROOT = dirname(fileURLToPath(import.meta.url))
+
+/**
+ * One absolute path as a repo-relative, forward-slash id.
+ *
+ * Every byte derived from a path must be machine-independent: the id lands
+ * verbatim in the bundle's `//#region` comments, and lightningcss hashes the
+ * `filename` it is given to scope CSS module class names. An absolute path
+ * therefore makes the artifact differ per build machine (`D:\...` vs
+ * `/home/runner/...`), which the CI lib/src drift gate reads as a real
+ * change — the gate can only work if the same source produces the same bytes
+ * everywhere.
+ * @param abs - absolute path to a source file.
+ * @returns the path relative to the package root, with forward slashes.
+ */
+function repoRelative(abs: string): string {
+  return relative(ROOT, abs).split(sep).join('/')
+}
 
 /** Browser platform modules resolved from the loader module table. */
 const PLATFORM_MODULES = [
@@ -78,15 +103,19 @@ const clientConfig: UserConfig = {
       resolveId(source: string, importer: string | undefined) {
         if (!source.endsWith('.module.css')) return null
         const abs = importer !== undefined ? sourceAssetPath(source, importer) : source
-        return CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
+        return CSS_VIRTUAL_PREFIX + repoRelative(abs) + CSS_VIRTUAL_SUFFIX
       },
       async load(virtualId: string) {
         if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
-        const fileId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+        const relId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+        const fileId = resolve(ROOT, relId)
         this.addWatchFile(fileId)
         const source = await readFile(fileId)
         const { code, exports: cssExports } = transform({
-          filename: fileId,
+          // The RELATIVE id, not the absolute path: lightningcss derives the
+          // class-name hash from this, so an absolute path would rescope every
+          // class per build machine.
+          filename: relId,
           code: source,
           cssModules: { pattern: '[hash]_[local]' },
           minify: true,
