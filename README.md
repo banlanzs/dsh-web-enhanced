@@ -223,12 +223,15 @@ Build outputs:
 
 ### Real-device e2e (no model key)
 
-The full real chain: start a temporary dsh web → install the plugin → open the workspace view's board/graph tabs, a session's floating panel and balance line — all asserted in a real browser, nothing mocked:
+The full real chain: start a temporary dsh web → install the current checkout's tarball → open the workspace view's explorer/preview, board, and graph tabs plus the balance line — all asserted in a real browser, nothing mocked. A `link:` install is deliberately unsupported for the peer-identity reason explained above.
 
 ```sh
 # needs the host build: DSH_ROOT (default ~/.dsh/source/current) with pnpm run build done
-node scripts/e2e.mjs --smoke --install link --port 3190
-node scripts/e2e.mjs --capture   # also refresh assets/*.png used by this README
+TARBALL_NAME="$(npm pack --silent)"
+TARBALL_PATH="$PWD/$TARBALL_NAME"
+TARBALL_SHA="$(sha256sum "$TARBALL_PATH")"; TARBALL_SHA="${TARBALL_SHA%% *}"
+node scripts/e2e.mjs --smoke --install tarball --tarball "$TARBALL_PATH" --tarball-sha256 "$TARBALL_SHA" --port 3190
+node scripts/e2e.mjs --capture --install tarball --tarball "$TARBALL_PATH" --tarball-sha256 "$TARBALL_SHA"   # also refresh assets/*.png
 ```
 
 Prereqs: `dsh`/`pnpm` on PATH, and the main repo's web build output (playwright resolves from the main repo). On PASS it exits 0; failure keeps `e2e-fail-*.png` screenshots and prints the `dsh-web.log` tail.

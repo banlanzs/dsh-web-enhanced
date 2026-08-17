@@ -70,10 +70,17 @@ jobs:
           }
 
       # no-key smoke：隔离 DSH_HOME + 精确宿主二进制 + 固定端口，绝不触碰
-      # 任何活跃实例；宿主二进制必须位于本次 checkout 内。
+      # 任何活跃实例；宿主二进制必须位于本次 checkout 内。必须从 tarball
+      # 安装，link: 会让 peer 依赖从插件真实路径解析出第二份协议模块，remote
+      # 描述符因此对宿主网关不可见。
       - name: Smoke e2e (no model key)
         run: |
-          node scripts/e2e.mjs --smoke --install link --port 3190
+          TARBALL_NAME="$(npm pack --silent)"
+          TARBALL_PATH="$GITHUB_WORKSPACE/$TARBALL_NAME"
+          TARBALL_SHA="$(sha256sum "$TARBALL_PATH")"
+          TARBALL_SHA="${TARBALL_SHA%% *}"
+          node scripts/e2e.mjs --smoke --install tarball \
+            --tarball "$TARBALL_PATH" --tarball-sha256 "$TARBALL_SHA" --port 3190
         env:
           DSH_ROOT: ${{ github.workspace }}/../../.dsh/source/current
           DSH_BIN: ${{ github.workspace }}/../../.dsh/source/current/apps/cli/lib/bin.js

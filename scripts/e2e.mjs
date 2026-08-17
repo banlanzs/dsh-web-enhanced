@@ -9,10 +9,9 @@
  * 截图保留到当前目录；清理在 finally 中完成，只杀自己起的进程组。
  *
  * 用法：
- *   node scripts/e2e.mjs [--port 3190] [--keep] [--install link|git|tarball]
+ *   node scripts/e2e.mjs [--port 3190] [--keep] --install git|tarball
  *                        [--tarball <路径> --tarball-sha256 <sha>] [--capture] [--smoke]
  *
- *   --install link    （默认）装当前工作区，测的就是当前代码
  *   --install git     从 git URL 安装（公开仓库）
  *   --install tarball 必须给 --tarball 绝对路径与 --tarball-sha256（防假安装）
  *   --capture         把四块 UI 截图保存到 assets/（board.png graph.png panel.png balance.png）
@@ -40,12 +39,15 @@ const DSH_ROOT = process.env.DSH_ROOT ?? resolve(process.env.HOME ?? '', '.dsh/s
 const DSH_BIN = process.env.DSH_BIN ?? join(DSH_ROOT, 'apps/cli/lib/bin.js')
 if (!resolve(DSH_BIN).startsWith('/')) fail('DSH_BIN 必须是绝对路径')
 if (!existsSync(DSH_BIN)) fail(`DSH_BIN 不存在: ${DSH_BIN}（在 DSH_ROOT 内先 pnpm run build）`)
-const arg = (name) => process.argv[process.argv.indexOf(name) + 1]
+const arg = (name) => {
+  const index = process.argv.indexOf(name)
+  return index === -1 ? undefined : process.argv[index + 1]
+}
 const PORT = Number(arg('--port') ?? 3190)
 const KEEP = process.argv.includes('--keep')
 const CAPTURE = process.argv.includes('--capture')
 const SMOKE = process.argv.includes('--smoke')
-const INSTALL = arg('--install') ?? 'link'
+const INSTALL = arg('--install')
 const TARBALL = arg('--tarball')
 const TARBALL_SHA = arg('--tarball-sha256')
 const GIT_URL = 'git+https://github.com/banlanzs/dsh-web-enhanced.git'
@@ -61,7 +63,9 @@ const UI = {
 }
 
 // ── 预检：参数、端口、工具 ─────────────────────────────────────────────────
-if (!['link', 'git', 'tarball'].includes(INSTALL)) fail(`--install 仅允许 link | git | tarball，收到 "${INSTALL}"`)
+if (!['git', 'tarball'].includes(INSTALL)) {
+  fail(`--install 仅允许 git | tarball，收到 "${String(INSTALL)}"；link 会复制 peer 依赖并使 remote 失效`)
+}
 if (INSTALL === 'tarball') {
   if (!TARBALL || !TARBALL_SHA) fail('tarball 模式必须提供 --tarball <绝对路径> 与 --tarball-sha256 <sha256>')
   if (!resolve(TARBALL).startsWith('/')) fail('--tarball 必须是绝对路径')
@@ -130,14 +134,10 @@ try {
     log('安装插件（git+https，公开仓库）...')
     const r = spawnSync(DSH_BIN, ['plugin', '--profile', 'web', 'add', GIT_URL], { env, stdio: 'inherit' })
     if (r.status !== 0) fail('git URL 安装失败（见上方输出）')
-  } else if (INSTALL === 'tarball') {
+  } else {
     log(`安装插件（tarball ${TARBALL}）...`)
     const r = spawnSync(DSH_BIN, ['plugin', '--profile', 'web', 'add', TARBALL], { env, stdio: 'inherit' })
     if (r.status !== 0) fail('tarball 安装失败（见上方输出）')
-  } else {
-    log('安装插件（link 当前工作区）...')
-    const r = spawnSync(DSH_BIN, ['plugin', '--profile', 'web', 'add', `link:${REPO_ROOT}`], { env, stdio: 'inherit' })
-    if (r.status !== 0) fail('link 安装失败（见上方输出）')
   }
 
   // ── 启动 dsh web（stdout/stderr 真写进 webLog）──────────────────────────

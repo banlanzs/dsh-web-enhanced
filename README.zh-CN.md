@@ -217,8 +217,11 @@ pnpm run check   # typecheck + 全部测试 + 构建（400 个测试，2 个跳�
 
 ```sh
 # 需要宿主构建：DSH_ROOT（默认 ~/.dsh/source/current）内先 pnpm run build
-node scripts/e2e.mjs --smoke --install link --port 3190
-node scripts/e2e.mjs --capture   # 顺带刷新本 README 使用的 assets/*.png
+TARBALL_NAME="$(npm pack --silent)"
+TARBALL_PATH="$PWD/$TARBALL_NAME"
+TARBALL_SHA="$(sha256sum "$TARBALL_PATH")"; TARBALL_SHA="${TARBALL_SHA%% *}"
+node scripts/e2e.mjs --smoke --install tarball --tarball "$TARBALL_PATH" --tarball-sha256 "$TARBALL_SHA" --port 3190
+node scripts/e2e.mjs --capture --install tarball --tarball "$TARBALL_PATH" --tarball-sha256 "$TARBALL_SHA"   # 顺带刷新 assets/*.png
 ```
 
 前置：PATH 上有 `dsh`/`pnpm`，以及主仓 web 构建产物（playwright 从主仓解析）。PASS 退出码 0；失败保留 `e2e-fail-*.png` 截图并打印 `dsh-web.log` 尾部。
