@@ -36,7 +36,7 @@ export type SettingsSectionProps = WebEnhancedProps<'settings.section'>
 type Tab = 'plugins' | 'general' | 'globalPrompt' | 'vision' | 'skins' | 'about'
 
 /** The web-enhanced settings page. */
-export function SettingsSection({ remote, api, t, skin }: SettingsSectionProps) {
+export function SettingsSection({ remote, t, skin }: SettingsSectionProps) {
   const [tab, setTab] = useState<Tab>('plugins')
   const tabs: ReadonlyArray<{ id: Tab; label: string }> = [
     { id: 'plugins', label: t('settings.tab.plugins') },
@@ -65,7 +65,7 @@ export function SettingsSection({ remote, api, t, skin }: SettingsSectionProps) 
       <div className={css.body}>
         {tab === 'plugins' && <PluginManager remote={remote} t={t} />}
         {tab === 'general' && <GeneralSettingsPanel remote={remote} t={t} />}
-        {tab === 'globalPrompt' && <GlobalPromptPanel api={api} t={t} />}
+        {tab === 'globalPrompt' && <GlobalPromptPanel remote={remote} t={t} />}
         {tab === 'vision' && <VisionStatusPanel remote={remote} t={t} />}
         {tab === 'skins' && <SkinPanel skin={skin} t={t} />}
         {tab === 'about' && <AboutPanel t={t} />}

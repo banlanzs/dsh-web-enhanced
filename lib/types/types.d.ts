@@ -765,3 +765,27 @@ export type VisionEndpointModelsResult = VisionEndpointModelsView | {
 export declare const GLOBAL_PROMPT_SETTINGS_NS: "dsh-web-enhanced-global-prompt";
 /** Upper bound on the global prompt text the settings page accepts. */
 export declare const GLOBAL_PROMPT_MAX_CHARS: 100000;
+/** One global-prompt settings read: the effective value plus CAS facts. */
+export interface GlobalPromptConfigView {
+    readonly enabled: boolean;
+    readonly text: string;
+    readonly revision: number | null;
+    readonly writable: boolean;
+}
+export type GlobalPromptGetResult = GlobalPromptConfigView | {
+    readonly error: ApiError;
+};
+/** One global-prompt settings save. */
+export interface GlobalPromptSaveRequest {
+    readonly enabled: boolean;
+    readonly text: string;
+    readonly expectedRevision?: number;
+}
+/** Successful save; `revision` is the new CAS value. */
+export interface GlobalPromptSaveView {
+    readonly ok: true;
+    readonly revision: number;
+}
+export type GlobalPromptSetResult = GlobalPromptSaveView | {
+    readonly error: ApiError;
+};

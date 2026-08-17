@@ -19,4 +19,4 @@ import type { WebEnhancedProps } from '../contract.ts';
 /** Full composed props of the settings section. */
 export type SettingsSectionProps = WebEnhancedProps<'settings.section'>;
 /** The web-enhanced settings page. */
-export declare function SettingsSection({ remote, api, t, skin }: SettingsSectionProps): import("react").JSX.Element;
+export declare function SettingsSection({ remote, t, skin }: SettingsSectionProps): import("react").JSX.Element;

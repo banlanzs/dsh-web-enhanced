@@ -31,7 +31,7 @@ const entry = { name: 'a', path: 'a', kind: 'file', size: 3 }
  * Methods invoked with no argument at all. Everything else takes exactly one
  * request object — see the arity guard below.
  */
-const nullaryMethods = new Set(['taskList', 'visionStatus', 'visionConfigGet', 'modelRetryGet', 'opencodeGoUsageGet'])
+const nullaryMethods = new Set(['taskList', 'visionStatus', 'visionConfigGet', 'modelRetryGet', 'globalPromptGet', 'opencodeGoUsageGet'])
 
 const visionStatusSample = {
   mounted: true,
@@ -191,6 +191,18 @@ const payloads: Record<string, unknown[]> = {
     },
   }, errorPayload],
   modelRetrySet: [{ ok: true, revision: 9 }, errorPayload],
+  globalPromptGet: [{
+    enabled: true,
+    text: 'You are a project engineer.',
+    revision: 5,
+    writable: true,
+  }, {
+    enabled: false,
+    text: '',
+    revision: null,
+    writable: false,
+  }, errorPayload],
+  globalPromptSet: [{ ok: true, revision: 6 }, errorPayload],
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
   gitCommit: [{ commit: commitDetail }, errorPayload],
@@ -294,10 +306,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 37 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 39 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(37)
+    expect(methods).toHaveLength(39)
   })
 
   it('every result schema accepts its success and error payloads', () => {

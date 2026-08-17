@@ -185,6 +185,13 @@ const opencodeGoUsageViewSchema = z.object({
   error: apiErrorSchema.optional(),
 })
 
+const globalPromptConfigViewSchema = z.object({
+  enabled: z.boolean(),
+  text: z.string(),
+  revision: z.number().nullable(),
+  writable: z.boolean(),
+})
+
 const pluginViewSchema = z.object({
   name: z.string(),
   spec: z.string(),
@@ -375,6 +382,11 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
     }),
   }))),
   unary('modelRetrySet', 'ModelRetrySetRequest', 'ModelRetrySetResult', okOrError(z.object({
+    ok: z.literal(true),
+    revision: z.number(),
+  }))),
+  nullary('globalPromptGet', 'GlobalPromptGetResult', okOrError(globalPromptConfigViewSchema)),
+  unary('globalPromptSet', 'GlobalPromptSaveRequest', 'GlobalPromptSetResult', okOrError(z.object({
     ok: z.literal(true),
     revision: z.number(),
   }))),

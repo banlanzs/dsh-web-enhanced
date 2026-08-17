@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitCommitDiffRequest, GitCommitDiffResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult, ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitCommitDiffRequest, GitCommitDiffResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, GlobalPromptGetResult, GlobalPromptSaveRequest, GlobalPromptSetResult, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult, ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
 /** One fallback vision endpoint entry, as declared in plugin config. */
 export interface VisionFallbackConfig {
     model: string;
@@ -154,6 +154,20 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     /** Save a bounded retry count into the DeepSeek provider settings. */
     modelRetrySet(request: ModelRetrySetRequest): Promise<ModelRetrySetResult>;
     /**
+     * Read the global-prompt settings namespace. Served through this plugin's
+     * own Typert gateway rather than the host settings RPCs: a plugin-owned
+     * namespace is not on the api-proxy settings allowlist, so the browser
+     * `settings.describe` would never list it.
+     */
+    globalPromptGet(): Promise<GlobalPromptGetResult>;
+    /**
+     * Save the two global-prompt fields into the settings namespace. The
+     * registered section text is read per assembly, so the next model request
+     * uses the saved value without a restart; `expectedRevision` gives the save
+     * CAS semantics.
+     */
+    globalPromptSet(request: GlobalPromptSaveRequest): Promise<GlobalPromptSetResult>;
+    /**
      * Fetch the dedicated endpoint's `/models` listing. A typed key is one-shot
      * for this call; otherwise the SAVED key (or its env fallback) is used. The
      * key is never stored, logged, or returned.
@@ -225,6 +239,8 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     private visionSettings;
     /** The settings provider the model-retry remotes read and write. */
     private modelRetrySettings;
+    /** The settings provider the global-prompt remotes read and write. */
+    private globalPromptSettings;
     /** The live integration status, or the explicit unmounted state. */
     private visionStatusView;
     /** Providers and models for the Vision tab, from the model picker's source. */

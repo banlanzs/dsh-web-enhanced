@@ -93,6 +93,8 @@ export function createRemoteFacade(
     visionEndpointModels: async request => open(await raw.visionEndpointModels(request)),
     modelRetryGet: async () => open(await raw.modelRetryGet()),
     modelRetrySet: async request => open(await raw.modelRetrySet(request)),
+    globalPromptGet: async () => open(await raw.globalPromptGet()),
+    globalPromptSet: async request => open(await raw.globalPromptSet(request)),
     gitBranches: async request => open(await raw.gitBranches(request)),
     gitLog: async request => open(await raw.gitLog(request)),
     gitCommit: async request => open(await raw.gitCommit(request)),

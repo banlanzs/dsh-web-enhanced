@@ -9,7 +9,6 @@
 import type {
   InjectFace, PropsLocale, PropsRuntime, SlotMap,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import type {
   BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult,
   FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest,
@@ -21,6 +20,7 @@ import type {
   GitDiffRequest, GitDiffResult,
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
+  GlobalPromptGetResult, GlobalPromptSaveRequest, GlobalPromptSetResult,
   ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
   ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView,
   OfficeBlock, OfficeKind, PluginListRequest,
@@ -65,6 +65,8 @@ export interface WebEnhancedRemote {
   visionEndpointModels(request: VisionEndpointModelsRequest): Promise<VisionEndpointModelsResult>
   modelRetryGet(): Promise<ModelRetryGetResult>
   modelRetrySet(request: ModelRetrySetRequest): Promise<ModelRetrySetResult>
+  globalPromptGet(): Promise<GlobalPromptGetResult>
+  globalPromptSet(request: GlobalPromptSaveRequest): Promise<GlobalPromptSetResult>
   gitBranches(request: GitBranchesRequest): Promise<GitBranchesResult>
   gitLog(request: GitLogRequest): Promise<GitLogResult>
   gitCommit(request: GitCommitRequest): Promise<GitCommitResult>
@@ -103,6 +105,8 @@ export type {
   GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusEntry,
   GitStatusRequest, GitStatusResult, GitWorkingFileView, GitWorkingRequest, GitWorkingResult,
   GitWorkingState, GitWorkingView,
+  GlobalPromptConfigView, GlobalPromptGetResult, GlobalPromptSaveRequest,
+  GlobalPromptSaveView, GlobalPromptSetResult,
   ModelRetryConfigView, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
   ModelRouteDescribeRequest, ModelRouteDescribeResult, ModelRouteDescribeView,
   OpencodeGoUsageView, OpencodeGoWindow,
@@ -227,11 +231,6 @@ export interface ModelRouteFace {
 export interface WebEnhancedInject extends OverlayActions, BrowseActions, PanelActions, PreviewActions {
   /** Host capabilities of this plugin's Typert namespace. */
   readonly remote: WebEnhancedRemote
-  /**
-   * Settings wire face for pages that edit their own namespaces directly
-   * (the Global Prompt tab) through the standard settings RPCs.
-   */
-  readonly api: Pick<IApiClient, 'settings'>
   /**
    * Make one session current (the task board's "jump to the run" gesture).
    * @param sessionId - a session id the host minted.

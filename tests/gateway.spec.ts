@@ -12,6 +12,7 @@ import { remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
 import { MemoryMediaPool, MemoryStorageBackend } from './helpers/memory-backend.ts'
 import { taskRecordSchema } from '../src/schemas.ts'
 import type { TaskId, TaskRecord, VisionConfigPatch } from '../src/types.ts'
+import { GLOBAL_PROMPT_SETTINGS_NS } from '../src/types.ts'
 import { WebEnhancedGateway } from '../src/index.ts'
 import { FakeSubprocess } from './helpers/fake-subprocess.ts'
 
@@ -228,7 +229,8 @@ describe('WebEnhancedGateway', () => {
     expect(remoteMethods(gateway).map(entry => entry.method)).toEqual([
       'taskList', 'taskCreate', 'taskUpdate', 'taskRemove', 'taskRun', 'balanceGet', 'pricingGet',
       'modelRouteDescribe', 'deepseekRateGet', 'opencodeGoUsageGet',
-      'visionStatus', 'visionConfigGet', 'visionConfigSet', 'modelRetryGet', 'modelRetrySet', 'visionEndpointModels',
+      'visionStatus', 'visionConfigGet', 'visionConfigSet', 'modelRetryGet', 'modelRetrySet',
+      'globalPromptGet', 'globalPromptSet', 'visionEndpointModels',
       'gitBranches', 'gitLog', 'gitCommit', 'gitCommitDiff', 'gitWorking', 'gitCheckout', 'gitStatus', 'gitDiff',
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',
@@ -812,6 +814,66 @@ describe('WebEnhancedGateway', () => {
 
       vi.unstubAllGlobals()
       expect(await gateway.visionEndpointModels({})).toMatchObject({ error: { code: 'vision-endpoint-missing' } })
+    })
+  })
+
+  describe('global prompt remote', () => {
+    it('answers global-prompt-settings-unavailable when no settings service is mounted', async () => {
+      const { gateway } = await harness()
+      expect(await gateway.globalPromptGet()).toMatchObject({ error: { code: 'global-prompt-settings-unavailable' } })
+      expect(await gateway.globalPromptSet({ enabled: true, text: 'x' }))
+        .toMatchObject({ error: { code: 'global-prompt-settings-unavailable' } })
+    })
+
+    it('reads the namespace and saves both fields with CAS through the plugin gateway', async () => {
+      const { ctx, gateway } = await harness()
+      const sections: Record<string, Record<string, unknown>> = {
+        [GLOBAL_PROMPT_SETTINGS_NS]: { enabled: false, text: '' },
+      }
+      const update = vi.fn(async (_ns: unknown, patch: object) => {
+        sections[GLOBAL_PROMPT_SETTINGS_NS] = { ...sections[GLOBAL_PROMPT_SETTINGS_NS], ...patch }
+      })
+      ctx.provide('settings' as never, {
+        get: (ns: unknown) => sections[String(ns)],
+        describe: () => [{ ns: GLOBAL_PROMPT_SETTINGS_NS, revision: 4 }],
+        update,
+        writable: true,
+      } as never)
+
+      const view = await gateway.globalPromptGet()
+      if ('error' in view) throw new Error(view.error.message)
+      expect(view).toEqual({ enabled: false, text: '', revision: 4, writable: true })
+
+      const saved = await gateway.globalPromptSet({
+        enabled: true,
+        text: 'You are a project engineer.',
+        expectedRevision: 4,
+      })
+      expect(saved).toEqual({ ok: true, revision: 4 })
+      expect(update).toHaveBeenCalledWith(GLOBAL_PROMPT_SETTINGS_NS, {
+        enabled: true,
+        text: 'You are a project engineer.',
+      }, 4)
+      expect(sections[GLOBAL_PROMPT_SETTINGS_NS]).toMatchObject({
+        enabled: true,
+        text: 'You are a project engineer.',
+      })
+    })
+
+    it('rejects invalid fields and surfaces a settings CAS conflict', async () => {
+      const { ctx, gateway } = await harness()
+      ctx.provide('settings' as never, {
+        get: () => ({ enabled: false, text: '' }),
+        describe: () => [{ ns: GLOBAL_PROMPT_SETTINGS_NS, revision: 1 }],
+        update: async () => { throw Object.assign(new Error('conflict'), { code: 'SETTINGS_CONFLICT' }) },
+        writable: true,
+      } as never)
+      expect(await gateway.globalPromptSet({ enabled: true, text: 'x'.repeat(100_001) }))
+        .toMatchObject({ error: { code: 'global-prompt-too-long' } })
+      expect(await gateway.globalPromptSet({ enabled: 'yes', text: '' } as never))
+        .toMatchObject({ error: { code: 'global-prompt-invalid' } })
+      expect(await gateway.globalPromptSet({ enabled: true, text: 'x', expectedRevision: 0 }))
+        .toMatchObject({ error: { code: 'global-prompt-config-conflict' } })
     })
   })
 

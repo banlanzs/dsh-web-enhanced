@@ -2,30 +2,27 @@
  * Global Prompt tab of the plugin's Settings page.
  *
  * The namespace is owned and schema-registered by the host half
- * (`src/global-prompt.ts`); this tab only reads the redacted user layer and
- * writes the two top-level keys through the standard `settings.mutate` CAS
- * RPC. The host section's text provider re-reads the resolved value on every
- * prompt assembly, so a successful save reaches the next model request
- * without a restart.
+ * (`src/global-prompt.ts`). Reads and writes go through this plugin's own
+ * Typert gateway (`globalPromptGet` / `globalPromptSet`), not the host
+ * `settings.describe` RPCs: a plugin-owned namespace is not on the
+ * api-proxy settings allowlist, so the generic browser settings RPCs would
+ * never list it. The host section's text provider re-reads the resolved
+ * value on every prompt assembly, so a successful save reaches the next
+ * model request without a restart.
  * @module dsh-web-enhanced/src/client/global-prompt/GlobalPromptPanel
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
-import { GLOBAL_PROMPT_MAX_CHARS, GLOBAL_PROMPT_SETTINGS_NS } from '../../types.ts'
+import { GLOBAL_PROMPT_MAX_CHARS } from '../../types.ts'
+import type { WebEnhancedRemote } from '../contract.ts'
 import type { Translate } from '../locale-keys.ts'
-import {
-  applyDraft, messageOf, recordOf,
-} from '../model-capabilities/settings-draft.ts'
-import {
-  globalPromptDraftOf, globalPromptRecordOf, validateGlobalPromptDraft,
-} from './draft.ts'
+import { validateGlobalPromptDraft } from './draft.ts'
 import type { GlobalPromptDraft } from './draft.ts'
 import css from './GlobalPromptPanel.module.css'
 
 /** Props of the tab (a plain child of the plugin's Settings section). */
 export interface GlobalPromptPanelProps {
-  readonly api: Pick<IApiClient, 'settings'>
+  readonly remote: WebEnhancedRemote
   readonly t: Translate
 }
 
@@ -33,7 +30,7 @@ export interface GlobalPromptPanelProps {
 type Phase = 'loading' | 'ready' | 'error'
 
 /** The Global Prompt tab: one switch, one text block, CAS save. */
-export function GlobalPromptPanel({ api, t }: GlobalPromptPanelProps) {
+export function GlobalPromptPanel({ remote, t }: GlobalPromptPanelProps) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [loadError, setLoadError] = useState('')
   const [writable, setWritable] = useState(false)
@@ -45,30 +42,28 @@ export function GlobalPromptPanel({ api, t }: GlobalPromptPanelProps) {
   const [saveError, setSaveError] = useState('')
   const generation = useRef(0)
 
-  /** Read the namespace view and anchor the draft on its current user layer. */
+  /** Read the gateway's view of the namespace and anchor the draft on it. */
   const load = useCallback(async () => {
     const current = ++generation.current
     setPhase('loading')
     setLoadError('')
     setSaved(false)
     try {
-      const response = await api.settings.describe({})
-      if (!response.result.ok) throw new Error(response.result.error.message)
-      const view = response.result.value.namespaces.find(entry => entry.ns === GLOBAL_PROMPT_SETTINGS_NS)
-      if (view === undefined) throw new Error(t('globalPrompt.namespaceMissing'))
-      const next = globalPromptDraftOf(recordOf(view.user))
+      const result = await remote.globalPromptGet()
+      if ('error' in result) throw new Error(result.error.message)
+      const next: GlobalPromptDraft = { enabled: result.enabled, text: result.text }
       if (current !== generation.current) return
-      setWritable(response.result.value.writable)
-      setRevision(view.revision)
+      setWritable(result.writable)
+      setRevision(result.revision)
       setBase(next)
       setDraft(next)
       setPhase('ready')
     } catch (error) {
       if (current !== generation.current) return
-      setLoadError(messageOf(error))
+      setLoadError(error instanceof Error ? error.message : String(error))
       setPhase('error')
     }
-  }, [api, t])
+  }, [remote])
 
   useEffect(() => {
     void load()
@@ -89,23 +84,20 @@ export function GlobalPromptPanel({ api, t }: GlobalPromptPanelProps) {
       setSaving(false)
       return
     }
-    const result = await applyDraft({
-      api,
-      ns: GLOBAL_PROMPT_SETTINGS_NS,
-      path: [],
-      before: globalPromptRecordOf(base),
-      after: globalPromptRecordOf(draft),
+    const result = await remote.globalPromptSet({
+      enabled: draft.enabled,
+      text: draft.text,
       expectedRevision: revision,
-      conflictText: t('globalPrompt.conflict'),
     })
-    if (result.ok) {
-      const committed = globalPromptDraftOf(recordOf(result.committed))
-      setBase(committed)
-      setDraft(committed)
+    if ('error' in result) {
+      setSaveError(result.error.code === 'global-prompt-config-conflict'
+        ? t('globalPrompt.conflict')
+        : result.error.message)
+    } else {
+      setBase(draft)
+      setDraft(draft)
       setRevision(result.revision)
       setSaved(true)
-    } else {
-      setSaveError(result.failure)
     }
     setSaving(false)
   }

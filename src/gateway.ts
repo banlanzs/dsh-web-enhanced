@@ -32,6 +32,8 @@ import type { LlmNamesFace } from './model-names.ts'
 import { OpencodeGoUsageClient } from './opencode-go.ts'
 import { classifyVisionHttpError, DEFAULT_VISION_MARKER, DEFAULT_VISION_PROMPT, resolveVisionApiKey, VISION_SETTINGS_NS } from './vision.ts'
 import type { VisionSettingsValue } from './vision.ts'
+import type { GlobalPromptSettingsValue } from './global-prompt.ts'
+import { GLOBAL_PROMPT_MAX_CHARS, GLOBAL_PROMPT_SETTINGS_NS } from './types.ts'
 import type {
   ApiError, BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult,
   FsBrowseRequest, FsBrowseResult, FsDeleteRequest,
@@ -43,6 +45,7 @@ import type {
   GitDiffRequest, GitDiffResult,
   GitLogRequest, GitLogResult, GitMutateRequest,
   GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult,
+  GlobalPromptConfigView, GlobalPromptGetResult, GlobalPromptSaveRequest, GlobalPromptSetResult,
   ModelRetryConfigView, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult,
   ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView,
   PluginListRequest, PluginListResult,
@@ -646,6 +649,74 @@ export class WebEnhancedGateway extends TypertRemoteService {
   }
 
   /**
+   * Read the global-prompt settings namespace. Served through this plugin's
+   * own Typert gateway rather than the host settings RPCs: a plugin-owned
+   * namespace is not on the api-proxy settings allowlist, so the browser
+   * `settings.describe` would never list it.
+   */
+  @Remote('globalPromptGet')
+  async globalPromptGet(): Promise<GlobalPromptGetResult> {
+    try {
+      const settings = this.globalPromptSettings()
+      if (settings === undefined) {
+        return { error: { code: 'global-prompt-settings-unavailable', message: 'the settings service is not mounted in this deployment' } }
+      }
+      const raw = settings.get(GLOBAL_PROMPT_SETTINGS_NS as never) as GlobalPromptSettingsValue | undefined
+      if (raw === undefined || typeof raw !== 'object') {
+        return { error: { code: 'global-prompt-settings-unmanaged', message: `settings namespace '${GLOBAL_PROMPT_SETTINGS_NS}' is not registered` } }
+      }
+      const descriptor = settings.describe().find(entry => entry.ns === GLOBAL_PROMPT_SETTINGS_NS)
+      const view: GlobalPromptConfigView = {
+        enabled: raw.enabled === true,
+        text: typeof raw.text === 'string' ? raw.text : '',
+        revision: descriptor?.revision ?? null,
+        writable: settings.writable,
+      }
+      return view
+    } catch (error) {
+      return { error: this.errorOf(error, 'global-prompt-config') }
+    }
+  }
+
+  /**
+   * Save the two global-prompt fields into the settings namespace. The
+   * registered section text is read per assembly, so the next model request
+   * uses the saved value without a restart; `expectedRevision` gives the save
+   * CAS semantics.
+   */
+  @Remote('globalPromptSet')
+  async globalPromptSet(request: GlobalPromptSaveRequest): Promise<GlobalPromptSetResult> {
+    try {
+      if (typeof request.enabled !== 'boolean' || typeof request.text !== 'string') {
+        return { error: { code: 'global-prompt-invalid', message: 'enabled must be a boolean and text must be a string' } }
+      }
+      if (request.text.length > GLOBAL_PROMPT_MAX_CHARS) {
+        return { error: { code: 'global-prompt-too-long', message: `text exceeds the ${String(GLOBAL_PROMPT_MAX_CHARS)}-character limit` } }
+      }
+      const settings = this.globalPromptSettings()
+      if (settings === undefined) {
+        return { error: { code: 'global-prompt-settings-unavailable', message: 'the settings service is not mounted in this deployment' } }
+      }
+      if (!settings.writable) {
+        return { error: { code: 'global-prompt-settings-readonly', message: 'the settings provider is read-only' } }
+      }
+      const raw = settings.get(GLOBAL_PROMPT_SETTINGS_NS as never)
+      if (raw === undefined) {
+        return { error: { code: 'global-prompt-settings-unmanaged', message: `settings namespace '${GLOBAL_PROMPT_SETTINGS_NS}' is not registered` } }
+      }
+      await settings.update(GLOBAL_PROMPT_SETTINGS_NS as never, {
+        enabled: request.enabled,
+        text: request.text,
+      }, request.expectedRevision)
+      const revision = settings.describe().find(entry => entry.ns === GLOBAL_PROMPT_SETTINGS_NS)?.revision ?? 0
+      return { ok: true, revision }
+    } catch (error) {
+      const conflict = (error as { code?: unknown }).code === 'SETTINGS_CONFLICT'
+      return { error: this.errorOf(error, conflict ? 'global-prompt-config-conflict' : 'global-prompt-config-save') }
+    }
+  }
+
+  /**
    * Fetch the dedicated endpoint's `/models` listing. A typed key is one-shot
    * for this call; otherwise the SAVED key (or its env fallback) is used. The
    * key is never stored, logged, or returned.
@@ -966,6 +1037,11 @@ export class WebEnhancedGateway extends TypertRemoteService {
 
   /** The settings provider the model-retry remotes read and write. */
   private modelRetrySettings(): SettingsVisionFace | undefined {
+    return this.ctx.get('settings' as never, false) as unknown as SettingsVisionFace | undefined
+  }
+
+  /** The settings provider the global-prompt remotes read and write. */
+  private globalPromptSettings(): SettingsVisionFace | undefined {
     return this.ctx.get('settings' as never, false) as unknown as SettingsVisionFace | undefined
   }
 

@@ -332,7 +332,6 @@ export function apply(ctx: ClientContext): void {
 
         const face = (): WebEnhancedInject => ({
           remote,
-          api: connection.api,
           modelRoute,
           appendMention: (sessionId, text) => { appendMentionTo(ctx, sessionId, text) },
           openSession: (sessionId) => {
