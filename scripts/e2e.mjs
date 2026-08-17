@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * dsh-web-enhanced 真机 e2e（无模型 key）：真实 dsh web + 插件 → 浏览器断言
- * 四块 UI —— 侧边栏「任务看板 / Git 图谱」入口、看板覆盖层、图谱覆盖层、会话页
- * 浮动面板（预览/文件/变更）与输入框下余额行。全程走真实链路，不 mock 任何环节，
+ * 四块 UI —— 会话「工作区」视图里的资源管理器/预览、任务看板、Git 图谱，
+ * 以及输入框下余额行。全程走真实链路，不 mock 任何环节，
  * 任何断言都不需要 DEEPSEEK_API_KEY（余额无 key 时渲染弱化错误态）。
  *
  * 失败日志可读：web 的 stdout/stderr 真写进 dsh-web.log，失败时输出日志尾部，
@@ -52,15 +52,12 @@ const GIT_URL = 'git+https://github.com/banlanzs/dsh-web-enhanced.git'
 
 // ── 文案（产品语言 zh，en 镜像；断言同时接受两者）─────────────────────────
 const UI = {
-  boardEntry: ['任务看板', 'Task board'],
-  graphEntry: ['Git 图谱', 'Git graph'],
-  close: ['关闭', 'Close'],
+  workspaceView: ['工作区', 'Workspace'],
   newSession: ['新会话', 'New session'],
   boardColumns: [
     ['待规划', 'Planned'], ['待办', 'To do'], ['进行中', 'Running'],
     ['已完成', 'Done'], ['已失败', 'Failed'],
   ],
-  panelTabs: [['预览', 'Preview'], ['文件', 'Files'], ['变更', 'Changes']],
 }
 
 // ── 预检：参数、端口、工具 ─────────────────────────────────────────────────
@@ -201,77 +198,7 @@ try {
   }
   log(`✓ client.js ${clientRes.status}`)
 
-  // ── 断言 1: 侧边栏入口 ──────────────────────────────────────────────────
-  // testid 优先，文案回退：侧边栏收起成 56px 轨道时入口只剩图标，label 根本
-  // 不进 DOM（见 SidebarEntry 的 rail 分支），此时文案匹配必然落空，而入口
-  // 其实渲染正常。覆盖层/悬浮面板/余额行早已按 testid 断言，这里保持一致。
-  const boardEntry = await waitForEntry(page, 'web-enhanced-board-entry', UI.boardEntry, 30000)
-  if (boardEntry === null) {
-    await screenshot('e2e-fail-sidebar.png')
-    await logTail()
-    const diag = await page.evaluate(() => {
-      const ours = [...document.querySelectorAll('[data-testid]')]
-        .map(el => el.getAttribute('data-testid'))
-        .filter(id => id !== null && id.includes('web-enhanced'))
-      const styles = [...document.querySelectorAll('style[data-plugin]')]
-        .map(el => el.getAttribute('data-plugin'))
-      return {
-        ours,
-        styles: [...new Set(styles)],
-        testIds: [...document.querySelectorAll('[data-testid]')].length,
-      }
-    }).catch(() => null)
-    log(`诊断：插件 testid=${JSON.stringify(diag?.ours ?? 'n/a')} 注入样式=${JSON.stringify(diag?.styles ?? 'n/a')} 页面 testid 总数=${String(diag?.testIds ?? 'n/a')}`)
-    fail(`侧边栏 30s 内未出现「任务看板」入口（pageerrors: ${pageErrors.slice(0, 3).join(' | ') || '无'}）`)
-  }
-  const graphEntry = await waitForEntry(page, 'web-enhanced-graph-entry', UI.graphEntry, 10000)
-  if (graphEntry === null) {
-    await screenshot('e2e-fail-sidebar.png')
-    await logTail()
-    fail(`侧边栏 10s 内未出现「Git 图谱」入口`)
-  }
-  log('✓ 侧边栏入口：任务看板 + Git 图谱')
-
-  // ── 断言 2: 看板覆盖层 ──────────────────────────────────────────────────
-  await boardEntry.click()
-  const boardOverlay = page.locator('[data-testid="board-overlay"]')
-  await boardOverlay.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
-  if (!(await boardOverlay.isVisible().catch(() => false))) {
-    await screenshot('e2e-fail-board.png')
-    await logTail()
-    fail('点击「任务看板」后 15s 内未出现看板覆盖层')
-  }
-  for (const col of UI.boardColumns) {
-    const found = await hasAnyText(boardOverlay, col, 5000)
-    if (!found) {
-      await screenshot('e2e-fail-board.png')
-      await logTail()
-      fail(`看板覆盖层缺少列「${col[0]}」`)
-    }
-  }
-  log('✓ 看板覆盖层：五列齐全')
-  if (CAPTURE) {
-    await mkdir(assetsDir, { recursive: true }).catch(() => {})
-    await page.screenshot({ path: join(assetsDir, 'board.png') })
-  }
-  await closeOverlay(page, boardOverlay, 'board')
-
-  // ── 断言 3: 图谱覆盖层 ──────────────────────────────────────────────────
-  await graphEntry.click()
-  const graphOverlay = page.locator('[data-testid="graph-overlay"]')
-  await graphOverlay.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
-  if (!(await graphOverlay.isVisible().catch(() => false))) {
-    await screenshot('e2e-fail-graph.png')
-    await logTail()
-    fail('点击「Git 图谱」后 15s 内未出现图谱覆盖层')
-  }
-  log('✓ 图谱覆盖层已打开')
-  if (CAPTURE) {
-    await page.screenshot({ path: join(assetsDir, 'graph.png') })
-  }
-  await closeOverlay(page, graphOverlay, 'graph')
-
-  // ── 断言 4: 会话页 —— 浮动面板 + 余额行 ────────────────────────────────
+  // ── 断言 1: 新会话进入工作区视图 ────────────────────────────────────────
   const newSession = await waitForText(page, UI.newSession, 10000)
   if (newSession === null) {
     await screenshot('e2e-fail-newsession.png')
@@ -281,36 +208,35 @@ try {
   await newSession.click().catch(() => {})
   await page.waitForTimeout(1500)
 
-  // 浮动面板（conversation.input.dock，需要会话挂到预置工作区）
-  const floatingPanel = page.locator('[data-testid="floating-panel"]')
-  await floatingPanel.waitFor({ state: 'visible', timeout: 45000 }).catch(() => {})
-  if (!(await floatingPanel.isVisible().catch(() => false))) {
-    await screenshot('e2e-fail-panel.png')
+  const workspaceTab = await waitForTab(page, UI.workspaceView, 30000)
+  if (workspaceTab === null) {
+    await screenshot('e2e-fail-workspace-tab.png')
     await logTail()
-    fail('新会话 45s 内未出现浮动面板（会话未挂到预置工作区？）')
+    await logPluginDiagnostics(page, pageErrors)
+    fail('新会话 30s 内未出现「工作区」视图标签')
   }
-  for (const tab of UI.panelTabs) {
-    const found = await hasAnyText(floatingPanel, tab, 5000)
-    if (!found) {
-      await screenshot('e2e-fail-panel.png')
-      await logTail()
-      fail(`浮动面板缺少标签「${tab[0]}」`)
-    }
+  await workspaceTab.click()
+  const workspaceView = page.locator('[data-testid="workspace-view"]')
+  await workspaceView.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
+  if (!(await workspaceView.isVisible().catch(() => false))) {
+    await screenshot('e2e-fail-workspace-view.png')
+    await logTail()
+    fail('点击「工作区」后 15s 内未出现工作区视图（会话未挂到预置工作区？）')
   }
-  log('✓ 浮动面板：预览 / 文件 / 变更')
+  log('✓ 会话工作区视图已打开')
 
   // 文件树 → 预览真实链路：点击工作区根目录的 README.md，断言 markdown
   // 预览出现（文件树 fsList → 文件打开 fsRead → 预览渲染，全程不 mock）。
-  const readmeRow = floatingPanel.locator('[data-testid="file-row"]').filter({ hasText: 'README.md' }).first()
+  const readmeRow = workspaceView.locator('[data-testid="file-row"]').filter({ hasText: 'README.md' }).first()
   await readmeRow.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {})
   if (!(await readmeRow.isVisible().catch(() => false))) {
     await screenshot('e2e-fail-filetree.png')
     await logTail()
-    fail('浮动面板文件树 20s 内未出现 README.md（工作区根未列出？）')
+    fail('工作区文件树 20s 内未出现 README.md（工作区根未列出？）')
   }
   await readmeRow.click()
   await page.waitForTimeout(2000)
-  const markdownHeading = floatingPanel.getByRole('heading', { name: /dsh-web-enhanced/ }).first()
+  const markdownHeading = workspaceView.getByRole('heading', { name: /dsh-web-enhanced/ }).first()
   await markdownHeading.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
   if (!(await markdownHeading.isVisible().catch(() => false))) {
     await screenshot('e2e-fail-preview.png')
@@ -321,6 +247,47 @@ try {
   if (CAPTURE) {
     await page.screenshot({ path: join(assetsDir, 'panel.png') })
   }
+
+  // ── 断言 2: 工作区任务看板 ──────────────────────────────────────────────
+  const boardTab = workspaceView.locator('[data-testid="workspace-view-tab-board"]')
+  await boardTab.click()
+  const boardPanel = workspaceView.locator('[data-testid="board-panel"]')
+  await boardPanel.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
+  if (!(await boardPanel.isVisible().catch(() => false))) {
+    await screenshot('e2e-fail-board.png')
+    await logTail()
+    fail('点击工作区「任务看板」标签后 15s 内未出现看板面板')
+  }
+  for (const col of UI.boardColumns) {
+    const found = await hasAnyText(boardPanel, col, 5000)
+    if (!found) {
+      await screenshot('e2e-fail-board.png')
+      await logTail()
+      fail(`看板面板缺少列「${col[0]}」`)
+    }
+  }
+  log('✓ 工作区任务看板：五列齐全')
+  if (CAPTURE) {
+    await mkdir(assetsDir, { recursive: true }).catch(() => {})
+    await page.screenshot({ path: join(assetsDir, 'board.png') })
+  }
+
+  // ── 断言 3: 工作区 Git 图谱 ─────────────────────────────────────────────
+  const graphTab = workspaceView.locator('[data-testid="workspace-view-tab-graph"]')
+  await graphTab.click()
+  const graphPanel = workspaceView.locator('[data-testid="graph-panel"]')
+  await graphPanel.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
+  if (!(await graphPanel.isVisible().catch(() => false))) {
+    await screenshot('e2e-fail-graph.png')
+    await logTail()
+    fail('点击工作区「Git 图谱」标签后 15s 内未出现图谱面板')
+  }
+  log('✓ 工作区 Git 图谱已打开')
+  if (CAPTURE) {
+    await page.screenshot({ path: join(assetsDir, 'graph.png') })
+  }
+
+  // ── 断言 4: 输入框下余额行 ──────────────────────────────────────────────
 
   // 余额行（conversation.composer.dock；无 key 时渲染错误态，有 key 渲染数值）
   const balanceLine = page.locator('[data-testid="balance-line"]')
@@ -352,7 +319,7 @@ try {
     fail(`页面异常: ${pageErrors.slice(0, 3).join(' | ')}`)
   }
 
-  console.log('PASS 真机 e2e 通过（无模型 key）：安装 → 侧边栏入口 → 看板 → 图谱 → 浮动面板 → 余额行')
+  console.log('PASS 真机 e2e 通过（无模型 key）：安装 → 新会话 → 工作区预览 → 看板 → 图谱 → 余额行')
   await browser.close()
   await cleanup()
   process.exit(0)
@@ -379,30 +346,30 @@ async function waitForText(page, variants, timeoutMs) {
   return null
 }
 
-/**
- * 等待一个侧边栏入口出现：先按 testid，再按文案回退。
- *
- * 入口在收起的 56px 轨道里只渲染图标（label 不进 DOM），所以文案匹配会漏报
- * 一个其实正常的入口；testid 两种形态都在。文案回退保留，是为了兼容还没有
- * testid 的旧构建。
- * @param page - playwright page。
- * @param testId - 入口按钮的 data-testid。
- * @param variants - 中英文案，testid 落空时回退匹配。
- * @param timeoutMs - 总超时。
- * @returns 命中的 locator，超时返回 null。
- */
-async function waitForEntry(page, testId, variants, timeoutMs) {
+/** 轮询等待任一命名的 tab 出现，返回 locator（zh/en 任一），超时返回 null。 */
+async function waitForTab(page, variants, timeoutMs) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    const byId = page.locator(`[data-testid="${testId}"]`).first()
-    if (await byId.isVisible().catch(() => false)) return byId
     for (const v of variants) {
-      const loc = page.getByText(v, { exact: false }).first()
+      const loc = page.getByRole('tab', { name: v, exact: true }).first()
       if (await loc.isVisible().catch(() => false)) return loc
     }
     await new Promise(r => setTimeout(r, 500))
   }
   return null
+}
+
+/** 输出插件加载诊断，区分 bundle 未执行、apply 未完成和 UI 选择器漂移。 */
+async function logPluginDiagnostics(page, pageErrors) {
+  const diag = await page.evaluate(() => {
+    const testIds = [...document.querySelectorAll('[data-testid]')]
+      .map(el => el.getAttribute('data-testid'))
+      .filter(id => id !== null && (id.includes('web-enhanced') || id.includes('workspace-view')))
+    const styles = [...document.querySelectorAll('style[data-plugin]')]
+      .map(el => el.getAttribute('data-plugin'))
+    return { testIds, styles: [...new Set(styles)] }
+  }).catch(() => null)
+  log(`诊断：插件 testid=${JSON.stringify(diag?.testIds ?? 'n/a')} 注入样式=${JSON.stringify(diag?.styles ?? 'n/a')} pageerrors=${JSON.stringify(pageErrors.slice(0, 3))}`)
 }
 
 /** 容器内是否出现任一文案（最多轮询 timeoutMs）。 */
@@ -416,27 +383,4 @@ async function hasAnyText(container, variants, timeoutMs) {
     await new Promise(r => setTimeout(r, 500))
   }
   return false
-}
-
-/** 点掉覆盖层的关闭按钮（按 overlay 作用域找文案，避免误点别处）。 */
-async function closeOverlay(page, overlay, label) {
-  const close = await (async () => {
-    for (const v of UI.close) {
-      const loc = overlay.getByText(v, { exact: false }).first()
-      if (await loc.isVisible().catch(() => false)) return loc
-    }
-    return null
-  })()
-  if (close === null) {
-    await screenshot(`e2e-fail-close-${label}.png`)
-    await logTail()
-    fail(`覆盖层（${label}）内未找到关闭按钮`)
-  }
-  await close.click().catch(() => {})
-  await page.waitForTimeout(500)
-  const gone = await overlay.isHidden().catch(() => true)
-  if (!gone) {
-    await screenshot(`e2e-fail-close-${label}.png`)
-    fail(`覆盖层（${label}）关闭失败`)
-  }
 }
