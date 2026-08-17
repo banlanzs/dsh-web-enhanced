@@ -28,6 +28,7 @@ const disposers: Array<() => void> = []
 
 afterEach(() => {
   for (const dispose of disposers.splice(0)) dispose()
+  vi.useRealTimers()
   document.body.innerHTML = ''
 })
 
@@ -36,14 +37,20 @@ function t(key: string, args?: Record<string, string>): string {
 }
 
 /** Minimal client-context face the navbar reads. */
-function makeCtx(totalTurns: number) {
+function makeCtx(
+  totalTurns: number,
+  paging: { loadOlder?: () => Promise<void>; hasMore?: () => boolean } = {},
+) {
   return {
     sessions: {
       list: { getSnapshot: () => ({ current: 's1' }) },
       binding: () => ({
         session: {
-          getSnapshot: () => ({ hasMore: false, loadingOlder: false }),
-          loadOlder: async () => {},
+          getSnapshot: () => ({
+            hasMore: paging.hasMore?.() ?? false,
+            loadingOlder: false,
+          }),
+          loadOlder: paging.loadOlder ?? (async () => {}),
           projections: {
             faceOf: () => ({
               getSnapshot: () => ({ turns: totalTurns }),
@@ -96,6 +103,20 @@ describe('navbar DOM windowing', () => {
     // "more" marker is the extra child.
     expect(dots).toHaveLength(6)
     expect(bar.childElementCount).toBe(7)
+  })
+
+  it('wheels up past the first materialized row by loading the previous turn', async () => {
+    vi.useFakeTimers()
+    seedTurns(10, 49)
+    let hasMore = true
+    const loadOlder = vi.fn(async () => { hasMore = false })
+    const ctx = makeCtx(58, { loadOlder, hasMore: () => hasMore })
+    disposers.push(applyNavbar(ctx as never))
+    const bar = document.querySelector('[data-dsh-we-navbar]') as HTMLElement
+    vi.advanceTimersByTime(200)
+    bar.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }))
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(loadOlder).toHaveBeenCalledTimes(1)
   })
 
   it('folds a 48-turn older backlog into one marker plus six virtual dots', () => {
