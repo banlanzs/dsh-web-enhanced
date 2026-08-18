@@ -13,15 +13,14 @@ jobs:
         # 默认两矩阵（发布负责人可按支持面增删）：
         #  - Node 22：最低支持宿主。
         #  - Node 24：前向集成。
-        # host-ref 是 smoke e2e 的宿主基线：web-enhanced 客户端消费 rc.6
-        # 发布包，e2e 的宿主必须提供与 rc.6 客户端槽位契约一致的 web 客户端。
-        # master 可能已前移，稳定时把两行都固定到开发基线 SHA
-        # （本地 deepseek-harness checkout 当前为 47f943859bef60e4160492346772ded9b24f765a）。
+        # host-ref 是 smoke e2e 的宿主基线，钉在 rc.7 发布提交
+        # （2026-08-17，全链路 e2e 首次全绿时的宿主）。宿主 master 前移
+        # 不再能使本仓库变红；升级基线时把两行一起改到新验证过的 SHA。
         include:
           - node: 22
-            host-ref: "master"
+            host-ref: "99f6f02fecdb7dff40c3fbc9470f5907c29f74ca"
           - node: 24
-            host-ref: "master"
+            host-ref: "99f6f02fecdb7dff40c3fbc9470f5907c29f74ca"
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -38,12 +37,16 @@ jobs:
       # 宿主 checkout 统一落在 $GITHUB_WORKSPACE/../../.dsh/source/current
       # （= $GITHUB_WORKSPACE 的规范化父级 .dsh）——smoke e2e 从这里取宿主
       # 二进制与 playwright chromium。
+      # 按 ref 定向浅取而不是 clone 默认分支再 checkout：host-ref 钉的是
+      # SHA，默认分支前移后浅克隆里不会再有它，checkout 必然失败。
       - name: Clone dsh main repo at DSH_ROOT
         run: |
           DSH_ROOT="$GITHUB_WORKSPACE/../../.dsh/source/current"
-          mkdir -p "$(dirname "$DSH_ROOT")"
-          git clone --depth 1 "https://github.com/deepseek-ai/deepseek-harness.git" "$DSH_ROOT"
-          git -C "$DSH_ROOT" checkout "${{ matrix.host-ref }}"
+          mkdir -p "$DSH_ROOT"
+          git init -q "$DSH_ROOT"
+          git -C "$DSH_ROOT" remote add origin "https://github.com/deepseek-ai/deepseek-harness.git"
+          git -C "$DSH_ROOT" fetch --depth 1 origin "${{ matrix.host-ref }}"
+          git -C "$DSH_ROOT" checkout -q --detach FETCH_HEAD
           echo "HOST_SHA=$(git -C "$DSH_ROOT" rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Install + build host
