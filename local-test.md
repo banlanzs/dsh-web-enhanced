@@ -2,6 +2,31 @@
 
 本文说明如何创建一个以 Web profile 为基础的独立 `test` profile，在其中测试本地构建的 `dsh-web-enhanced`，确认无误后再安装到正式 `web` profile。
 
+## 推送前：本地 CI 门
+
+`.github/workflows/ci.yml` 的 `check` job 只做 checkout / setup-node / setup-pnpm，其余每一步都由 `scripts/ci-local.mjs` 执行。本地跑同一个脚本，得到的就是 CI 会跑的全部内容。
+
+```bash
+node scripts/ci-local.mjs            # 默认 --full：等价 CI 的单个矩阵分支
+node scripts/ci-local.mjs --fast     # 跳过 smoke e2e，日常迭代用
+node scripts/ci-local.mjs --matrix   # Node 22 + 24 全覆盖，等价整个 check job
+```
+
+脚本默认在 `.ci-local/worktree`（HEAD 的干净副本）里执行，因此 `git diff --exit-code -- lib/` 的产物漂移门与 CI 的全新 checkout 语义一致，也不会污染开发树。代价是**未提交的改动不参与验证**：要验证工作中的改动，先提交，或加 `--no-worktree` 就地跑。
+
+宿主基线 SHA 钉在脚本的 `HOST_REF` 常量里，是升级宿主基线时唯一需要改的地方。宿主按 SHA 缓存在 `.ci-local/host/<sha>`，优先从本地已有的 deepseek-harness clone 以 `git clone --local` 取（零网络、秒级），找不到才走网络浅取；构建一次后后续运行整步跳过，用 `--rebuild-host` 强制重建。
+
+`--full` 需要两项一次性准备，缺失时脚本在第一步就报出安装指令：
+
+- 系统 Chrome：`scripts/e2e.mjs` 用 playwright 的 `channel: 'chrome'`（CI 的 ubuntu-latest 预装）。装法 `npx playwright@1.49.0 install --with-deps chrome` 或 `sudo apt install google-chrome-stable`。
+- `--matrix` 还需要 Node 22：`nvm install 22`。
+
+本地无法完全等价的残余部分：`ubuntu-latest` 镜像的月度更新、npm registry 的时间依赖行为（pnpm `minimumReleaseAge` 策略、`@next` 标签解析）、GitHub 侧的并发与 artifact 语义。这些不受本脚本覆盖。
+
+`host-canary` job 只在 schedule / workflow_dispatch 触发且 `continue-on-error: true`，不参与 push 的红绿判定，因此不在本脚本范围内。
+
+本文其余部分讲的是另一件事：把插件真装进 profile 做人工交互验证。两者互补——CI 门保证「推上去会绿」，profile 测试保证「用起来对」。
+
 ## 关键结论
 
 - `dsh` 支持同时运行多个 profile；不同 Web 实例必须使用不同端口。

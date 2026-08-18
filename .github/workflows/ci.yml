@@ -19,14 +19,7 @@ jobs:
         # 默认两矩阵（发布负责人可按支持面增删）：
         #  - Node 22：最低支持宿主。
         #  - Node 24：前向集成。
-        # host-ref 是 smoke e2e 的宿主基线，钉在 rc.7 发布提交
-        # （2026-08-17，全链路 e2e 首次全绿时的宿主）。宿主 master 前移
-        # 不再能使本仓库变红；升级基线时把两行一起改到新验证过的 SHA。
-        include:
-          - node: 22
-            host-ref: "99f6f02fecdb7dff40c3fbc9470f5907c29f74ca"
-          - node: 24
-            host-ref: "99f6f02fecdb7dff40c3fbc9470f5907c29f74ca"
+        node: [22, 24]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -40,59 +33,13 @@ jobs:
         with:
           version: 11.7.0
 
-      # 宿主 checkout 统一落在 $GITHUB_WORKSPACE/../../.dsh/source/current
-      # （= $GITHUB_WORKSPACE 的规范化父级 .dsh）——smoke e2e 从这里取宿主
-      # 二进制与 playwright chromium。
-      # 按 ref 定向浅取而不是 clone 默认分支再 checkout：host-ref 钉的是
-      # SHA，默认分支前移后浅克隆里不会再有它，checkout 必然失败。
-      - name: Clone dsh main repo at DSH_ROOT
-        run: |
-          DSH_ROOT="$GITHUB_WORKSPACE/../../.dsh/source/current"
-          mkdir -p "$DSH_ROOT"
-          git init -q "$DSH_ROOT"
-          git -C "$DSH_ROOT" remote add origin "https://github.com/deepseek-ai/deepseek-harness.git"
-          git -C "$DSH_ROOT" fetch --depth 1 origin "${{ matrix.host-ref }}"
-          git -C "$DSH_ROOT" checkout -q --detach FETCH_HEAD
-          echo "HOST_SHA=$(git -C "$DSH_ROOT" rev-parse HEAD)" >> "$GITHUB_ENV"
-
-      - name: Install + build host
-        working-directory: ${{ github.workspace }}/../../.dsh/source/current
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm run build
-
-      - name: Install plugin dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Check (typecheck + full tests + build)
-        run: pnpm run check
-
-      - name: Pack verification gate
-        run: node scripts/verify-pack.mjs
-
-      # 提交进仓的 lib/ 必须与 src 一致：漂移 = 上次源码改动从未构建发布。
-      - name: Verify lib matches src
-        run: |
-          git diff --exit-code -- lib/ || {
-            echo "::error::lib/ 与 src/ 不一致：请运行 pnpm run build 并提交 lib/ 产物"
-            exit 1
-          }
-
-      # no-key smoke：隔离 DSH_HOME + 精确宿主二进制 + 固定端口，绝不触碰
-      # 任何活跃实例；宿主二进制必须位于本次 checkout 内。必须从 tarball
-      # 安装，link: 会让 peer 依赖从插件真实路径解析出第二份协议模块，remote
-      # 描述符因此对宿主网关不可见。
-      - name: Smoke e2e (no model key)
-        run: |
-          TARBALL_NAME="$(npm pack --silent)"
-          TARBALL_PATH="$GITHUB_WORKSPACE/$TARBALL_NAME"
-          TARBALL_SHA="$(sha256sum "$TARBALL_PATH")"
-          TARBALL_SHA="${TARBALL_SHA%% *}"
-          node scripts/e2e.mjs --smoke --install tarball \
-            --tarball "$TARBALL_PATH" --tarball-sha256 "$TARBALL_SHA" --port 3190
-        env:
-          DSH_ROOT: ${{ github.workspace }}/../../.dsh/source/current
-          DSH_BIN: ${{ github.workspace }}/../../.dsh/source/current/apps/cli/lib/bin.js
+      # 这一步就是 check job 的全部内容：宿主取回并构建、插件 frozen 安装、
+      # check、打包门、lib/ 漂移门、无 key smoke e2e。步骤定义全在脚本里，
+      # 本地执行同一条命令即可得到等价结论——CI 与本地因此不会漂移。
+      # 宿主基线 SHA 也钉在脚本内（唯一事实来源），矩阵只负责 Node 版本。
+      # --no-worktree：CI 的 checkout 本身已是干净树，无需再开 worktree。
+      - name: CI gate (host build + check + pack + drift + smoke e2e)
+        run: node scripts/ci-local.mjs --full --no-worktree --port 3190
 
       - name: Archive e2e artifacts
         if: failure()
