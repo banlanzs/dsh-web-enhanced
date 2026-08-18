@@ -228,6 +228,23 @@ try {
   await page.waitForTimeout(1500)
   log('✓ 新会话入口已点击')
 
+  // 空白会话不渲染视图标签条：ConversationSessionHeader 对 blank 会话隐藏
+  // 整个 chrome（hideChrome = blank && composerPhase === 'blank'），必须先
+  // 尝试发送首个 prompt，composerPhase 才离开 blank。无模型 key 时发送会
+  // 失败，但宿主 ComposerPhase 文档写明「失败的首个 prompt 停留在
+  // engaging（输入框 + 错误条）」——chrome 照常出现，标签条随之渲染。
+  // 输入框契约与宿主自己的浏览器 e2e 相同：第一个 textarea + Enter。
+  const composer = page.locator('textarea').first()
+  await composer.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {})
+  if (!(await composer.isVisible().catch(() => false))) {
+    await screenshot('e2e-fail-composer.png')
+    await logTail()
+    fail('新会话页 10s 内未出现输入框')
+  }
+  await composer.fill('e2e smoke: unblank the session (no model key; the turn is expected to error)')
+  await composer.press('Enter')
+  log('✓ 已发送首个 prompt（无 key，预期回合报错，仅用于离开空白态）')
+
   const workspaceTab = await waitForTab(page, UI.workspaceView, 30000)
   if (workspaceTab === null) {
     await screenshot('e2e-fail-workspace-tab.png')
