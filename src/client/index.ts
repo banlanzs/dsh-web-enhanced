@@ -60,7 +60,7 @@ import { CapabilitiesStore, refreshIfLoaded } from './model-capabilities/store.t
 import { PastedTextDock } from './pasted-text/PastedTextDock.tsx'
 import type { PastedTextDockInjected } from './pasted-text/PastedTextDock.tsx'
 import { PastedTextUserNodeView } from './pasted-text/PastedTextUserNodeView.tsx'
-import { CollapsedToolCalls } from './tool-calls/CollapsedToolCalls.tsx'
+import { applyToolCallCollapse } from './tool-calls/apply.ts'
 import type { PastedTextUserNodeInjected } from './pasted-text/PastedTextUserNodeView.tsx'
 import { applyPastedText, removePastedText } from './pasted-text/apply.ts'
 import { PastedTextStore } from './pasted-text/store.ts'
@@ -283,16 +283,14 @@ export function apply(ctx: ClientContext): void {
     inject: (): PastedTextUserNodeInjected => ({ store: pastedText }),
   }, PastedTextUserNodeView))
 
-  // Tool-call side: one disclosure row per agent step. While the step runs it
-  // stays expanded through the host's own keyed atomic tool views; when every
-  // call settles it auto-collapses to `工具调用 · N 次`.
-  ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
-    name: 'conversation.chat.node',
-    key: 'tool-call',
-    priority: -1,
-    locale: NS,
-    children: { 'tool.call.toolview': { kind: 'keyed', scope: 'session' } },
-  }, CollapsedToolCalls))
+  // Tool-call side: runs of adjacent tool-call rows collapse behind one
+  // disclosure header once their step is over. Done from the DOM, wrapping the
+  // host rows from the outside, because a `conversation.chat.node` shadow could
+  // not re-dispatch the host's atomic tool views — `tool.call.toolview` is
+  // declared by the host's own entry, and the registry pins a child slot to a
+  // single declaration while renderSlot only honours the CALLING entry's
+  // children table. See src/client/tool-calls/apply.ts.
+  ctx.effect(() => applyToolCallCollapse(ctx), 'web-enhanced: tool call collapse')
 
   const overlay = createOverlay()
   const browse = createBrowse()

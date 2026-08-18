@@ -2,11 +2,14 @@
 
 ## [Unreleased]
 
-### 新增：工具调用完成后自动折叠
+### 新增：工具调用完成后自动折叠（改由 DOM 层实现）
 
-- 以 `priority:-1` shadow 宿主 `conversation.chat.node` 的 `tool-call` 渲染器，把同一 agent step 的所有根工具调用合并成一个 DisclosureRow 分组：运行中保持展开，继续通过宿主自己的 `tool.call.toolview` 键控槽渲染 Bash / Read / Search 等原子卡片；该步全部调用完成后自动折叠为「工具调用 · N 次」，点击可重新展开查看完整过程。加载历史会话时已完成步骤默认折叠，不再被大量 Think / Bash 行刷屏。
-- 第一个 tool 节点负责渲染分组，同组其余节点返回 null（宿主 `flowItem:empty` 规则隐藏空行）；`think` 等宿主未注册的工具走插件内置的通用折叠行兜底，不会因替换渲染器而消失。
-- 新增 `tool-calls.spec.ts` 6 个单测（运行/完成判别、嵌套调用计数、分组与自动折叠状态），测试 490 → 496。
+- 同一 agent step 的连续工具调用合并成一个折叠分组：运行中保持展开，该步结束后自动折叠为「工具调用 · N 次」，点击可重新展开。加载历史会话时已完成步骤默认折叠，不再被大量 Think / Bash 行刷屏。宿主专用工具卡片（Bash argv、Edit diff、Read 预览）全部原样保留。
+- 修复 `597da85` 导致插件无法加载的回归：那一版以 `priority:-1` shadow 宿主 `conversation.chat.node` 的 `tool-call` 渲染器，并在自己的 `children` 里重新声明 `tool.call.toolview` 以复用宿主原子卡片。真实宿主上这必然抛错——该子槽由宿主自己的 `tool-call` entry 声明，`SlotCore.register` 规定一个子槽全局只能声明一次，而 `renderSlot` 只认调用方 entry 自己的 `children` 表：shadow 只赢渲染权，不转移声明权。抛错发生在写入 ledger 之前，整个插件 boot 失败，网页只剩「Failed to load plugins」。
+- 改为 DOM 层包裹（`tool-calls/apply.ts`）：不注册任何 chat node，让宿主照常渲染每一行，插件把 `[data-chat-flow]` 中连续的 `data-chat-flow-kind="tool-call"` 项归为一组，在组首插入折叠头并以属性隐藏组内行。render 幂等（只在值真正变化时写 DOM），所以自身插入引发的下一轮 render 无写入、mutation 自然收敛，无需 disconnect/reconnect。
+- 运行判定读位置而非宿主工具卡内部结构：只有位于聊天流末尾的那一组可能仍在运行，一旦其后出现任何非 tool-call 节点（assistant 消息、turn tail）即视为该步结束并自动折叠。用户手动展开/折叠按「会话 id + 组首节点 key」记住，自动折叠不覆盖它；跨会话不串状态。
+- 单个工具调用不再加折叠头（`MIN_RUN = 2`）——宿主单行本身已是折叠态，再包一层不省空间。
+- 删除失效的 slot 方案（`CollapsedToolCalls.tsx` / `.module.css` / `ui-tool-shim.d.ts`）；`toolCalls.*` 文案去掉写死的「点击展开 / 点击收起」动作提示，改由 `aria-expanded` 与 chevron 表达。测试由 `tool-calls.spec.ts` 6 个换成 `tool-calls-dom.spec.ts` 11 个，496 → 501。
 
 ### 优化：设置页标签改为左侧竖向工具栏
 
