@@ -5,9 +5,9 @@
  * `data-chat-flow-kind` items — because that markup IS this module's contract:
  * it wraps host rows from the outside and never reads inside a tool view.
  *
- * The real host alternates `assistant-step` (Think) and `tool-call` rows, and
- * the final assistant-step of a turn is the user's answer. These tests pin
- * both facts: runs include the alternating rows, but the answer never folds.
+ * The real host alternates `assistant-step` (Think/answer) and `tool-call`
+ * rows. These tests pin both facts: runs include the alternating rows, but
+ * every assistant-step carrying answer content stays visible.
  * @module dsh-web-enhanced/tests/tool-calls-dom
  */
 
@@ -207,6 +207,32 @@ describe('tool-call collapse', () => {
     await flush()
     expect(hiddenKeys()).toEqual(['n1', 'n2'])
     expect(headers()[0]?.hasAttribute('data-we-tool-expanded')).toBe(false)
+  })
+
+  it('releases stale hidden rows when streamed answer text dissolves a group', async () => {
+    const flow = seedFlow([
+      'user',
+      { kind: 'assistant-step', think: true },
+      'tool-call',
+      { kind: 'assistant-step', answer: true },
+      'turn-tail',
+    ])
+    const firstStep = flow.querySelector<HTMLElement>('[data-chat-flow-key="n1"]')
+    expect(firstStep).not.toBeNull()
+    const streamedAnswer = document.createTextNode('')
+    firstStep?.appendChild(streamedAnswer)
+    mount()
+
+    expect(headers()).toHaveLength(1)
+    expect(hiddenKeys()).toEqual(['n1', 'n2'])
+
+    // React may update an existing text node while streaming instead of adding
+    // a new element. That character-data mutation must reclassify n1 as an
+    // answer row; with only one tool row left, the group no longer saves space.
+    streamedAnswer.data = '流式补出的正式回复'
+    await flush()
+    expect(headers()).toHaveLength(0)
+    expect(hiddenKeys()).toEqual([])
   })
 
   it('hides every member of a run that ends on a tool call', () => {

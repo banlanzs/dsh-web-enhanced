@@ -221,6 +221,7 @@ export function applyToolCallCollapse(ctx: ClientContext): () => void {
     const last = items.at(-1)
     const sid = sessionKey()
     const kept = new Set<HTMLElement>()
+    const desiredHidden = new Set<HTMLElement>()
 
     for (const run of activityRuns(items)) {
       const lead = run[0]
@@ -255,9 +256,20 @@ export function applyToolCallCollapse(ctx: ClientContext): () => void {
         : t('toolCalls.groupCountSettled', { count: targets.length })
       if (count !== null && count.textContent !== summary) count.textContent = summary
 
-      const hidden = new Set(expanded ? [] : targets)
-      for (const el of run) setAttr(el, HIDDEN, hidden.has(el) ? '' : null)
+      if (!expanded) {
+        for (const el of targets) desiredHidden.add(el)
+      }
     }
+
+    // Reconcile the whole flow instead of only the runs that still qualify for
+    // a header. Streaming answer text can turn a pure-Think row into a visible
+    // reply and reduce the remaining target count below MIN_HIDDEN; in that
+    // case the group disappears, and every attribute from its previous render
+    // must disappear with it.
+    for (const el of flow.querySelectorAll<HTMLElement>(`:scope > [${HIDDEN}]`)) {
+      if (!desiredHidden.has(el)) setAttr(el, HIDDEN, null)
+    }
+    for (const el of desiredHidden) setAttr(el, HIDDEN, '')
 
     // Drop headers whose run is gone (virtualized away, or session switched).
     for (const stale of flow.querySelectorAll<HTMLElement>(`:scope > [${HEADER}]`)) {
@@ -275,8 +287,17 @@ export function applyToolCallCollapse(ctx: ClientContext): () => void {
   // Render is idempotent — a pass that changes nothing emits no mutations — so
   // the header this module inserts settles after one extra pass instead of
   // looping. Attributes are not observed, so the hide/expand writes are silent.
-  const observer = new MutationObserver(() => { scheduleRender() })
-  observer.observe(body, { childList: true, subtree: true })
+  const observer = new MutationObserver((mutations) => {
+    const flow = flowOf()
+    // Child-list changes may mount/remount the flow or add a new chat row.
+    // Character-data changes matter only inside the flow: streamed Markdown
+    // may turn a previously pure-Think assistant-step into answer content.
+    if (mutations.some(mutation =>
+      mutation.type === 'childList'
+      || (flow !== null && flow.contains(mutation.target)),
+    )) scheduleRender()
+  })
+  observer.observe(body, { childList: true, characterData: true, subtree: true })
   render()
 
   return () => {
