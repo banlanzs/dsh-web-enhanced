@@ -41,7 +41,7 @@ export declare const DEFAULT_VISION_MARKER = "[\u56FE\u7247\u5185\u5BB9\u63CF\u8
  * Settings namespace carrying the user-editable vision configuration.
  *
  * The static `vision*` plugin config is the composition `base` layer; what the
- * Settings → Web Enhanced → Vision tab saves becomes the user layer and wins.
+ * Settings → Plugins → Web Enhanced → Vision tab saves becomes the user layer and wins.
  * The namespace is owned by this plugin's own gateway/UI (not the host settings
  * whitelist), so no api-proxy patch is needed.
  */

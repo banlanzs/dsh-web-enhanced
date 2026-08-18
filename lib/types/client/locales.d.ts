@@ -175,6 +175,7 @@ export declare const zh: {
     readonly 'settings.tab.plugins': "插件管理";
     readonly 'settings.tab.general': "通用设置";
     readonly 'settings.tab.globalPrompt': "全局提示词";
+    readonly 'settings.tab.modelCapabilities': "模型能力";
     readonly 'settings.tab.vision': "识图";
     readonly 'settings.tab.about': "关于";
     readonly 'settings.tab.skins': "皮肤";

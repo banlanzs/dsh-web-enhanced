@@ -8,6 +8,6 @@
  */
 import type { WebEnhancedProps } from '../contract.ts';
 /** The settings section props this panel actually uses. */
-export type ModelRetryPanelProps = Pick<WebEnhancedProps<'settings.section'>, 'remote' | 't'>;
+export type ModelRetryPanelProps = Pick<WebEnhancedProps<'settings.plugins.tab'>, 'remote' | 't'>;
 /** The DeepSeek retry settings panel. */
 export declare function ModelRetryPanel({ remote, t }: ModelRetryPanelProps): import("react").JSX.Element;

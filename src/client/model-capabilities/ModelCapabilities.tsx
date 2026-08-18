@@ -1,7 +1,6 @@
 /**
- * The Model Capabilities settings page: a separate settings section right
- * after the host Models page. It edits exactly what the host Models editor
- * deliberately leaves out:
+ * The Model Capabilities settings page inside Web Enhanced. It edits exactly
+ * what the host Models editor deliberately leaves out:
  *
  * - llm-deepseek (whole section): `thinking` and `reasoningEffort`.
  * - llm-pi-ai provider profiles: `defaultInput` / `reasoning`, plus every
@@ -22,9 +21,7 @@ import type {
 import {
   deletePath, getPath, hasPath, setPath,
 } from '@deepseek-ai/dsh-client-schema-form'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-// Type-only: pulls the settings shell's SlotMap merge ('settings.section').
-import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   applyDraft, cloneRecord, DEEPSEEK_NS, draftAt, isRecord, MODALITIES,
   normalizePiAiDraft, PI_AI_NS, recordOf, THINKING_LEVELS, validateDeepSeekDraft,
@@ -46,10 +43,7 @@ export interface ModelCapabilitiesInjected {
 }
 
 /** Full composed props of the settings section. */
-export type ModelCapabilitiesProps =
-  PropsRuntime<'settings.section'>
-  & InjectFace<ModelCapabilitiesInjected>
-  & PropsLocale<'webEnhanced'>
+export type ModelCapabilitiesProps = InjectFace<ModelCapabilitiesInjected> & PropsLocale<'webEnhanced'>
 
 /** Localized copy face the cards share. */
 type T = ModelCapabilitiesProps['t']

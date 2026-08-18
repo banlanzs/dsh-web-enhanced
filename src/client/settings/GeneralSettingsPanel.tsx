@@ -12,7 +12,7 @@ import { ModelRetryPanel } from './ModelRetryPanel.tsx'
 import css from './GeneralSettingsPanel.module.css'
 
 /** The settings section props the general group uses. */
-export type GeneralSettingsPanelProps = Pick<WebEnhancedProps<'settings.section'>, 'remote' | 't'>
+export type GeneralSettingsPanelProps = Pick<WebEnhancedProps<'settings.plugins.tab'>, 'remote' | 't'>
 
 /** General settings: currently the model-request retry policy. */
 export function GeneralSettingsPanel({ remote, t }: GeneralSettingsPanelProps) {

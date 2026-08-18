@@ -1,7 +1,6 @@
 /**
- * The Model Capabilities settings page: a separate settings section right
- * after the host Models page. It edits exactly what the host Models editor
- * deliberately leaves out:
+ * The Model Capabilities settings page inside Web Enhanced. It edits exactly
+ * what the host Models editor deliberately leaves out:
  *
  * - llm-deepseek (whole section): `thinking` and `reasoningEffort`.
  * - llm-pi-ai provider profiles: `defaultInput` / `reasoning`, plus every
@@ -15,7 +14,7 @@
  */
 import type { ReactNode } from 'react';
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client';
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
+import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
 import type { CapabilitiesState, CapabilitiesStore } from './store.ts';
 /** Injected dependencies of {@link ModelCapabilitiesSection}. */
 export interface ModelCapabilitiesInjected {
@@ -27,6 +26,6 @@ export interface ModelCapabilitiesInjected {
     api: Pick<IApiClient, 'settings' | 'llm'>;
 }
 /** Full composed props of the settings section. */
-export type ModelCapabilitiesProps = PropsRuntime<'settings.section'> & InjectFace<ModelCapabilitiesInjected> & PropsLocale<'webEnhanced'>;
+export type ModelCapabilitiesProps = InjectFace<ModelCapabilitiesInjected> & PropsLocale<'webEnhanced'>;
 /** Render the settings section content column. */
 export declare function ModelCapabilitiesSection(props: ModelCapabilitiesProps): ReactNode;

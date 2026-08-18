@@ -14,7 +14,7 @@ import type { ModelRetryConfigView, WebEnhancedProps } from '../contract.ts'
 import css from './ModelRetryPanel.module.css'
 
 /** The settings section props this panel actually uses. */
-export type ModelRetryPanelProps = Pick<WebEnhancedProps<'settings.section'>, 'remote' | 't'>
+export type ModelRetryPanelProps = Pick<WebEnhancedProps<'settings.plugins.tab'>, 'remote' | 't'>
 
 /** Load state of the retry policy. */
 type State =

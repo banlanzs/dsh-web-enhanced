@@ -6,6 +6,6 @@
  */
 import type { WebEnhancedProps } from '../contract.ts';
 /** The settings section props the general group uses. */
-export type GeneralSettingsPanelProps = Pick<WebEnhancedProps<'settings.section'>, 'remote' | 't'>;
+export type GeneralSettingsPanelProps = Pick<WebEnhancedProps<'settings.plugins.tab'>, 'remote' | 't'>;
 /** General settings: currently the model-request retry policy. */
 export declare function GeneralSettingsPanel({ remote, t }: GeneralSettingsPanelProps): import("react").JSX.Element;

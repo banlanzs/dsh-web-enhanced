@@ -54,7 +54,7 @@ import { BrowseOverlay } from './browse/BrowseOverlay.tsx'
 import { BranchStrip } from './git/BranchStrip.tsx'
 import { WorkspaceView } from './panel/WorkspaceView.tsx'
 import { SettingsSection } from './settings/SettingsSection.tsx'
-import { ModelCapabilitiesSection } from './model-capabilities/ModelCapabilities.tsx'
+import { WEB_ENHANCED_PLUGIN_TAB } from './settings/navigation.ts'
 import type { ModelCapabilitiesInjected } from './model-capabilities/ModelCapabilities.tsx'
 import { CapabilitiesStore, refreshIfLoaded } from './model-capabilities/store.ts'
 import { PastedTextDock } from './pasted-text/PastedTextDock.tsx'
@@ -226,9 +226,8 @@ export function apply(ctx: ClientContext): void {
 
   // The Model Capabilities page joins the same three wire facts as the host
   // Models page but edits only what that page leaves out: input modalities
-  // and reasoning efforts. It is a separate settings section on purpose —
-  // the settings shell projects raw ledger rows, so shadowing the host
-  // 'models' cell would draw a duplicate nav row instead of replacing it.
+  // and reasoning efforts. It is rendered as a tab inside this plugin's
+  // Web Enhanced settings page.
   const connection = ctx.get('connection') as ConnectionHandle
   const capabilities = new CapabilitiesStore(connection.api)
   const useCapabilities = bindSnapshotSelector(capabilities.store)
@@ -237,14 +236,6 @@ export function apply(ctx: ClientContext): void {
     useSnapshot: useCapabilities,
     api: connection.api,
   })
-  ctx.slots.inject('settings.section', () => ctx.slots.register({
-    name: 'settings.section',
-    id: 'model-capabilities',
-    order: 11,
-    locale: NS,
-    label: () => ctx.locale.bind(NS)('modelCapabilities.nav'),
-    inject: capabilitiesInjected,
-  }, ModelCapabilitiesSection))
   ctx.effect(() => {
     const refresh = (): void => { refreshIfLoaded(capabilities) }
     const disposers = [
@@ -430,17 +421,18 @@ export function apply(ctx: ClientContext): void {
             locale: NS,
             inject: face,
           }, BalanceLine)),
-          // The settings shell projects this registration's id/order/label into
-          // one nav row and renders only the selected section. `label` is
-          // thunked so a locale switch retitles the row through the ledger tick
-          // rather than needing a re-registration.
-          ctx.slots.inject('settings.section', () => ctx.slots.register({
-            name: 'settings.section',
-            id: 'web-enhanced',
-            order: 60,
+          // The host Plugins settings page projects this registration into its
+          // tab list. The Web Enhanced page keeps its own feature tabs inside.
+          ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
+            name: 'settings.plugins.tab',
+            id: WEB_ENHANCED_PLUGIN_TAB.id,
+            order: WEB_ENHANCED_PLUGIN_TAB.order,
             locale: NS,
             label: () => ctx.locale.bind(NS)('settings.nav'),
-            inject: face,
+            inject: (): WebEnhancedInject & ModelCapabilitiesInjected => ({
+              ...face(),
+              ...capabilitiesInjected(),
+            }),
           }, SettingsSection)),
           registerMentionCommands(ctx, remote, browse.actions.openBrowse),
         )
