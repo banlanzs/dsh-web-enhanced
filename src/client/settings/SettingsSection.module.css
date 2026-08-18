@@ -1,27 +1,39 @@
 .root {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 14px;
   min-height: 0;
 }
 
+/* The left rail owns vertical space instead of horizontal width: eight tabs
+   fit as a column even when the pane is narrow, and the rail scrolls on its
+   own rather than wrapping or pushing the page. */
 .tabs {
   display: flex;
   flex: none;
-  gap: 4px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(0 0 0 / 4%));
+  flex-direction: column;
+  gap: 2px;
+  width: 132px;
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--dsw-alias-border-l1, rgba(0 0 0 / 4%));
+  padding-right: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsw-alias-border-l3, rgba(0 0 0 / 12%)) transparent;
 }
 
 .tab,
 .tabActive {
   border: none;
-  border-bottom: 2px solid transparent;
+  border-left: 2px solid transparent;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   cursor: pointer;
   font: inherit;
   font-size: 14px;
-  padding: 6px 12px;
+  text-align: left;
+  padding: 6px 8px 6px 10px;
   transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
@@ -42,7 +54,8 @@
 }
 
 .tabActive {
-  border-bottom-color: var(--dsw-alias-state-business-primary, rgb(65 118 230));
+  border-left-color: var(--dsw-alias-state-business-primary, rgb(65 118 230));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
   font-weight: 600;
   color: var(--dsw-alias-label-primary, rgb(15 17 21));
 }
@@ -53,6 +66,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
   overflow: auto;
   scrollbar-width: thin;

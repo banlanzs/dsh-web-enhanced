@@ -52,7 +52,7 @@ export function SettingsSection({ remote, t, skin, notifications }: SettingsSect
   ]
   return (
     <div className={css.root}>
-      <div className={css.tabs} role="tablist">
+      <div className={css.tabs} role="tablist" aria-orientation="vertical">
         {tabs.map(entry => (
           <button
             key={entry.id}
