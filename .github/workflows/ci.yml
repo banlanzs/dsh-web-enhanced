@@ -4,9 +4,15 @@ on:
   push:
     branches: [master]
   pull_request:
+  # canary 的定时闸门：宿主前移是时间驱动的，不是 push 驱动的。
+  schedule:
+    - cron: '37 2 * * 1'
+  workflow_dispatch:
 
 jobs:
   check:
+    # 定时触发只为跑 canary；主矩阵要完整构建宿主，没必要陪跑。
+    if: github.event_name != 'schedule'
     strategy:
       fail-fast: false
       matrix:
@@ -97,3 +103,69 @@ jobs:
             e2e-*.png
             dsh-web.log
           if-no-files-found: ignore
+
+  # ── 宿主前沿探针 ────────────────────────────────────────────────────────
+  # 上面的矩阵故意把宿主钉死在已验证的 SHA，lockfile 也故意锁在最低支持版
+  # （peerDependencies 的下界 0.1.0-rc.6）——那是「不会误用新 API」的保护，
+  # 不是落后。代价是宿主继续前移时 CI 什么都不会说。
+  #
+  # 这个 job 补上另一半：把宿主包临时升到前沿再跑类型检查与单测，抓 API
+  # 重命名、类型收窄、导出移除这类破坏性变更。改动只存在于 runner 上。
+  # 允许失败：它报告的是「宿主动了什么」，不是「本仓库坏了」。
+  #
+  # 三个必须踩准的点（都是实测踩出来的）：
+  #  1. 用 next 而不是 latest——rc.7 发布在 next 上，latest 还停在 rc.6，
+  #     且 dsh-llm 的 latest 竟指向远古的 0.0.1-rc.1。
+  #  2. 关掉 minimumReleaseAge——pnpm 11 的供应链策略会拒绝刚发布的版本，
+  #     而 pnpm-workspace.yaml 的白名单是逐版本钉死的 rc.6 列表。
+  #  3. 升级后必须断言版本真的变了——被策略挡住时 pnpm 只说
+  #     "Already up to date" 并静默成功，探针会假装通过。
+  host-canary:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Install at the pinned baseline
+        run: pnpm install --frozen-lockfile
+
+      - name: Upgrade the host packages to the frontier
+        run: |
+          BASELINE="$(node -p "require('./node_modules/@deepseek-ai/dsh-typert-protocol/package.json').version")"
+          echo "baseline: $BASELINE"
+          PKGS="$(node -p "
+            Object.keys(require('./package.json').devDependencies)
+              .filter(name => name.startsWith('@deepseek-ai/dsh'))
+              .map(name => name + '@next')
+              .join(' ')
+          ")"
+          pnpm add -D $PKGS --config.minimumReleaseAge=0
+          FRONTIER="$(node -p "require('./node_modules/@deepseek-ai/dsh-typert-protocol/package.json').version")"
+          echo "frontier: $FRONTIER"
+          if [ "$BASELINE" = "$FRONTIER" ]; then
+            echo "::warning::宿主前沿与基线相同（$BASELINE），本次探针没有验证任何新版本。" \
+                 "若确信 next 上有更新版本，检查 pnpm 供应链策略是否仍在拦截。"
+          fi
+          echo "HOST_FRONTIER=$FRONTIER" >> "$GITHUB_ENV"
+
+      - name: Typecheck and test against the frontier host
+        run: |
+          npx tsc -b --force
+          npx vitest run
+
+      - name: Report a breaking host change
+        if: failure()
+        run: |
+          echo "::warning::宿主 $HOST_FRONTIER 与本插件不兼容——见上方 tsc/vitest 失败。" \
+               "适配后上调 peerDependencies 下界、pnpm-workspace.yaml 的" \
+               "minimumReleaseAgeExclude 白名单，以及 ci.yml 的 host-ref。"
