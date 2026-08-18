@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### 修复：真实宿主上工具折叠没生效——Think / Bash 是交替行
+
+- 根因：真实宿主聊天流不是「连续多条 tool-call」，而是每个模型步骤一条 `assistant-step`（Think）与一条 `tool-call`（Bash）交替出现。上一版只把相邻 `tool-call` 归组，`MIN_RUN = 2` 因此几乎永远不满足——实测一个 40 步的历史回合只折叠了唯一一处偶然相邻的两个 Bash，其余 Think / Bash 原样铺开。
+- 修复：`activityRuns` 把相邻的 `assistant-step` + `tool-call` 作为一个执行过程归组；该组结束后隐藏组内除**最后一个 assistant-step** 外的所有行——最后一个 assistant-step 就是给用户的最终回复，必须保持可见。组尾是 tool-call（没有收尾回复）时才整组隐藏。
+- 只有当实际可隐藏的行数 ≥2 时才插折叠头，单条 tool-call 或纯 assistant-step 回合不加壳；文案改为「执行过程 · N 步」，点击展开/收起仍按会话 + 组首节点记忆。修复 stateKey 中误入的 NUL 分隔符（该文件因此曾被 Git 判为二进制）。
+- `tool-calls-dom.spec.ts` 重写为真实交替行夹具（11 → 13 个用例：交替归组、最终回复保持可见、尾组自动折叠、组尾 tool-call 整组隐藏、纯 Think / 单工具不加壳等），测试 501 → 503。
+
 ### 新增：工具调用完成后自动折叠（改由 DOM 层实现）
 
 - 同一 agent step 的连续工具调用合并成一个折叠分组：运行中保持展开，该步结束后自动折叠为「工具调用 · N 次」，点击可重新展开。加载历史会话时已完成步骤默认折叠，不再被大量 Think / Bash 行刷屏。宿主专用工具卡片（Bash argv、Edit diff、Read 预览）全部原样保留。

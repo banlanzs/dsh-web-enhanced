@@ -204,9 +204,9 @@ export declare const zh: {
     readonly 'notify.testPopupBlocked': "未能显示系统弹窗：请先授权通知权限";
     readonly 'notify.completeTitle': "工作完成";
     readonly 'notify.completeBody': "「{title}」已完成本轮工作。";
-    readonly 'toolCalls.groupTitle': "工具调用";
-    readonly 'toolCalls.groupCountSettled': "{count} 次 · 已完成";
-    readonly 'toolCalls.groupCountRunning': "{count} 次 · 进行中";
+    readonly 'toolCalls.groupTitle': "执行过程";
+    readonly 'toolCalls.groupCountSettled': "{count} 步 · 已完成";
+    readonly 'toolCalls.groupCountRunning': "{count} 步 · 进行中";
     readonly 'globalPrompt.title': "全局系统提示词";
     readonly 'globalPrompt.hint': "这段文本会作为一个独立段落追加到每个会话的系统提示词里（order 50：位于所选模式 persona 之后、工具说明之前），对所有模式、会话和子代理生效。保存后从下一轮请求开始生效，无需重启 dsh web；关闭开关或留空则不注入。注意：极简模式把 persona 声明为 complete（整段替换系统提示词），届时本全局提示词不会追加。";
     readonly 'globalPrompt.enabled': "启用全局提示词";

@@ -1,10 +1,11 @@
 /**
  * Tool-call group collapse — DOM layer.
  *
- * The host renders one `tool-call` chat node per ROOT invocation, each already
- * collapsed to a row. A long agent step still stacks a dozen of those rows, so
- * this module groups every RUN of adjacent tool-call rows behind one disclosure
- * header and hides the run once the step is over.
+ * The host renders one flow row per ROOT tool invocation and one `assistant-step`
+ * (Think) row per model step. A long turn therefore alternates Think/Bash rows
+ * for a screenful. This module groups every RUN of adjacent Think/tool rows
+ * behind one disclosure header and hides the run once the turn is over, keeping
+ * the FINAL assistant step visible because it is the user's answer.
  *
  * Why DOM and not a slot: reaching the same UX from `conversation.chat.node`
  * would mean shadowing the host `tool-call` entry and re-dispatching each root
@@ -23,8 +24,15 @@
  * @module dsh-web-enhanced/src/client/tool-calls/apply
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client';
-/** Runs of adjacent tool-call flow items, in flow order. */
-export declare function toolRuns(items: readonly HTMLElement[]): HTMLElement[][];
+/** Runs of adjacent Think/tool-call flow items, in flow order. */
+export declare function activityRuns(items: readonly HTMLElement[]): HTMLElement[][];
+/**
+ * Members of one run that a collapse hides. The FINAL assistant-step stays
+ * visible: in this host it is the user's answer, and folding it away would
+ * leave the reply itself hidden. A run that ends on a tool call has no such
+ * answer, so every member folds.
+ */
+export declare function collapseTargets(run: readonly HTMLElement[]): HTMLElement[];
 /**
  * Mount the tool-call group collapse for this page.
  * @param ctx - client root context (locale for the header, sessions for state scoping).
