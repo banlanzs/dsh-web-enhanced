@@ -45,7 +45,7 @@ function makeCtx(sessionId = 's1') {
  * Seed a host chat flow. Each spec entry is one flow item's kind; keys are
  * assigned positionally so a run's leading key is stable across renders.
  */
-function seedFlow(kinds: readonly string[]): HTMLElement {
+function seedFlow(kinds: readonly SeedKind[]): HTMLElement {
   const flow = document.createElement('div')
   flow.setAttribute('data-chat-flow', '')
   document.body.appendChild(flow)
@@ -53,11 +53,38 @@ function seedFlow(kinds: readonly string[]): HTMLElement {
   return flow
 }
 
-function appendItem(flow: HTMLElement, kind: string, key: string): HTMLElement {
+/**
+ * One flow-item seed entry. Plain strings keep the old "kind only" fixtures;
+ * an object lets a test inject host-style content so collapseTargets can
+ * distinguish a pure-Think assistant-step row from one carrying the answer.
+ */
+type SeedKind =
+  | string
+  | { readonly kind: string; readonly think?: boolean; readonly answer?: boolean }
+
+function appendItem(flow: HTMLElement, seed: SeedKind, key: string): HTMLElement {
+  const kind = typeof seed === 'string' ? seed : seed.kind
   const item = document.createElement('div')
   item.setAttribute('data-chat-anchor-key', key)
   item.setAttribute('data-chat-flow-key', key)
   item.setAttribute('data-chat-flow-kind', kind)
+  if (typeof seed === 'object' && kind === 'assistant-step') {
+    // Mirror the host: an outer assistant-markdown wrapper whose children are
+    // either a ReasoningRow ([data-variant="think"]) or the answer body.
+    const wrap = document.createElement('div')
+    if (seed.think === true) {
+      const row = document.createElement('div')
+      row.setAttribute('data-variant', 'think')
+      row.textContent = '思考内容'
+      wrap.appendChild(row)
+    }
+    if (seed.answer === true) {
+      const body = document.createElement('div')
+      body.textContent = '正式回复'
+      wrap.appendChild(body)
+    }
+    item.appendChild(wrap)
+  }
   flow.appendChild(item)
   return item
 }
@@ -98,8 +125,29 @@ describe('activity run grouping', () => {
     ])
   })
 
-  it('keeps the final assistant-step visible when a run collapses', () => {
-    const flow = seedFlow(['assistant-step', 'tool-call', 'assistant-step'])
+  it('keeps a middle answer row visible when a run collapses', () => {
+    const flow = seedFlow([
+      { kind: 'assistant-step', think: true },
+      'tool-call',
+      { kind: 'assistant-step', answer: true },
+      'tool-call',
+      { kind: 'assistant-step', think: true },
+      'turn-tail',
+    ])
+    const run = [...flow.children] as HTMLElement[]
+    // only the pure-Think rows fold; the middle answer row stays visible.
+    expect(collapseTargets(run).map(el => el.getAttribute('data-chat-flow-key')))
+      .toEqual(['n0', 'n1', 'n3', 'n4'])
+    expect(collapseTargets(run.slice(0, 2)).map(el => el.getAttribute('data-chat-flow-key')))
+      .toEqual(['n0', 'n1'])
+  })
+
+  it('keeps the final answer-carrying assistant-step visible when a run collapses', () => {
+    const flow = seedFlow([
+      { kind: 'assistant-step', think: true },
+      'tool-call',
+      { kind: 'assistant-step', answer: true },
+    ])
     const run = [...flow.children] as HTMLElement[]
     expect(collapseTargets(run).map(el => el.getAttribute('data-chat-flow-key'))).toEqual(['n0', 'n1'])
     expect(collapseTargets(run.slice(0, 2)).map(el => el.getAttribute('data-chat-flow-key'))).toEqual(['n0', 'n1'])
@@ -109,8 +157,13 @@ describe('activity run grouping', () => {
 describe('tool-call collapse', () => {
   it('collapses a finished Think/tool run but keeps its final answer visible', () => {
     seedFlow([
-      'user', 'assistant-step', 'tool-call', 'assistant-step', 'tool-call',
-      'assistant-step', 'turn-tail',
+      'user',
+      { kind: 'assistant-step', think: true },
+      'tool-call',
+      { kind: 'assistant-step', think: true },
+      'tool-call',
+      { kind: 'assistant-step', answer: true },
+      'turn-tail',
     ])
     mount()
 
@@ -123,7 +176,7 @@ describe('tool-call collapse', () => {
   })
 
   it('does not wrap a pure assistant-step run or a lone tool call', () => {
-    seedFlow(['user', 'assistant-step', 'assistant-step', 'turn-tail'])
+    seedFlow(['user', { kind: 'assistant-step', think: true }, { kind: 'assistant-step', think: true }, 'turn-tail'])
     mount()
     expect(headers()).toHaveLength(0)
 
@@ -135,7 +188,7 @@ describe('tool-call collapse', () => {
   })
 
   it('keeps the trailing run expanded while the turn is live', () => {
-    seedFlow(['user', 'assistant-step', 'tool-call', 'assistant-step'])
+    seedFlow(['user', { kind: 'assistant-step', think: true }, 'tool-call', { kind: 'assistant-step', answer: true }])
     mount()
 
     expect(headers()).toHaveLength(1)
@@ -146,7 +199,7 @@ describe('tool-call collapse', () => {
   })
 
   it('auto-collapses the trailing run once the turn tail lands', async () => {
-    const flow = seedFlow(['user', 'assistant-step', 'tool-call', 'assistant-step'])
+    const flow = seedFlow(['user', { kind: 'assistant-step', think: true }, 'tool-call', { kind: 'assistant-step', answer: true }])
     mount()
     expect(hiddenKeys()).toEqual([])
 
@@ -157,7 +210,7 @@ describe('tool-call collapse', () => {
   })
 
   it('hides every member of a run that ends on a tool call', () => {
-    seedFlow(['user', 'assistant-step', 'tool-call', 'tool-call', 'turn-tail'])
+    seedFlow(['user', { kind: 'assistant-step', think: true }, 'tool-call', 'tool-call', 'turn-tail'])
     mount()
     expect(hiddenKeys()).toEqual(['n1', 'n2', 'n3'])
     expect(headers()[0]?.querySelector('[data-we-tool-count]')?.textContent)
@@ -165,7 +218,7 @@ describe('tool-call collapse', () => {
   })
 
   it('toggles a run when its header is clicked', async () => {
-    seedFlow(['user', 'assistant-step', 'tool-call', 'assistant-step', 'turn-tail'])
+    seedFlow(['user', { kind: 'assistant-step', think: true }, 'tool-call', { kind: 'assistant-step', answer: true }, 'turn-tail'])
     mount()
     expect(hiddenKeys()).toEqual(['n1', 'n2'])
 
@@ -182,7 +235,7 @@ describe('tool-call collapse', () => {
   })
 
   it('does not auto-collapse a run the user re-expanded', async () => {
-    const flow = seedFlow(['user', 'assistant-step', 'tool-call', 'assistant-step'])
+    const flow = seedFlow(['user', { kind: 'assistant-step', think: true }, 'tool-call', { kind: 'assistant-step', answer: true }])
     mount()
     const button = headers()[0]?.querySelector('button') as HTMLButtonElement
     // Collapse the live run by hand, then re-expand it.
@@ -200,7 +253,7 @@ describe('tool-call collapse', () => {
   })
 
   it('settles without looping on the header it inserts', async () => {
-    seedFlow(['user', 'assistant-step', 'tool-call', 'assistant-step', 'turn-tail'])
+    seedFlow(['user', { kind: 'assistant-step', think: true }, 'tool-call', { kind: 'assistant-step', answer: true }, 'turn-tail'])
     mount()
     expect(headers()).toHaveLength(1)
     await flush()
@@ -210,7 +263,7 @@ describe('tool-call collapse', () => {
   })
 
   it('drops a header whose run was virtualized away', async () => {
-    const flow = seedFlow(['user', 'assistant-step', 'tool-call', 'assistant-step', 'turn-tail'])
+    const flow = seedFlow(['user', { kind: 'assistant-step', think: true }, 'tool-call', { kind: 'assistant-step', answer: true }, 'turn-tail'])
     mount()
     expect(headers()).toHaveLength(1)
 
@@ -223,7 +276,7 @@ describe('tool-call collapse', () => {
 
   it('does not carry one session\'s collapse choice into another', async () => {
     let sessionId = 's1'
-    const flow = seedFlow(['user', 'assistant-step', 'tool-call', 'assistant-step'])
+    const flow = seedFlow(['user', { kind: 'assistant-step', think: true }, 'tool-call', { kind: 'assistant-step', answer: true }])
     mount({
       sessions: { list: { getSnapshot: () => ({ current: sessionId }) } },
       locale: { bind: () => t },
@@ -236,15 +289,14 @@ describe('tool-call collapse', () => {
     // the choice above must not follow them into the new session.
     sessionId = 's2'
     flow.innerHTML = ''
-    for (const [i, kind] of ['user', 'assistant-step', 'tool-call', 'assistant-step'].entries()) {
-      appendItem(flow, kind, `n${i}`)
-    }
+    const rebuildKinds: readonly SeedKind[] = ['user', { kind: 'assistant-step', think: true }, 'tool-call', { kind: 'assistant-step', answer: true }]
+    rebuildKinds.forEach((seed, i) => appendItem(flow, seed, 'n' + i))
     await flush()
     expect(hiddenKeys()).toEqual([])
   })
 
   it('restores the host DOM on dispose', () => {
-    seedFlow(['user', 'assistant-step', 'tool-call', 'assistant-step', 'turn-tail'])
+    seedFlow(['user', { kind: 'assistant-step', think: true }, 'tool-call', { kind: 'assistant-step', answer: true }, 'turn-tail'])
     const before = (document.querySelector('[data-chat-flow]') as HTMLElement).innerHTML
     mount()
     expect(headers()).toHaveLength(1)

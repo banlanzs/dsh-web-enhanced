@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### 修复：工具折叠把夹在 Think / Bash 之间的正式回复一并折掉
+
+- 根因：`collapseTargets` 只保护 run 的**最后一个** `assistant-step` 行，默认它才是给用户的回复；但一个 agent 回合里模型可能在两次工具调用之间先输出一段正文再思考、再调工具——这个中间的 `assistant-step` 行同样含正式回复，却和其它纯活动行一起被隐藏。
+- 修复：折叠目标从「run 去掉最后一个 assistant-step」改为「run 去掉所有**纯活动**行」：`tool-call` 行照旧全折，`assistant-step` 行只在「内容全在 `[data-variant="think"]` 里」时折叠；行内 Think 子树之外只要还有非空白文本或图片（Markdown 正文 / 图片），无论位置都保持可见。宿主渲染保证 tool-call 块在单独的 flow 行，assistant-step 行只含 think / 正文 / 图片，因此按 DOM 子树判断不会误伤工具卡。
+- 测试夹具改为注入宿主风格内容（`{ kind, think?, answer? }`），新增「中间正文行保持可见」用例并改写既有用例为 think/answer 行；`pnpm check` 504 通过。
+
 ### 修复：真实宿主上工具折叠没生效——Think / Bash 是交替行
 
 - 根因：真实宿主聊天流不是「连续多条 tool-call」，而是每个模型步骤一条 `assistant-step`（Think）与一条 `tool-call`（Bash）交替出现。上一版只把相邻 `tool-call` 归组，`MIN_RUN = 2` 因此几乎永远不满足——实测一个 40 步的历史回合只折叠了唯一一处偶然相邻的两个 Bash，其余 Think / Bash 原样铺开。

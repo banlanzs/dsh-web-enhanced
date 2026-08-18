@@ -5,7 +5,8 @@
  * (Think) row per model step. A long turn therefore alternates Think/Bash rows
  * for a screenful. This module groups every RUN of adjacent Think/tool rows
  * behind one disclosure header and hides the run once the turn is over, keeping
- * the FINAL assistant step visible because it is the user's answer.
+ * every assistant step that carries answer content visible — the user-facing
+ * reply may sit in the middle of a run, not only at its tail.
  *
  * Why DOM and not a slot: reaching the same UX from `conversation.chat.node`
  * would mean shadowing the host `tool-call` entry and re-dispatching each root
@@ -27,10 +28,15 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client';
 /** Runs of adjacent Think/tool-call flow items, in flow order. */
 export declare function activityRuns(items: readonly HTMLElement[]): HTMLElement[][];
 /**
- * Members of one run that a collapse hides. The FINAL assistant-step stays
- * visible: in this host it is the user's answer, and folding it away would
- * leave the reply itself hidden. A run that ends on a tool call has no such
- * answer, so every member folds.
+ * Members of one run that a collapse hides.
+ *
+ * A run is the agent's execution process: alternating Think rows and tool
+ * calls. Only the rows that are pure activity may fold. An `assistant-step`
+ * row that carries answer content (markdown text, images) is the user-facing
+ * reply even when it sits in the MIDDLE of the run — a model may talk between
+ * tool calls — so folding it would hide part of the answer. Rows ending the
+ * run are handled by the same rule: a trailing pure-Think step folds, a
+ * trailing answer-carrying step stays.
  */
 export declare function collapseTargets(run: readonly HTMLElement[]): HTMLElement[];
 /**

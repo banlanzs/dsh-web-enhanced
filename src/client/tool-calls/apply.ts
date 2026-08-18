@@ -5,7 +5,8 @@
  * (Think) row per model step. A long turn therefore alternates Think/Bash rows
  * for a screenful. This module groups every RUN of adjacent Think/tool rows
  * behind one disclosure header and hides the run once the turn is over, keeping
- * the FINAL assistant step visible because it is the user's answer.
+ * every assistant step that carries answer content visible — the user-facing
+ * reply may sit in the middle of a run, not only at its tail.
  *
  * Why DOM and not a slot: reaching the same UX from `conversation.chat.node`
  * would mean shadowing the host `tool-call` entry and re-dispatching each root
@@ -51,6 +52,45 @@ function isFlowItem(el: Element): el is HTMLElement {
 /** Flow-item kinds that make up one agent execution process. */
 const ACTIVITY_KINDS = new Set(['tool-call', 'assistant-step'])
 
+/**
+ * Whether an assistant-step row carries plain answer content (markdown text,
+ * images, …) in addition to or instead of Think blocks.
+ *
+ * The host renders one `assistant-step` per model step; its `blocks` may
+ * mix `reasoning` (→ ReasoningRow, `data-variant="think"`) and `text`
+ * (→ MarkdownText). Tool-call blocks are rendered in separate flow rows, so
+ * an assistant-step row only ever contains Think/answer blocks. A row whose
+ * visible content is all inside `[data-variant="think"]` is pure reasoning
+ * and may fold; a row with anything else carries the user-facing answer and
+ * must stay visible.
+ */
+function hasAnswerContent(el: HTMLElement): boolean {
+  // No Think blocks at all → whatever renders (or nothing at all) is not
+  // pure reasoning; keep the row visible to avoid hiding a potential answer
+  // or an empty placeholder the host may still be streaming into.
+  if (el.querySelector('[data-variant="think"]') === null) return true
+  return hasContentOutsideThink(el)
+}
+
+/**
+ * Recursively inspect a subtree for visible content that is NOT inside a
+ * Think disclosure (`[data-variant="think"]`). Non-whitespace text or an
+ * image counts as answer content; a Think subtree is skipped wholesale.
+ */
+function hasContentOutsideThink(node: Node): boolean {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return (node.textContent ?? '').trim() !== ''
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) return false
+  const el = node as Element
+  if (el.getAttribute('data-variant') === 'think') return false
+  if (el.tagName === 'IMG') return true
+  for (const child of el.childNodes) {
+    if (hasContentOutsideThink(child)) return true
+  }
+  return false
+}
+
 /** Runs of adjacent Think/tool-call flow items, in flow order. */
 export function activityRuns(items: readonly HTMLElement[]): HTMLElement[][] {
   const runs: HTMLElement[][] = []
@@ -68,17 +108,23 @@ export function activityRuns(items: readonly HTMLElement[]): HTMLElement[][] {
 }
 
 /**
- * Members of one run that a collapse hides. The FINAL assistant-step stays
- * visible: in this host it is the user's answer, and folding it away would
- * leave the reply itself hidden. A run that ends on a tool call has no such
- * answer, so every member folds.
+ * Members of one run that a collapse hides.
+ *
+ * A run is the agent's execution process: alternating Think rows and tool
+ * calls. Only the rows that are pure activity may fold. An `assistant-step`
+ * row that carries answer content (markdown text, images) is the user-facing
+ * reply even when it sits in the MIDDLE of the run — a model may talk between
+ * tool calls — so folding it would hide part of the answer. Rows ending the
+ * run are handled by the same rule: a trailing pure-Think step folds, a
+ * trailing answer-carrying step stays.
  */
 export function collapseTargets(run: readonly HTMLElement[]): HTMLElement[] {
-  const last = run.at(-1)
-  if (last !== undefined && last.getAttribute('data-chat-flow-kind') === 'assistant-step') {
-    return run.slice(0, -1) as HTMLElement[]
-  }
-  return [...run]
+  return run.filter((el) => {
+    const kind = el.getAttribute('data-chat-flow-kind')
+    if (kind === 'assistant-step') return !hasAnswerContent(el)
+    if (kind === 'tool-call') return true
+    return false
+  }) as HTMLElement[]
 }
 
 /** Write an attribute only when it actually changes (keeps render idempotent). */
