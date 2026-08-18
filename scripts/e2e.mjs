@@ -198,6 +198,13 @@ try {
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 })
   await page.waitForTimeout(5000)
 
+  // ── 首启引导弹窗 ────────────────────────────────────────────────────────
+  // 干净 DSH_HOME 首启必现：内测声明（继续）→ 无可用模型时的 DeepSeek key
+  // 引导（稍后配置）。宿主 OnboardingModal 会把 #root 设为 inert 并铺全屏
+  // 遮罩，不点掉后面什么都点不了。本地看不到是因为脚本复制了
+  // ~/.dsh/settings.yaml（确认记录随之带入）；CI 是全新 HOME。
+  await dismissOnboarding(page)
+
   // client.js 必须 200（插件 bundle 可加载）；404 直接失败
   const clientRes = await fetch(`${BASE}/plugins/dsh-web-enhanced/client.js`)
   if (!clientRes.ok) {
@@ -345,6 +352,44 @@ try {
 }
 
 // ── 工具函数 ────────────────────────────────────────────────────────────────
+
+/**
+ * 逐个点掉首启引导弹窗，直到一段时间内不再出现新的引导按钮。
+ *
+ * 步骤与按钮（产品双语文案，与本脚本其他断言同一策略）：
+ *   1. 内测声明 → 「继续 / Continue」（点击后确认记录持久化，下次不再弹）
+ *   2. DeepSeek key 引导（无任何可用 provider 时出现）→ 「稍后配置 /
+ *      Configure later」
+ * 不预埋 settings.yaml 里的确认版本号：宿主 bump WELCOME_NOTICE_VERSION 后
+ * 预埋值会静默失效，而 key 引导看的是「有无可用 provider」，根本没有可预埋
+ * 的开关。点掉即真实用户的首启路径，对两者都稳。
+ * @param page - playwright page。
+ */
+async function dismissOnboarding(page) {
+  const labels = [/^(?:继续|Continue)$/, /^(?:稍后配置|Configure later)$/]
+  const deadline = Date.now() + 40000
+  let quietSince = Date.now()
+  let dismissed = 0
+  while (Date.now() < deadline) {
+    let clicked = false
+    for (const name of labels) {
+      const button = page.getByRole('button', { name }).first()
+      if (await button.isVisible().catch(() => false)) {
+        await button.click().catch(() => {})
+        dismissed += 1
+        clicked = true
+        quietSince = Date.now()
+        await page.waitForTimeout(800)
+        break
+      }
+    }
+    if (clicked) continue
+    // 引导步是串行挂载的：上一个点掉后下一个才出现，安静窗口给足挂载时间。
+    if (Date.now() - quietSince > 5000) break
+    await new Promise(r => setTimeout(r, 300))
+  }
+  if (dismissed > 0) log(`✓ 已关闭 ${dismissed} 个首启引导弹窗`)
+}
 
 /** 轮询等待任一命名的 tab 出现，返回 locator（zh/en 任一），超时返回 null。 */
 async function waitForTab(page, variants, timeoutMs) {
