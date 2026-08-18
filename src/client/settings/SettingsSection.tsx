@@ -8,11 +8,11 @@
  * shell's own id allowlist (an unknown id gets the generic one) and nothing
  * else about the nav is ours to decide.
  *
- * The page carries its own tabs because it hosts six unrelated things:
+ * The page carries its own tabs because it hosts seven unrelated things:
  * managing what the profile has installed, general settings (model-request
  * retry), the global system prompt, configuring image understanding,
- * switching the interface skin, and describing what this plugin is. None
- * deserves a separate nav row.
+ * completion notifications, switching the interface skin, and describing
+ * what this plugin is. None deserves a separate nav row.
  * @module dsh-web-enhanced/src/client/settings/SettingsSection
  */
 
@@ -28,16 +28,17 @@ import { MemoryPanel } from './MemoryPanel.tsx'
 import { PluginManager } from './PluginManager.tsx'
 import { VisionStatusPanel } from './VisionStatusPanel.tsx'
 import { GlobalPromptPanel } from '../global-prompt/GlobalPromptPanel.tsx'
+import { NotificationPanel } from './NotificationPanel.tsx'
 import css from './SettingsSection.module.css'
 
 /** Full composed props of the settings section. */
 export type SettingsSectionProps = WebEnhancedProps<'settings.section'>
 
 /** Which page of the section is showing. */
-type Tab = 'plugins' | 'general' | 'globalPrompt' | 'memory' | 'vision' | 'skins' | 'about'
+type Tab = 'plugins' | 'general' | 'globalPrompt' | 'memory' | 'vision' | 'notify' | 'skins' | 'about'
 
 /** The web-enhanced settings page. */
-export function SettingsSection({ remote, t, skin }: SettingsSectionProps) {
+export function SettingsSection({ remote, t, skin, notifications }: SettingsSectionProps) {
   const [tab, setTab] = useState<Tab>('plugins')
   const tabs: ReadonlyArray<{ id: Tab; label: string }> = [
     { id: 'plugins', label: t('settings.tab.plugins') },
@@ -45,6 +46,7 @@ export function SettingsSection({ remote, t, skin }: SettingsSectionProps) {
     { id: 'globalPrompt', label: t('settings.tab.globalPrompt') },
     { id: 'memory', label: t('settings.tab.memory') },
     { id: 'vision', label: t('settings.tab.vision') },
+    { id: 'notify', label: t('settings.tab.notify') },
     { id: 'skins', label: t('settings.tab.skins') },
     { id: 'about', label: t('settings.tab.about') },
   ]
@@ -70,6 +72,7 @@ export function SettingsSection({ remote, t, skin }: SettingsSectionProps) {
         {tab === 'globalPrompt' && <GlobalPromptPanel remote={remote} t={t} />}
         {tab === 'memory' && <MemoryPanel remote={remote} t={t} />}
         {tab === 'vision' && <VisionStatusPanel remote={remote} t={t} />}
+        {tab === 'notify' && <NotificationPanel notifications={notifications} t={t} />}
         {tab === 'skins' && <SkinPanel skin={skin} t={t} />}
         {tab === 'about' && <AboutPanel t={t} />}
       </div>

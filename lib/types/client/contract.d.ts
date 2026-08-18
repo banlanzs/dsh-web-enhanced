@@ -9,6 +9,7 @@ import type { InjectFace, PropsLocale, PropsRuntime, SlotMap } from '@deepseek-a
 import type { BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitDiffRequest, GitCommitDiffResult, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, GlobalPromptGetResult, GlobalPromptSaveRequest, GlobalPromptSetResult, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult, ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView, OfficeBlock, OfficeKind, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult, MemoryConfigGetResult, MemoryConfigSaveRequest, MemoryConfigSetResult, MemoryDeleteRequest, MemoryDeleteResult, MemoryListRequest, MemoryListResult } from '../types.ts';
 import type { BrowseActions, BrowseState, Observable, OverlayActions, OverlayState, PanelActions, PanelState, PreviewActions, PreviewState } from './stores.ts';
 import type { SkinFace } from './skins/skin-layer.ts';
+import type { CompletionNotifyFace } from './notify/completion-notify.ts';
 /**
  * The remote facade components call. Every member mirrors one `@Remote`
  * method of `WebEnhancedGateway`, and the request types are the gateway's own
@@ -187,6 +188,8 @@ export interface WebEnhancedInject extends OverlayActions, BrowseActions, PanelA
     };
     /** The skin system's runtime face (the Settings page's Skins tab). */
     readonly skin: SkinFace;
+    /** Completion notification preferences and test buttons (the Settings tab). */
+    readonly notifications: CompletionNotifyFace;
 }
 /**
  * Component-side view of {@link WebEnhancedInject}: the `hooks` compartment

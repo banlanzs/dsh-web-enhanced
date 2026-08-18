@@ -39,6 +39,7 @@ import type {
   PreviewActions, PreviewState,
 } from './stores.ts'
 import type { SkinFace } from './skins/skin-layer.ts'
+import type { CompletionNotifyFace } from './notify/completion-notify.ts'
 
 /**
  * The remote facade components call. Every member mirrors one `@Remote`
@@ -266,6 +267,8 @@ export interface WebEnhancedInject extends OverlayActions, BrowseActions, PanelA
   }
   /** The skin system's runtime face (the Settings page's Skins tab). */
   readonly skin: SkinFace
+  /** Completion notification preferences and test buttons (the Settings tab). */
+  readonly notifications: CompletionNotifyFace
 }
 
 /**

@@ -8,15 +8,15 @@
  * shell's own id allowlist (an unknown id gets the generic one) and nothing
  * else about the nav is ours to decide.
  *
- * The page carries its own tabs because it hosts six unrelated things:
+ * The page carries its own tabs because it hosts seven unrelated things:
  * managing what the profile has installed, general settings (model-request
  * retry), the global system prompt, configuring image understanding,
- * switching the interface skin, and describing what this plugin is. None
- * deserves a separate nav row.
+ * completion notifications, switching the interface skin, and describing
+ * what this plugin is. None deserves a separate nav row.
  * @module dsh-web-enhanced/src/client/settings/SettingsSection
  */
 import type { WebEnhancedProps } from '../contract.ts';
 /** Full composed props of the settings section. */
 export type SettingsSectionProps = WebEnhancedProps<'settings.section'>;
 /** The web-enhanced settings page. */
-export declare function SettingsSection({ remote, t, skin }: SettingsSectionProps): import("react").JSX.Element;
+export declare function SettingsSection({ remote, t, skin, notifications }: SettingsSectionProps): import("react").JSX.Element;

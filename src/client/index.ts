@@ -41,7 +41,11 @@ import { createModelRoute } from './model-route.ts'
 import { applyMention, mentionOptions } from './mention.ts'
 import type { MentionDeps, MentionKind, MentionOption } from './mention.ts'
 import { workspaceOfSessionId } from './workspace.ts'
-import { createBrowse, createOverlay, createPanel, createPreview } from './stores.ts'
+import { createBrowse, createCell, createOverlay, createPanel, createPreview } from './stores.ts'
+import {
+  applyCompletionNotify, COMPLETION_NOTIFY_SETTINGS_KEY, DEFAULT_COMPLETION_NOTIFY_SETTINGS,
+  reviveCompletionNotifySettings,
+} from './notify/completion-notify.ts'
 import { SkinLayer } from './skins/skin-layer.ts'
 import { applyNavbar } from './navbar/index.ts'
 import { ModelPicker } from './model-picker/ModelPicker.tsx'
@@ -207,6 +211,18 @@ export const inject = ['slots', 'locale', 'connection', 'remote', 'sessions', 'w
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'web-enhanced: dictionaries')
 
+  // Completion alerts: a chime and/or OS popup when a watched session's
+  // running bit flips true → false. Preferences are browser-local; the
+  // settings face travels with the Web Enhanced section below.
+  const notifications = applyCompletionNotify(
+    ctx,
+    createCell(DEFAULT_COMPLETION_NOTIFY_SETTINGS, {
+      key: COMPLETION_NOTIFY_SETTINGS_KEY,
+      revive: reviveCompletionNotifySettings,
+    }),
+    ctx.locale.bind(NS),
+  )
+
   // The Model Capabilities page joins the same three wire facts as the host
   // Models page but edits only what that page leaves out: input modalities
   // and reasoning efforts. It is a separate settings section on purpose —
@@ -365,6 +381,7 @@ export function apply(ctx: ClientContext): void {
             preview: preview.cell,
           },
           skin,
+          notifications,
           ...overlay.actions,
           ...browse.actions,
           ...panel.actions,
