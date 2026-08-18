@@ -264,11 +264,14 @@ try {
 
   // 文件树 → 预览真实链路：点击工作区根目录的 README.md，断言 markdown
   // 预览出现（文件树 fsList → 文件打开 fsRead → 预览渲染，全程不 mock）。
-  const readmeRow = workspaceView.locator('[data-testid="file-row"]').filter({ hasText: 'README.md' }).first()
+  // 行 testid 是 FileTree 的 `file-tree-row-${entry.path}`，根目录文件的
+  // path 就是文件名。
+  const readmeRow = workspaceView.locator('[data-testid="file-tree-row-README.md"]').first()
   await readmeRow.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {})
   if (!(await readmeRow.isVisible().catch(() => false))) {
     await screenshot('e2e-fail-filetree.png')
     await logTail()
+    await logPluginDiagnostics(page, pageErrors, consoleErrors, responseErrors)
     fail('工作区文件树 20s 内未出现 README.md（工作区根未列出？）')
   }
   await readmeRow.click()

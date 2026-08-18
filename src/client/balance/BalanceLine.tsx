@@ -324,12 +324,12 @@ function DeepSeekLine({
   const groups: ReactNode[] = []
   groups.push(<ProviderGroup key="route" names={names} provider={provider} model={model} t={t} />)
   if (fatal !== null) {
-    groups.push(<span key="fatal" className={css.error}>{t('balance.error', { message: fatal })}</span>)
+    groups.push(<span key="fatal" className={css.error} data-testid="balance-error">{t('balance.error', { message: fatal })}</span>)
   } else if (info === undefined && view.error !== undefined) {
     if (view.error.code === 'no-api-key') {
-      groups.push(<span key="nokey" className={css.error}>{t('balance.noKey')}</span>)
+      groups.push(<span key="nokey" className={css.error} data-testid="balance-error">{t('balance.noKey')}</span>)
     } else {
-      groups.push(<span key="berr" className={css.error}>{t('balance.error', { message: view.error.message })}</span>)
+      groups.push(<span key="berr" className={css.error} data-testid="balance-error">{t('balance.error', { message: view.error.message })}</span>)
     }
   } else if (info !== undefined) {
     const low = info.totalBalance < lowThreshold
@@ -339,7 +339,7 @@ function DeepSeekLine({
       toppedUp: formatBalanceAmount(info.currency, info.toppedUpBalance),
     })
     groups.push(
-      <span key="bal" className={css.group} title={title}>
+      <span key="bal" className={css.group} title={title} data-testid="balance-value">
         {t('balance.title')}{' '}
         <b className={css.num}>{formatBalanceAmount(info.currency, info.totalBalance)}</b>
         {low
@@ -416,13 +416,13 @@ function OpencodeGoLine({
   ]
 
   if (fatal !== null) {
-    groups.push(<span key="fatal" className={css.error}>{t('balance.opencodeGoError', { message: fatal })}</span>)
+    groups.push(<span key="fatal" className={css.error} data-testid="balance-error">{t('balance.opencodeGoError', { message: fatal })}</span>)
   } else if (view === null || loading) {
     groups.push(<span key="loading" className={css.group}>{t('balance.opencodeGoLoading')}</span>)
   } else if (view.error !== undefined && view.windows.length === 0) {
     groups.push(view.error.code === 'opencode-go-no-key'
-      ? <span key="nokey" className={css.error}>{t('balance.opencodeGoNoKey')}</span>
-      : <span key="subberr" className={css.error}>{t('balance.opencodeGoError', { message: view.error.message })}</span>)
+      ? <span key="nokey" className={css.error} data-testid="balance-error">{t('balance.opencodeGoNoKey')}</span>
+      : <span key="subberr" className={css.error} data-testid="balance-error">{t('balance.opencodeGoError', { message: view.error.message })}</span>)
   } else {
     const windows = view.windows
     const remainingOf = (window: OpencodeGoWindow): number => Math.max(0, 100 - window.usedPercent)
@@ -447,7 +447,7 @@ function OpencodeGoLine({
       }))
     }
     groups.push(
-      <span key="windows" className={css.group} title={titleLines.join('\n')}>
+      <span key="windows" className={css.group} title={titleLines.join('\n')} data-testid="balance-value">
         {windows.map((window, index) => {
           const remaining = remainingOf(window)
           return (
