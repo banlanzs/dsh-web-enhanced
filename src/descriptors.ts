@@ -370,8 +370,9 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
     truncated: z.boolean(),
   }))),
   nullary('modelRetryGet', 'ModelRetryGetResult', okOrError(z.object({
-    config: z.object({
-      provider: z.literal('deepseek-official'),
+    configs: z.array(z.object({
+      provider: z.string(),
+      displayName: z.string().nullable(),
       managed: z.boolean(),
       writable: z.boolean(),
       revision: z.number().nullable(),
@@ -380,7 +381,7 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
       initialDelayMs: z.number(),
       maxDelayMs: z.number(),
       jitterRatio: z.number(),
-    }),
+    })),
   }))),
   unary('modelRetrySet', 'ModelRetrySetRequest', 'ModelRetrySetResult', okOrError(z.object({
     ok: z.literal(true),

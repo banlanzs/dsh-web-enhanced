@@ -882,60 +882,105 @@ describe('WebEnhancedGateway', () => {
   })
 
   describe('model retry remote', () => {
+    /** Provide the provider directory entries the retry remotes enumerate. */
+    function provideDirectory(
+      ctx: Context,
+      entries: ReadonlyArray<{ provider: string; settingsNs: string; settingsPath: string[]; declared?: boolean }>,
+      active: string[] = [],
+    ): void {
+      ctx.provide('llm' as never, {
+        listConfigurableProviders: () => entries,
+        listProviders: () => active.map(id => ({ id })),
+      } as never)
+    }
+
     it('answers model-retry-settings-unavailable when no settings service is mounted', async () => {
       const { gateway } = await harness()
       expect(await gateway.modelRetryGet()).toMatchObject({ error: { code: 'model-retry-settings-unavailable' } })
-      expect(await gateway.modelRetrySet({ maxRetries: 3 }))
+      expect(await gateway.modelRetrySet({ provider: 'deepseek-official', maxRetries: 3 }))
         .toMatchObject({ error: { code: 'model-retry-settings-unavailable' } })
     })
 
-    it('reads the DeepSeek retry policy and saves a bounded retry count with CAS', async () => {
+    it('answers an empty list when the provider directory is not composed', async () => {
       const { ctx, gateway } = await harness()
-      const section: Record<string, unknown> = {
+      ctx.provide('settings' as never, {
+        get: () => ({}),
+        describe: () => [],
+        update: async () => {},
+        writable: true,
+      } as never)
+      expect(await gateway.modelRetryGet()).toEqual({ configs: [] })
+    })
+
+    it('reads every retry-capable route and saves one with CAS', async () => {
+      const { ctx, gateway } = await harness()
+      const deepseekSection: Record<string, unknown> = {
         retryPolicy: {
           mode: 'always',
           backoff: { initialDelayMs: 25, maxDelayMs: 100, jitterRatio: 0.2 },
         },
       }
-      const update = vi.fn(async (_ns: unknown, patch: object) => {
-        Object.assign(section.retryPolicy as Record<string, unknown>, patch.retryPolicy as Record<string, unknown>)
-      })
+      const piAiSection: Record<string, unknown> = {
+        providers: {
+          octopus: {
+            displayName: 'Octopus',
+            retryPolicy: { mode: 'normal', maxRetries: 5 },
+          },
+          dormant: { displayName: 'Dormant' },
+        },
+      }
+      const sections: Record<string, unknown> = { 'llm-deepseek': deepseekSection, 'llm-pi-ai': piAiSection }
+      const update = vi.fn(async () => {})
       ctx.provide('settings' as never, {
-        get: () => section,
+        get: (ns: unknown) => sections[ns as string],
+        describe: () => [{ ns: 'llm-deepseek', revision: 5 }, { ns: 'llm-pi-ai', revision: 7 }],
+        update,
+        writable: true,
+      } as never)
+      provideDirectory(ctx, [
+        { provider: 'deepseek-official', settingsNs: 'llm-deepseek', settingsPath: [] },
+        { provider: 'octopus', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'octopus'], declared: true },
+        { provider: 'dormant', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'dormant'], declared: true },
+      ], ['deepseek-official'])
+
+      const view = await gateway.modelRetryGet()
+      if ('error' in view) throw new Error(view.error.message)
+      expect(view.configs).toHaveLength(3)
+      expect(view.configs[0]).toMatchObject({
+        provider: 'deepseek-official', displayName: null, mode: 'always', maxRetries: null,
+        initialDelayMs: 25, maxDelayMs: 100, jitterRatio: 0.2, revision: 5,
+      })
+      expect(view.configs[1]).toMatchObject({
+        provider: 'octopus', displayName: 'Octopus', mode: 'normal', maxRetries: 5, revision: 7,
+      })
+      expect(view.configs[2]).toMatchObject({
+        provider: 'dormant', displayName: 'Dormant', mode: 'normal', maxRetries: 2, revision: 7,
+      })
+
+      expect(await gateway.modelRetrySet({ provider: 'octopus', maxRetries: 4, expectedRevision: 7 }))
+        .toEqual({ ok: true, revision: 7 })
+      expect(update).toHaveBeenCalledWith('llm-pi-ai', {
+        providers: { octopus: { retryPolicy: { mode: 'normal', maxRetries: 4 } } },
+      }, 7)
+    })
+
+    it('saves the DeepSeek route at the section root', async () => {
+      const { ctx, gateway } = await harness()
+      const update = vi.fn(async () => {})
+      ctx.provide('settings' as never, {
+        get: () => ({ retryPolicy: { mode: 'normal', maxRetries: 2 } }),
         describe: () => [{ ns: 'llm-deepseek', revision: 5 }],
         update,
         writable: true,
       } as never)
-
-      const view = await gateway.modelRetryGet()
-      if ('error' in view) throw new Error(view.error.message)
-      expect(view.config).toMatchObject({
-        provider: 'deepseek-official', mode: 'always', maxRetries: null,
-        initialDelayMs: 25, maxDelayMs: 100, jitterRatio: 0.2,
-      })
-
-      expect(await gateway.modelRetrySet({ maxRetries: 4, expectedRevision: 5 }))
+      provideDirectory(ctx, [
+        { provider: 'deepseek-official', settingsNs: 'llm-deepseek', settingsPath: [] },
+      ], ['deepseek-official'])
+      expect(await gateway.modelRetrySet({ provider: 'deepseek-official', maxRetries: 4, expectedRevision: 5 }))
         .toEqual({ ok: true, revision: 5 })
       expect(update).toHaveBeenCalledWith('llm-deepseek', {
         retryPolicy: { mode: 'normal', maxRetries: 4 },
       }, 5)
-    })
-
-    it('reads normal defaults when the namespace has no stored retryPolicy yet', async () => {
-      const { ctx, gateway } = await harness()
-      ctx.provide('settings' as never, {
-        get: () => ({}),
-        describe: () => [{ ns: 'llm-deepseek', revision: 1 }],
-        update: async () => {},
-        writable: true,
-      } as never)
-      const view = await gateway.modelRetryGet()
-      if ('error' in view) throw new Error(view.error.message)
-      expect(view.config).toMatchObject({
-        provider: 'deepseek-official', mode: 'normal', maxRetries: 2,
-        initialDelayMs: 500, maxDelayMs: 10000, jitterRatio: 0.1,
-      })
-      expect(await gateway.modelRetrySet({ maxRetries: 0 })).toEqual({ ok: true, revision: 1 })
     })
 
     it('rejects a non-integer retry count before touching settings', async () => {
@@ -947,9 +992,25 @@ describe('WebEnhancedGateway', () => {
         update,
         writable: true,
       } as never)
-      expect(await gateway.modelRetrySet({ maxRetries: 1.5 }))
+      provideDirectory(ctx, [
+        { provider: 'deepseek-official', settingsNs: 'llm-deepseek', settingsPath: [] },
+      ], ['deepseek-official'])
+      expect(await gateway.modelRetrySet({ provider: 'deepseek-official', maxRetries: 1.5 }))
         .toMatchObject({ error: { code: 'model-retry-invalid' } })
       expect(update).not.toHaveBeenCalled()
+    })
+
+    it('answers model-retry-unmanaged for a provider outside the directory', async () => {
+      const { ctx, gateway } = await harness()
+      ctx.provide('settings' as never, {
+        get: () => ({}),
+        describe: () => [],
+        update: async () => {},
+        writable: true,
+      } as never)
+      provideDirectory(ctx, [])
+      expect(await gateway.modelRetrySet({ provider: 'ghost', maxRetries: 1 }))
+        .toMatchObject({ error: { code: 'model-retry-unmanaged' } })
     })
 
     it('maps a settings conflict onto the conflict code', async () => {
@@ -964,8 +1025,39 @@ describe('WebEnhancedGateway', () => {
         },
         writable: true,
       } as never)
-      expect(await gateway.modelRetrySet({ maxRetries: 1, expectedRevision: 3 }))
+      provideDirectory(ctx, [
+        { provider: 'deepseek-official', settingsNs: 'llm-deepseek', settingsPath: [] },
+      ], ['deepseek-official'])
+      expect(await gateway.modelRetrySet({ provider: 'deepseek-official', maxRetries: 1, expectedRevision: 3 }))
         .toMatchObject({ error: { code: 'model-retry-conflict' } })
+    })
+
+    it('hides dormant built-in routes and lists active ones beside hand-declared routes', async () => {
+      const { ctx, gateway } = await harness()
+      ctx.provide('settings' as never, {
+        get: (ns: unknown) => ns === 'llm-pi-ai'
+          ? { providers: { octopus: { displayName: 'Octopus', retryPolicy: { mode: 'normal', maxRetries: 3 } } } }
+          : { retryPolicy: { mode: 'normal', maxRetries: 2 } },
+        describe: () => [{ ns: 'llm-deepseek', revision: 1 }, { ns: 'llm-pi-ai', revision: 2 }],
+        update: async () => {},
+        writable: true,
+      } as never)
+      provideDirectory(ctx, [
+        { provider: 'deepseek-official', settingsNs: 'llm-deepseek', settingsPath: [] },
+        { provider: 'fengshao', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'fengshao'] },
+        { provider: 'zhipu', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'zhipu'] },
+        { provider: 'octopus', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'octopus'], declared: true },
+      ], ['deepseek-official', 'fengshao'])
+
+      const view = await gateway.modelRetryGet()
+      if ('error' in view) throw new Error(view.error.message)
+      // zhipu: built-in without an active adapter → hidden; fengshao: active built-in → listed.
+      expect(view.configs.map(config => config.provider)).toEqual([
+        'deepseek-official', 'fengshao', 'octopus',
+      ])
+      expect(view.configs[1]).toMatchObject({
+        provider: 'fengshao', displayName: null, mode: 'normal', maxRetries: 2, revision: 2,
+      })
     })
   })
 

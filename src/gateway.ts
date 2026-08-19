@@ -72,7 +72,10 @@ interface LlmDirectoryFace {
     readonly provider: string
     readonly settingsNs: string
     readonly settingsPath: readonly string[]
+    /** True when the route is hand-declared rather than a built-in catalog entry. */
+    readonly declared?: boolean
   }>
+  listProviders(): ReadonlyArray<{ readonly id: string }>
 }
 
 /** The settings read face, structurally (see {@link LlmDirectoryFace}). */
@@ -88,8 +91,49 @@ interface SettingsVisionFace {
   readonly writable: boolean
 }
 
-/** Settings namespace whose retry policy the model-retry remotes edit. */
-const MODEL_RETRY_SETTINGS_NS = 'llm-deepseek'
+/** Settings namespaces whose route-level retry policy the model-retry remotes edit. */
+const MODEL_RETRY_NAMESPACES: ReadonlySet<string> = new Set(['llm-deepseek', 'llm-pi-ai'])
+
+/**
+ * The retry-capable routes the panel may show: hand-declared routes, plus
+ * built-in catalog routes that are currently active (an adapter is
+ * registered for them — the user set a key). Dormant built-in routes the
+ * user never configured stay hidden.
+ */
+function retryConfigurableEntries(llm: LlmDirectoryFace): ReadonlyArray<{
+  readonly provider: string
+  readonly settingsNs: string
+  readonly settingsPath: readonly string[]
+}> {
+  const active = new Set(llm.listProviders().map(entry => entry.id))
+  return llm.listConfigurableProviders().filter(entry =>
+    MODEL_RETRY_NAMESPACES.has(entry.settingsNs)
+    && (entry.declared === true || active.has(entry.provider)))
+}
+
+/** Read a value at one settings path; absent parents answer undefined. */
+function readPath(value: unknown, path: readonly string[]): unknown {
+  let current = value
+  for (const step of path) {
+    if (typeof current !== 'object' || current === null || Array.isArray(current)) return undefined
+    current = (current as Record<string, unknown>)[step]
+  }
+  return current
+}
+
+/** Nest one value under a settings path for a merge-style update patch. */
+function nestAt(path: readonly string[], value: unknown): Record<string, unknown> {
+  let result = value as Record<string, unknown>
+  for (let index = path.length - 1; index >= 0; index--) result = { [path[index]!]: result }
+  return result
+}
+
+/** Read a value as a plain record, defaulting everything else to {}. */
+function recordValue(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
 
 /** How long one cached empty-query search result serves the mention picker (ms). */
 const FS_SEARCH_CACHE_TTL_MS = 30_000
@@ -97,18 +141,6 @@ const FS_SEARCH_CACHE_TTL_MS = 30_000
 /** Distinct empty-query search results kept at once (insertion-order eviction). */
 const FS_SEARCH_CACHE_LIMIT = 4
 
-/** The resolved shape of the DeepSeek adapter's retry policy settings. */
-interface DeepSeekRetrySettingsValue {
-  readonly retryPolicy?: {
-    readonly mode?: 'normal' | 'always'
-    readonly maxRetries?: number
-    readonly backoff?: {
-      readonly initialDelayMs?: number
-      readonly maxDelayMs?: number
-      readonly jitterRatio?: number
-    }
-  }
-}
 
 /** The provider/model directory face the vision config picker reads. */
 interface LlmVisionDirectoryFace {
@@ -586,10 +618,12 @@ export class WebEnhancedGateway extends TypertRemoteService {
   }
 
   /**
-   * Read the DeepSeek provider's current model-request retry policy from the
-   * host's settings service. Saving a number switches the provider back to
-   * bounded normal mode and takes effect on the next request without a
-   * restart (`llm-deepseek` re-registers its route when the policy changes).
+   * Read every enabled provider route's current model-request retry policy
+   * from the host's settings service — llm-deepseek at its section root and
+   * each pi-ai route inside `providers.<route>.retryPolicy`. Saving a number
+   * switches the route back to bounded normal mode and takes effect on the
+   * next request without a restart (the adapter re-registers its route when
+   * the policy changes).
    */
   @Remote('modelRetryGet')
   async modelRetryGet(): Promise<ModelRetryGetResult> {
@@ -598,33 +632,47 @@ export class WebEnhancedGateway extends TypertRemoteService {
       if (settings === undefined) {
         return { error: { code: 'model-retry-settings-unavailable', message: 'the settings service is not mounted in this deployment' } }
       }
-      const raw = settings.get(MODEL_RETRY_SETTINGS_NS as never) as DeepSeekRetrySettingsValue | undefined
-      if (raw === undefined || typeof raw !== 'object') {
-        return { error: { code: 'model-retry-settings-unmanaged', message: `settings namespace '${MODEL_RETRY_SETTINGS_NS}' is not registered` } }
+      const llm = this.ctx.get('llm' as never) as unknown as LlmDirectoryFace | undefined
+      if (llm === undefined) return { configs: [] }
+      const revisions = new Map(settings.describe().map(entry => [entry.ns, entry.revision]))
+      const configs: ModelRetryConfigView[] = []
+      for (const entry of retryConfigurableEntries(llm)) {
+        // The resolved settings value omits `retryPolicy` until the user writes
+        // one (the schema field has no default); the adapter resolves the same
+        // omission to the normal defaults, so mirror that here.
+        let section: unknown
+        try {
+          section = readPath(settings.get(entry.settingsNs as never), entry.settingsPath)
+        } catch {
+          section = undefined
+        }
+        const route = recordValue(section)
+        const policy = recordValue(route['retryPolicy'])
+        const backoff = recordValue(policy['backoff'])
+        const mode = policy['mode'] === 'always' ? 'always' : 'normal'
+        const displayName = typeof route['displayName'] === 'string' && route['displayName'].length > 0
+          ? route['displayName']
+          : null
+        configs.push({
+          provider: entry.provider,
+          displayName,
+          managed: revisions.has(entry.settingsNs),
+          writable: settings.writable,
+          revision: revisions.get(entry.settingsNs) ?? null,
+          mode,
+          maxRetries: mode === 'always' ? null : typeof policy['maxRetries'] === 'number' ? policy['maxRetries'] : 2,
+          initialDelayMs: typeof backoff['initialDelayMs'] === 'number' ? backoff['initialDelayMs'] : 500,
+          maxDelayMs: typeof backoff['maxDelayMs'] === 'number' ? backoff['maxDelayMs'] : 10_000,
+          jitterRatio: typeof backoff['jitterRatio'] === 'number' ? backoff['jitterRatio'] : 0.1,
+        })
       }
-      // The resolved settings value omits `retryPolicy` until the user writes
-      // one (the schema field has no default); the adapter resolves the same
-      // omission to the normal defaults, so mirror that here.
-      const policy = raw.retryPolicy
-      const descriptor = settings.describe().find(entry => entry.ns === MODEL_RETRY_SETTINGS_NS)
-      const config: ModelRetryConfigView = {
-        provider: 'deepseek-official',
-        managed: true,
-        writable: settings.writable,
-        revision: descriptor?.revision ?? null,
-        mode: policy?.mode === 'always' ? 'always' : 'normal',
-        maxRetries: policy?.mode === 'always' ? null : policy?.maxRetries ?? 2,
-        initialDelayMs: policy?.backoff?.initialDelayMs ?? 500,
-        maxDelayMs: policy?.backoff?.maxDelayMs ?? 10_000,
-        jitterRatio: policy?.backoff?.jitterRatio ?? 0.1,
-      }
-      return { config }
+      return { configs }
     } catch (error) {
       return { error: this.errorOf(error, 'model-retry-config') }
     }
   }
 
-  /** Save a bounded retry count into the DeepSeek provider settings. */
+  /** Save a bounded retry count into one provider route's settings. */
   @Remote('modelRetrySet')
   async modelRetrySet(request: ModelRetrySetRequest): Promise<ModelRetrySetResult> {
     try {
@@ -638,14 +686,17 @@ export class WebEnhancedGateway extends TypertRemoteService {
       if (!settings.writable) {
         return { error: { code: 'model-retry-settings-readonly', message: 'the settings provider is read-only' } }
       }
-      const raw = settings.get(MODEL_RETRY_SETTINGS_NS as never)
-      if (raw === undefined) {
-        return { error: { code: 'model-retry-settings-unmanaged', message: `settings namespace '${MODEL_RETRY_SETTINGS_NS}' is not registered` } }
+      const llm = this.ctx.get('llm' as never) as unknown as LlmDirectoryFace | undefined
+      const entry = llm === undefined
+        ? undefined
+        : retryConfigurableEntries(llm).find(candidate => candidate.provider === request.provider)
+      if (entry === undefined) {
+        return { error: { code: 'model-retry-unmanaged', message: `provider "${request.provider}" has no configurable retry settings` } }
       }
-      await settings.update(MODEL_RETRY_SETTINGS_NS as never, {
+      await settings.update(entry.settingsNs as never, nestAt(entry.settingsPath, {
         retryPolicy: { mode: 'normal', maxRetries: request.maxRetries },
-      }, request.expectedRevision)
-      const revision = settings.describe().find(entry => entry.ns === MODEL_RETRY_SETTINGS_NS)?.revision ?? 0
+      }), request.expectedRevision)
+      const revision = settings.describe().find(desc => desc.ns === entry.settingsNs)?.revision ?? 0
       return { ok: true, revision }
     } catch (error) {
       const conflict = (error as { code?: unknown }).code === 'SETTINGS_CONFLICT'

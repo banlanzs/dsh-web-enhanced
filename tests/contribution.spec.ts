@@ -166,8 +166,9 @@ const payloads: Record<string, unknown[]> = {
     truncated: true,
   }, errorPayload],
   modelRetryGet: [{
-    config: {
+    configs: [{
       provider: 'deepseek-official',
+      displayName: null,
       managed: true,
       writable: true,
       revision: 7,
@@ -176,10 +177,9 @@ const payloads: Record<string, unknown[]> = {
       initialDelayMs: 500,
       maxDelayMs: 10000,
       jitterRatio: 0.1,
-    },
-  }, {
-    config: {
-      provider: 'deepseek-official',
+    }, {
+      provider: 'octopus',
+      displayName: 'Octopus',
       managed: true,
       writable: true,
       revision: 8,
@@ -188,7 +188,7 @@ const payloads: Record<string, unknown[]> = {
       initialDelayMs: 25,
       maxDelayMs: 100,
       jitterRatio: 0.2,
-    },
+    }],
   }, errorPayload],
   modelRetrySet: [{ ok: true, revision: 9 }, errorPayload],
   globalPromptGet: [{

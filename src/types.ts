@@ -507,17 +507,20 @@ export interface VisionStatusView {
 export type VisionStatusResult = VisionStatusView | { readonly error: ApiError }
 
 /**
- * The DeepSeek provider's model-request retry policy, as the Settings tab
+ * One provider route's model-request retry policy, as the Settings tab
  * edits it. `maxRetries` is null when the provider is configured for
  * unbounded (`always`) retries; saving a number switches it to bounded normal
  * mode.
  */
 export interface ModelRetryConfigView {
-  readonly provider: 'deepseek-official'
-  /** Whether the llm-deepseek settings namespace is registered. */
+  /** Provider route id: 'deepseek-official' or one pi-ai route. */
+  readonly provider: string
+  /** Configured display name, when the route's settings declare one. */
+  readonly displayName: string | null
+  /** Whether the owning settings namespace is registered. */
   readonly managed: boolean
   readonly writable: boolean
-  /** CAS revision; send it back with the next save. */
+  /** CAS revision of the owning namespace; send it back with the next save. */
   readonly revision: number | null
   readonly mode: 'normal' | 'always'
   /** null = retries every failure until success, cancellation, or disposal. */
@@ -527,10 +530,11 @@ export interface ModelRetryConfigView {
   readonly jitterRatio: number
 }
 
-export type ModelRetryGetResult = { readonly config: ModelRetryConfigView } | { readonly error: ApiError }
+export type ModelRetryGetResult = { readonly configs: readonly ModelRetryConfigView[] } | { readonly error: ApiError }
 
-/** One save, carrying the revision the form loaded. */
+/** One save for one provider route, carrying the revision the form loaded. */
 export interface ModelRetrySetRequest {
+  readonly provider: string
   readonly maxRetries: number
   readonly expectedRevision?: number
 }

@@ -1,9 +1,11 @@
 /**
- * Model-request retry settings: edits the DeepSeek provider's bounded retry
- * count through the host settings service. The value lives in the
- * `llm-deepseek` namespace (owned by the provider plugin), so saving here is
- * a settings write, not a web-enhanced config — and the provider re-registers
- * its route immediately, applying the new policy to the next request.
+ * Model-request retry settings: edits every enabled provider route's
+ * bounded retry count through the host settings service. The value lives in
+ * the owning adapter's settings namespace — `llm-deepseek` at its section
+ * root, each pi-ai route at `providers.<route>.retryPolicy` — so saving here
+ * is a settings write, not a web-enhanced config, and the provider
+ * re-registers its route immediately, applying the new policy to the next
+ * request.
  * @module dsh-web-enhanced/src/client/settings/ModelRetryPanel
  */
 
@@ -16,115 +18,135 @@ import css from './ModelRetryPanel.module.css'
 /** The settings section props this panel actually uses. */
 export type ModelRetryPanelProps = Pick<WebEnhancedProps<'settings.plugins.tab'>, 'remote' | 't'>
 
-/** Load state of the retry policy. */
+/** Load state of the retry policies. */
 type State =
   | { readonly phase: 'loading' }
-  | { readonly phase: 'ready'; readonly config: ModelRetryConfigView; readonly draft: string }
+  | { readonly phase: 'ready'; readonly configs: readonly ModelRetryConfigView[]; readonly drafts: Readonly<Record<string, string>> }
   | { readonly phase: 'error'; readonly message: string }
 
-/** The DeepSeek retry settings panel. */
+/** Per-provider retry settings, one editable row per enabled route. */
 export function ModelRetryPanel({ remote, t }: ModelRetryPanelProps) {
   const [state, setState] = useState<State>({ phase: 'loading' })
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [saved, setSaved] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const live = useRef(true)
   useEffect(() => () => { live.current = false }, [])
 
-  useEffect(() => {
+  const load = useCallback(async (): Promise<void> => {
     setState({ phase: 'loading' })
-    void (async () => {
-      const result = await remote.modelRetryGet()
-      if (!live.current) return
-      setState('error' in result
-        ? { phase: 'error', message: result.error.message }
-        : {
-          phase: 'ready',
-          config: result.config,
-          draft: result.config.maxRetries === null ? '' : String(result.config.maxRetries),
-        })
-    })()
+    const result = await remote.modelRetryGet()
+    if (!live.current) return
+    if ('error' in result) {
+      setState({ phase: 'error', message: result.error.message })
+      return
+    }
+    const drafts: Record<string, string> = {}
+    for (const config of result.configs) {
+      drafts[config.provider] = config.maxRetries === null ? '' : String(config.maxRetries)
+    }
+    setState({ phase: 'ready', configs: result.configs, drafts })
   }, [remote])
 
-  const save = useCallback(async (): Promise<void> => {
+  useEffect(() => { void load() }, [load])
+
+  const setDraft = (provider: string, text: string): void => {
     if (state.phase !== 'ready') return
-    const maxRetries = Number(state.draft)
+    setSaved(null)
+    setSaveError(null)
+    setState({ ...state, drafts: { ...state.drafts, [provider]: text } })
+  }
+
+  const save = useCallback(async (config: ModelRetryConfigView): Promise<void> => {
+    if (state.phase !== 'ready') return
+    const draft = state.drafts[config.provider] ?? ''
+    const maxRetries = Number(draft)
     if (!Number.isSafeInteger(maxRetries) || maxRetries < 0) return
-    setSaving(true)
-    setSaved(false)
+    setSaving(config.provider)
+    setSaved(null)
     setSaveError(null)
     const result = await remote.modelRetrySet({
+      provider: config.provider,
       maxRetries,
-      ...(state.config.revision === null ? {} : { expectedRevision: state.config.revision }),
+      ...(config.revision === null ? {} : { expectedRevision: config.revision }),
     })
     if (!live.current) return
-    setSaving(false)
+    setSaving(null)
     if ('error' in result) {
       setSaveError(result.error.message)
       return
     }
-    setState({
-      phase: 'ready',
-      config: { ...state.config, mode: 'normal', maxRetries, revision: result.revision },
-      draft: String(maxRetries),
-    })
-    setSaved(true)
-  }, [remote, state])
+    setSaved(config.provider)
+    // Reload: the namespace revision advanced and every sibling route shares it.
+    void load()
+  }, [load, remote, state])
 
   if (state.phase === 'loading') return <p className={css.note}>{t('modelRetry.loading')}</p>
   if (state.phase === 'error') return <p className={css.error}>{t('modelRetry.error', { message: state.message })}</p>
-
-  const valid = state.draft !== '' && Number.isSafeInteger(Number(state.draft)) && Number(state.draft) >= 0
-  const unchanged = state.config.maxRetries !== null && state.draft === String(state.config.maxRetries)
+  if (state.configs.length === 0) return <p className={css.note}>{t('modelRetry.empty')}</p>
 
   return (
     <section className={css.panel} data-testid="model-retry-panel">
       <h3 className={css.title}>{t('modelRetry.title')}</h3>
-      <dl className={css.facts}>
-        <dt>{t('modelRetry.provider')}</dt>
-        <dd>{t('modelRetry.providerName')}</dd>
-        <dt>{t('modelRetry.current')}</dt>
-        <dd>{state.config.maxRetries === null ? t('modelRetry.unlimited') : String(state.config.maxRetries)}</dd>
-      </dl>
       <p className={css.hint}>{t('modelRetry.hint')}</p>
-      <label className={css.field}>
-        <span className={css.label}>{t('modelRetry.maxLabel')}</span>
-        <input
-          className={css.input}
-          type="number"
-          min={0}
-          step={1}
-          value={state.draft}
-          placeholder={t('modelRetry.placeholder')}
-          data-testid="model-retry-input"
-          onChange={event => {
-            setSaved(false)
-            setSaveError(null)
-            setState({ ...state, draft: event.target.value })
-          }}
-        />
-      </label>
-      {!valid && state.draft !== '' && <p className={css.error}>{t('modelRetry.invalid')}</p>}
-      <button
-        type="button"
-        className={css.save}
-        disabled={saving || !valid || unchanged}
-        data-testid="model-retry-save"
-        onClick={() => { void save() }}
-      >
-        {t('modelRetry.save')}
-      </button>
-      {saved && <p className={css.saved}>{t('modelRetry.saved')}</p>}
+      <div className={css.providers}>
+        {state.configs.map(config => {
+          const draft = state.drafts[config.provider] ?? ''
+          const valid = draft !== '' && Number.isSafeInteger(Number(draft)) && Number(draft) >= 0
+          const unchanged = config.maxRetries !== null && draft === String(config.maxRetries)
+          const busy = saving === config.provider
+          const label = config.displayName ?? (config.provider === 'deepseek-official' ? t('modelRetry.providerName') : config.provider)
+          return (
+            <div className={css.providerCard} key={config.provider}>
+              <div className={css.providerHead}>
+                <span className={css.providerName} title={config.provider}>{label}</span>
+                {!config.managed && <span className={css.unmanaged}>{t('modelRetry.unmanaged')}</span>}
+                <span className={css.providerCurrent}>
+                  {config.mode === 'always' ? t('modelRetry.unlimited') : String(config.maxRetries)}
+                </span>
+              </div>
+              <div className={css.providerRow}>
+                <label className={css.field}>
+                  <span className={css.label}>{t('modelRetry.maxLabel')}</span>
+                  <input
+                    className={css.input}
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={draft}
+                    placeholder={t('modelRetry.placeholder')}
+                    data-testid={`model-retry-input-${config.provider}`}
+                    onChange={event => { setDraft(config.provider, event.target.value) }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className={css.save}
+                  disabled={busy || !config.writable || !valid || unchanged}
+                  data-testid={`model-retry-save-${config.provider}`}
+                  onClick={() => { void save(config) }}
+                >
+                  {t('modelRetry.save')}
+                </button>
+              </div>
+              {!valid && draft !== '' && <p className={css.error}>{t('modelRetry.invalid')}</p>}
+              {saved === config.provider && <p className={css.saved}>{t('modelRetry.saved')}</p>}
+              <details className={css.backoff}>
+                <summary className={css.backoffSummary}>{t('modelRetry.backoffTitle')}</summary>
+                <dl className={css.facts}>
+                  <dt>{t('modelRetry.initialDelay')}</dt>
+                  <dd>{config.initialDelayMs}ms</dd>
+                  <dt>{t('modelRetry.maxDelay')}</dt>
+                  <dd>{config.maxDelayMs}ms</dd>
+                  <dt>{t('modelRetry.jitter')}</dt>
+                  <dd>{config.jitterRatio}</dd>
+                </dl>
+              </details>
+            </div>
+          )
+        })}
+      </div>
       {saveError !== null && <p className={css.error}>{t('modelRetry.saveError', { message: saveError })}</p>}
-      <h4 className={css.subtitle}>{t('modelRetry.backoffTitle')}</h4>
-      <dl className={css.facts}>
-        <dt>{t('modelRetry.initialDelay')}</dt>
-        <dd>{state.config.initialDelayMs}ms</dd>
-        <dt>{t('modelRetry.maxDelay')}</dt>
-        <dd>{state.config.maxDelayMs}ms</dd>
-        <dt>{t('modelRetry.jitter')}</dt>
-        <dd>{state.config.jitterRatio}</dd>
-      </dl>
     </section>
   )
 }
