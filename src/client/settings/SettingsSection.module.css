@@ -2,20 +2,30 @@
   display: flex;
   flex-direction: row;
   gap: 14px;
-  height: 100%;
-  max-height: 100%;
-  min-height: 0;
+  /* The host settings shell's height chain breaks at the plugins tab panel
+     (its panel has no flex:1 / min-height:0), so height:100% resolves to
+     auto and the whole page rides the host's one scrollbar. Own a concrete
+     viewport-derived height instead so the left rail and the right body
+     scroll independently. */
+  height: calc(100vh - 240px);
+  min-height: 320px;
+  min-width: 0;
 }
 
 /* The left rail owns vertical space instead of horizontal width: eight tabs
    fit as a column even when the pane is narrow, and the rail scrolls on its
-   own rather than wrapping or pushing the page. */
+   own rather than wrapping or pushing the page. Sticky keeps it pinned when
+   a short viewport lets the host's outer scrollbar take over. */
 .tabs {
   display: flex;
   flex: none;
   flex-direction: column;
   gap: 2px;
   width: 132px;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  max-height: 100%;
   min-height: 0;
   overflow-y: auto;
   border-right: 1px solid var(--dsw-alias-border-l1, rgba(0 0 0 / 4%));

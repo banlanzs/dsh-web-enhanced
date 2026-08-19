@@ -48,12 +48,19 @@
 
 /* The centered dialog card: wider and roomier than the host's small menu. */
 .modal {
+  display: flex;
+  flex-direction: column;
   width: min(640px, calc(100vw - 32px));
   max-height: min(720px, calc(100vh - 32px));
 }
 
 .modalContent {
-  max-height: min(640px, calc(100vh - 120px));
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsw-alias-border-l3, rgba(0 0 0 / 12%)) transparent;
 }
 
 .footer {
