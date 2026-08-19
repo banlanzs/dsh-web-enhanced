@@ -227,12 +227,16 @@ if (NODES.length === 0 && !flag('--matrix')) {
 if (CLEAN) {
   // 全部重新生成、纯缓存性质的产物：worktree（含 node_modules）与本次打包的 tgz。
   // host/<sha> 保留——宿主构建最重且按 SHA 缓存，删了每次 --full 都重建。
+  // worktree 模式下 tgz 打包在 worktree 内，随目录删除一并消失，只在主树模式
+  // （--no-worktree）额外扫描主树根。
   log('--clean：清理 worktree 与打包产物')
+  if (!USE_WORKTREE && existsSync(REPO_DIR)) {
+    for (const file of readdirSync(REPO_DIR)) {
+      if (file.endsWith('.tgz')) rmSync(join(REPO_DIR, file), { force: true })
+    }
+  }
   if (existsSync(WORKTREE_DIR)) rmSync(WORKTREE_DIR, { recursive: true, force: true })
   run('git', ['worktree', 'prune'], { cwd: MAIN_ROOT })
-  for (const file of readdirSync(REPO_DIR)) {
-    if (file.endsWith('.tgz')) rmSync(join(REPO_DIR, file), { force: true })
-  }
 }
 process.exit(0)
 
