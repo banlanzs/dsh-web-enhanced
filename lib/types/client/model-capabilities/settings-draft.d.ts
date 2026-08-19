@@ -88,6 +88,27 @@ export type PiAiDraftFailure = 'defaultInputEmpty' | 'modelInputInvalid' | 'mode
  */
 export declare function normalizePiAiDraft(draft: JsonRecord): JsonRecord;
 /**
+ * Write one reasoning-efforts value onto every model in a provider draft —
+ * every entry of a `models` list, or every `modelOverrides` entry — so a
+ * route-level preset reaches all models in one action instead of per-model
+ * editing. `undefined` removes the field (returning models to inheritance);
+ * the caller's normalize step drops any override left empty by the removal.
+ * @param draft - the provider profile draft.
+ * @param reasoningEfforts - the value to set (`undefined` | `false` | dict).
+ * @param listMode - whether the draft uses a `models` list (true) or
+ *   `modelOverrides` (false).
+ * @returns a new draft with every model's reasoning-efforts replaced.
+ */
+export declare function applyReasoningToAll(draft: JsonRecord, reasoningEfforts: unknown, listMode: boolean): JsonRecord;
+/**
+ * Whether a batch-apply reasoning-efforts preset is a value worth writing:
+ * 'false' (non-reasoning) or a dict offering at least one non-off level with
+ * a non-empty wire value. 'undefined' and an empty/off-only dict are not.
+ * @param value - the preset the batch editor holds.
+ * @returns whether the batch apply button may run with this preset.
+ */
+export declare function usableReasoningPreset(value: unknown): boolean;
+/**
  * Validate one pi-ai provider profile draft before it is written.
  * @param draft - the provider profile draft.
  * @returns the first localized failure key, or undefined when it may apply.

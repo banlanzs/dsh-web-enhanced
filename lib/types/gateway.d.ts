@@ -146,13 +146,15 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
      */
     visionConfigSet(request: VisionConfigSaveRequest): Promise<VisionConfigSetResult>;
     /**
-     * Read the DeepSeek provider's current model-request retry policy from the
-     * host's settings service. Saving a number switches the provider back to
-     * bounded normal mode and takes effect on the next request without a
-     * restart (`llm-deepseek` re-registers its route when the policy changes).
+     * Read every enabled provider route's current model-request retry policy
+     * from the host's settings service — llm-deepseek at its section root and
+     * each pi-ai route inside `providers.<route>.retryPolicy`. Saving a number
+     * switches the route back to bounded normal mode and takes effect on the
+     * next request without a restart (the adapter re-registers its route when
+     * the policy changes).
      */
     modelRetryGet(): Promise<ModelRetryGetResult>;
-    /** Save a bounded retry count into the DeepSeek provider settings. */
+    /** Save a bounded retry count into one provider route's settings. */
     modelRetrySet(request: ModelRetrySetRequest): Promise<ModelRetrySetResult>;
     /**
      * Read the global-prompt settings namespace. Served through this plugin's

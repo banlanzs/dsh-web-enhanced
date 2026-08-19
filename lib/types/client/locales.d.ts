@@ -134,8 +134,6 @@ export declare const zh: {
     readonly 'modelCapabilities.routeReasoning': "默认推理档位";
     readonly 'modelCapabilities.routeReasoningInherit': "使用适配器 / 目录默认";
     readonly 'modelCapabilities.routeReasoningHint': "仅作为该渠道的请求默认档位；不会为未声明推理能力的模型新增可选档位。";
-    readonly 'modelCapabilities.reasoningInherited': "目录能力：{levels}；默认 {default}";
-    readonly 'modelCapabilities.reasoningInheritedNone': "目录未声明推理档位：渠道级默认只作为请求默认，不会在选择器里生成档位；这里选择“自定义可提供的档位”后才会显示。";
     readonly 'modelCapabilities.modelSection': "模型输入与推理强度";
     readonly 'modelCapabilities.modelsListMode': "该渠道使用自定义 models 列表";
     readonly 'modelCapabilities.modelsListModeHint': "模型增删与 ID / 名称 / 容量请在“模型”页编辑；这里只编辑每个模型的 input 与 reasoningEfforts。";
@@ -151,9 +149,10 @@ export declare const zh: {
     readonly 'modelCapabilities.inputText': "文本 (text)";
     readonly 'modelCapabilities.inputImage': "图片 (image)";
     readonly 'modelCapabilities.reasoning': "推理强度";
-    readonly 'modelCapabilities.reasoningInherit': "继承目录能力";
     readonly 'modelCapabilities.reasoningNone': "不支持推理（false）";
     readonly 'modelCapabilities.reasoningCustom': "自定义可提供的档位";
+    readonly 'modelCapabilities.reasoningUnset': "未设置";
+    readonly 'modelCapabilities.reasoningNoneSelected': "未勾选档位";
     readonly 'modelCapabilities.reasoningCustomHint': "勾选要提供的档位，并填写发送给端点的 wire 值；“off”留空表示不发参数。";
     readonly 'modelCapabilities.reasoningLevelOff': "off";
     readonly 'modelCapabilities.reasoningLevelMinimal': "minimal";
@@ -167,6 +166,9 @@ export declare const zh: {
     readonly 'modelCapabilities.reasoningWirePlaceholder': "例如 low / medium / high";
     readonly 'modelCapabilities.reasoningNeedLevel': "自定义推理强度至少要勾选一个非 off 档位。";
     readonly 'modelCapabilities.reasoningWireRequired': "每个勾选的非 off 档位都需要非空 wire 值。";
+    readonly 'modelCapabilities.reasoningPreset': "推理档位批量设置";
+    readonly 'modelCapabilities.reasoningPresetHint': "设置一次推理档位，点击「应用到所有模型」即可批量配置，无需逐个模型选择自定义挡位。";
+    readonly 'modelCapabilities.reasoningApplyAll': "应用到所有模型";
     readonly 'modelCapabilities.modelInputInvalid': "input 只能是 text / image 列表。";
     readonly 'modelCapabilities.modelOverrideEmptyId': "模型覆盖的模型 ID 不能为空。";
     readonly 'modelCapabilities.thinkingInvalid': "thinking 只能是 enabled 或 disabled。";
@@ -263,7 +265,9 @@ export declare const zh: {
     readonly 'modelRetry.unlimited': "无限重试（always）";
     readonly 'modelRetry.maxLabel': "失败后重试次数";
     readonly 'modelRetry.placeholder': "例如 2";
-    readonly 'modelRetry.hint': "只管理 deepseek-official 渠道。保存会写入 llm-deepseek 的 retryPolicy 设置，下一次请求立即生效，无需重启。";
+    readonly 'modelRetry.hint': "为 DSH 中启用的每个模型渠道分别设置失败后重试次数。保存写入对应渠道的 retryPolicy 设置，下一次请求立即生效，无需重启。";
+    readonly 'modelRetry.empty': "没有可管理的模型渠道。";
+    readonly 'modelRetry.unmanaged': "渠道设置未注册";
     readonly 'modelRetry.invalid': "请输入不小于 0 的整数";
     readonly 'modelRetry.save': "保存";
     readonly 'modelRetry.saved': "已保存，下一次请求生效";
