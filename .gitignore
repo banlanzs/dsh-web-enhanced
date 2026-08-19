@@ -7,6 +7,10 @@ lib/*.map
 # e2e 失败时留在 cwd 的排障产物
 e2e-*.png
 dsh-web.log
+# 会话日志修复前的本地备份（用户数据，不入库）
+.session-backup/
+# Playwright MCP 留在 cwd 的快照与截图
+.playwright-mcp/
 FEATURE-REQUEST.md
 TODO.md
 MEMORY.md
