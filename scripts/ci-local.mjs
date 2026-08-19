@@ -17,6 +17,7 @@
  *   --port          smoke e2e 的端口，默认 3190
  *   --rebuild-host  强制重装重建宿主，忽略已缓存的构建
  *   --keep          保留 e2e 的临时 DSH_HOME（排障用）
+ *   --clean         成功后删除 worktree 与本次打包产物（省空间，下次全量重建）
  *
  * 本地默认在 `.ci-local/worktree`（HEAD 的干净副本）里执行，因此
  * `git diff --exit-code -- lib/` 与 CI 的全新 checkout 语义一致，且不污染
@@ -105,6 +106,7 @@ const USE_WORKTREE = !flag('--no-worktree')
 const PORT = value('--port') ?? '3190'
 const REBUILD_HOST = flag('--rebuild-host')
 const KEEP = flag('--keep')
+const CLEAN = flag('--clean')
 const NODES = flag('--matrix')
   ? MATRIX_NODES
   : (value('--node') ?? '').split(',').map(s => s.trim()).filter(Boolean)
@@ -221,6 +223,16 @@ console.log(`\n✓ 全部通过 —— 这与 ci.yml 的 check job 在 Node ${pr
 if (FAST) console.log('  注意：--fast 跳过了 smoke e2e，CI 仍会跑它。')
 if (NODES.length === 0 && !flag('--matrix')) {
   console.log(`  注意：本次只覆盖 Node ${process.versions.node.split('.')[0]}；CI 矩阵是 ${MATRIX_NODES.join(' + ')}，用 --matrix 全覆盖。`)
+}
+if (CLEAN) {
+  // 全部重新生成、纯缓存性质的产物：worktree（含 node_modules）与本次打包的 tgz。
+  // host/<sha> 保留——宿主构建最重且按 SHA 缓存，删了每次 --full 都重建。
+  log('--clean：清理 worktree 与打包产物')
+  if (existsSync(WORKTREE_DIR)) rmSync(WORKTREE_DIR, { recursive: true, force: true })
+  run('git', ['worktree', 'prune'], { cwd: MAIN_ROOT })
+  for (const file of readdirSync(REPO_DIR)) {
+    if (file.endsWith('.tgz')) rmSync(join(REPO_DIR, file), { force: true })
+  }
 }
 process.exit(0)
 
