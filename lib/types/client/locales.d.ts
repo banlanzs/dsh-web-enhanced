@@ -435,6 +435,18 @@ export declare const zh: {
     readonly 'panel.tab.scm': "变更";
     readonly 'panel.tab.board': "任务看板";
     readonly 'panel.tab.graph': "Git 图谱";
+    readonly 'terminal.title': "终端";
+    readonly 'terminal.expand': "展开终端";
+    readonly 'terminal.collapse': "收起终端";
+    readonly 'terminal.new': "新建终端";
+    readonly 'terminal.close': "关闭终端";
+    readonly 'terminal.resize': "拖动调整终端高度";
+    readonly 'terminal.empty': "还没有终端，点「+」新建一个";
+    readonly 'terminal.connecting': "正在连接…";
+    readonly 'terminal.reconnecting': "连接已断开，正在重连…";
+    readonly 'terminal.exited': "进程已退出（{code}）";
+    readonly 'terminal.gone': "这个终端已经不存在了";
+    readonly 'terminal.error': "终端错误：{message}";
     readonly 'files.collapse': "收起侧边栏";
     readonly 'navbar.pin': "精选";
     readonly 'navbar.unpin': "取消精选";

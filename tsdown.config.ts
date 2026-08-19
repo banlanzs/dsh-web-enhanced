@@ -5,6 +5,7 @@
  * hand-declared src-json contribution, so no typert generation step exists.
  */
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { basename, dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, type UserConfig } from 'tsdown'
@@ -56,6 +57,30 @@ const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES, RUNTIME_STORE_
 const CSS_VIRTUAL_PREFIX = '\0dsh-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
 
+/**
+ * Plain (non-module) stylesheets shipped by dependencies, keyed by specifier
+ * and mapped to a FIXED virtual id.
+ *
+ * The client bundle is one JS file loaded by the host's module loader — a
+ * stylesheet emitted beside it would never be fetched, so vendor CSS has to
+ * ride the same inline-and-inject path the CSS modules use. The virtual id is
+ * fixed rather than derived from the resolved path because that path contains
+ * the pnpm store layout (`node_modules/.pnpm/@xterm+xterm@5.5.0/...`), which
+ * would put a version-pinned machine-specific string into the artifact and
+ * trip the CI lib/src drift gate on any dependency bump.
+ */
+const VENDOR_CSS: Readonly<Record<string, string>> = {
+  '@xterm/xterm/css/xterm.css': 'vendor/xterm.css',
+}
+
+/** Attribution retained in the bundle: minification drops the source's own header. */
+const VENDOR_CSS_NOTICE: Readonly<Record<string, string>> = {
+  'vendor/xterm.css': '/*! xterm.js — Copyright (c) 2017 The xterm.js authors — MIT */\n',
+}
+
+/** Resolve a vendor stylesheet against this package's installed dependencies. */
+const requireFromConfig = createRequire(import.meta.url)
+
 /** Resolve an emitted lib/types asset import against its src/ counterpart. */
 function sourceAssetPath(source: string, importer: string): string {
   const emitted = resolve(dirname(importer), source)
@@ -101,6 +126,8 @@ const clientConfig: UserConfig = {
     {
       name: 'dsh-css-modules-inline',
       resolveId(source: string, importer: string | undefined) {
+        const vendor = VENDOR_CSS[source]
+        if (vendor !== undefined) return CSS_VIRTUAL_PREFIX + vendor + CSS_VIRTUAL_SUFFIX
         if (!source.endsWith('.module.css')) return null
         const abs = importer !== undefined ? sourceAssetPath(source, importer) : source
         return CSS_VIRTUAL_PREFIX + repoRelative(abs) + CSS_VIRTUAL_SUFFIX
@@ -108,7 +135,8 @@ const clientConfig: UserConfig = {
       async load(virtualId: string) {
         if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
         const relId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
-        const fileId = resolve(ROOT, relId)
+        const specifier = Object.keys(VENDOR_CSS).find(key => VENDOR_CSS[key] === relId)
+        const fileId = specifier === undefined ? resolve(ROOT, relId) : requireFromConfig.resolve(specifier)
         this.addWatchFile(fileId)
         const source = await readFile(fileId)
         const { code, exports: cssExports } = transform({
@@ -117,7 +145,9 @@ const clientConfig: UserConfig = {
           // class per build machine.
           filename: relId,
           code: source,
-          cssModules: { pattern: '[hash]_[local]' },
+          // Vendor stylesheets address the DOM their own library builds, so
+          // their selectors must stay global.
+          ...specifier === undefined ? { cssModules: { pattern: '[hash]_[local]' as const } } : {},
           minify: true,
         })
         const classMap: Record<string, string> = {}
@@ -132,8 +162,9 @@ const clientConfig: UserConfig = {
           .sort((left, right) => (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0))
         for (const [local, name] of ordered) classMap[local] = name
         const tagId = ID + '/' + basename(fileId)
+        const notice = VENDOR_CSS_NOTICE[relId] ?? ''
         return [
-          `const css = ${JSON.stringify(code.toString())};`,
+          `const css = ${JSON.stringify(notice + code.toString())};`,
           `const tagId = ${JSON.stringify(tagId)};`,
           'if (typeof document !== \'undefined\' && document.querySelector(\'style[data-plugin-css=\' + JSON.stringify(tagId) + \']\') === null) {',
           '  const tag = document.createElement(\'style\');',

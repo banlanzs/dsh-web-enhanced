@@ -241,6 +241,17 @@ const visionStatusSchema = z.object({
   })),
 })
 
+const terminalViewSchema = z.object({
+  id: z.string(),
+  workspaceId: z.string(),
+  title: z.string(),
+  pid: z.number(),
+  running: z.boolean(),
+  createdAt: z.number(),
+  cols: z.number(),
+  rows: z.number(),
+})
+
 /**
  * Build one direct-method descriptor taking a single `request` object.
  * @param method - gateway method name (also the wire method).
@@ -447,4 +458,16 @@ export const WEB_ENHANCED_DESCRIPTORS: readonly InvocationDescriptor[] = [
   unary('pluginList', 'PluginListRequest', 'PluginListResult', okOrError(pluginListSchema)),
   unary('pluginRemove', 'PluginMutateRequest', 'PluginMutateResult', okOrError(pluginMutateSchema)),
   unary('pluginUpdate', 'PluginMutateRequest', 'PluginMutateResult', okOrError(pluginMutateSchema)),
+  unary('terminalList', 'TerminalListRequest', 'TerminalListResult', okOrError(z.object({
+    terminals: z.array(terminalViewSchema),
+  }))),
+  unary('terminalSpawn', 'TerminalSpawnRequest', 'TerminalSpawnResult', okOrError(z.object({
+    terminal: terminalViewSchema,
+  }))),
+  unary('terminalClose', 'TerminalCloseRequest', 'TerminalCloseResult', okOrError(z.object({
+    closed: z.boolean(),
+  }))),
+  unary('terminalSignal', 'TerminalSignalRequest', 'TerminalSignalResult', okOrError(z.object({
+    delivered: z.boolean(),
+  }))),
 ]

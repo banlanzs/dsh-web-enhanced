@@ -54,6 +54,17 @@ const visionStatusSample = {
   }],
 }
 
+const terminalView = {
+  id: 'term-1',
+  workspaceId: 'w1',
+  title: 'bash',
+  pid: 4321,
+  running: true,
+  createdAt: 1755280000000,
+  cols: 120,
+  rows: 24,
+}
+
 /** One representative payload per method, both the success and the error branch. */
 const payloads: Record<string, unknown[]> = {
   taskList: [{ tasks: [task] }, errorPayload],
@@ -211,6 +222,10 @@ const payloads: Record<string, unknown[]> = {
     errorPayload,
   ],
   memoryConfigSet: [{ ok: true, revision: 4 }, errorPayload],
+  terminalList: [{ terminals: [] }, { terminals: [terminalView] }, errorPayload],
+  terminalSpawn: [{ terminal: terminalView }, errorPayload],
+  terminalClose: [{ closed: true }, errorPayload],
+  terminalSignal: [{ delivered: true }, errorPayload],
   gitBranches: [{ branches: [{ name: 'main', current: true }] }, errorPayload],
   gitLog: [{ commits: [commit] }, errorPayload],
   gitCommit: [{ commit: commitDetail }, errorPayload],
@@ -314,10 +329,10 @@ describe('webEnhancedRemote contribution', () => {
     }
   })
 
-  it('exposes exactly the 43 gateway methods, each with a representative payload', () => {
+  it('exposes exactly the 47 gateway methods, each with a representative payload', () => {
     const methods = webEnhancedRemote.descriptors.map(d => d.method).sort()
     expect(methods).toEqual(Object.keys(payloads).sort())
-    expect(methods).toHaveLength(43)
+    expect(methods).toHaveLength(47)
   })
 
   it('every result schema accepts its success and error payloads', () => {

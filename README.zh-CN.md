@@ -20,7 +20,8 @@
 | **Git 图谱** | 「工作区」视图里的 **Git 图谱**标签页；分支泳道 + 提交历史以 SVG 渲染（首父连续泳道 + 合并横向连线）；分支下拉只筛选图谱显示的提交（全部分支 / 单分支），不切换仓库；点击任一提交展开详情：完整 hash、父提交、作者与邮箱、时间、提交正文，以及逐文件增删行数。**顶部另有「未提交的改动」一行**：空心虚线圆点画在 HEAD 所在泳道上并虚线连到 HEAD，展开后逐文件列出暂存 / 未暂存 / 未跟踪的增删行数（未跟踪文件的行数由宿主读文件数出，二进制或超限报 `—`）。**未提交与历史提交里的每个变更文件都可以点击**：在资源管理器预览侧打开该文件的 unified diff，提交以后也能回看。会话标题旁的**分支切换器**（`titleCluster` 行）才是真正的 checkout，与图谱筛选是两回事；切换前若工作区不干净会先问一句，并分开报「已跟踪 / 未跟踪」的条数。 |
 | **长文本粘贴挂载** | 在输入框粘贴 **2000+ 字符**的纯文本时不再把草稿撑成一篇长文：插件在宿主处理前拦截粘贴，保存原文并插入一个 `已粘贴文本` 引用 chip（输入机像图片附件一样渲染）。输入卡上方的 dock 行列出 chip，点击弹窗预览 / 编辑 / 保存 / 移除；发送时由 codec 把 chip 还原为完整文本交给模型，移除 chip 同步删除草稿引用。内容存 localStorage，单条与总条数有界。 |
 | **全局系统提示词** | 设置 → 插件 → Web 增强 → **全局提示词**：一个开关 + 一段文本，保存进 `dsh-web-enhanced-global-prompt` settings 命名空间。宿主把它注册为全局 `systemPrompt` section（order 50——位于所选 Agent 模式的 persona 之后、工具说明之前），因此对**所有模式、会话和子代理**追加生效；text 每次装配实时读取，保存后**下一轮请求立即生效、无需重启 dsh web**，关掉开关或留空则不注入。（极简模式把 persona 声明为 `complete`、整段替换系统提示词，届时全局提示词不会追加。） |
-| **工作区视图** | 会话顶部视图栏中的「工作区」标签页，与「对话」「轨迹」并列，内含**资源管理器**（VSCode 式布局：左侧文件树侧边栏、右侧打开文件的预览）/ 变更 / **任务看板** / **Git 图谱**四个面板。文件树侧边栏可一键收起/展开（状态持久化），支持整行展开、文件名搜索、点击在右侧打开预览；预览支持 markdown（含 GFM 表格、HTML 表格与行内 HTML）/ HTML（sandbox iframe）/ 代码 / **diff**（行级高亮 unified diff）/ CSV / 图片 / PDF / 文本 / **Office（docx/xlsx，宿主侧结构化转换）**，且支持**源码 / 分屏 / 预览**三态与保存；变更页基于真实 git status，支持 stage / unstage / discard 与逐文件 diff。当前面板与展开的目录按工作区持久化。
+| **工作区视图** | 会话顶部视图栏中的「工作区」标签页，与「对话」「轨迹」并列，内含**资源管理器**（VSCode 式布局：左侧文件树侧边栏、右侧打开文件的预览）/ 变更 / **任务看板** / **Git 图谱**四个面板。文件树侧边栏可一键收起/展开（状态持久化），支持整行展开、文件名搜索、点击在右侧打开预览；预览支持 markdown（含 GFM 表格、HTML 表格与行内 HTML）/ HTML（sandbox iframe）/ 代码 / **diff**（行级高亮 unified diff）/ CSV / 图片 / PDF / 文本 / **Office（docx/xlsx，宿主侧结构化转换）**，且支持**源码 / 分屏 / 预览**三态与保存；变更页基于真实 git status，支持 stage / unstage / discard 与逐文件 diff。当前面板与展开的目录按工作区持久化。视图底部另有一个**集成终端抽屉**（见上），四个面板都在它上方。
+| **集成终端** | 「工作区」视图**底部的可拖拽抽屉**，跨资源管理器 / 变更 / 任务看板 / Git 图谱四个标签常驻——边看文件边敲命令，不用切出去开编辑器。抽屉顶部一排终端标签，可新建 / 切换 / 关闭，能一边挂着 dev server 一边跑别的命令。PTY 由宿主的 `subprocess.spawnTerminal`（node-pty）分配，工作目录是当前项目根，跑的是**你自己的 shell**（不禁用 rc/profile，别名与提示符照旧），`TERM=xterm-256color` 因此颜色正常，vim / htop 一类全屏程序可用。**会话活在 dsh 进程里而不是页面里**：刷新、切标签、断线都不杀它，重连按 id 重新附着并回放最近 256 KB 输出，`cd` 与运行中的进程都还在。抽屉默认收起，高度、折叠状态与当前终端持久化。 |
 | **对话节点导航条** | 对话流右缘等距节点串（每条 user 消息一节点）：激活药丸跟随阅读位置（视口内最顶 user 消息）、悬停/聚焦弹 6 行截断预览卡、点击平滑跳转、>11 节点滑动窗口、导航条上滚轮逐条切换、整条可点无需瞄准；<2 条 user 消息或非对话页自动隐藏。导航条本身装在限高可滚动容器里，且**不会把所有轮次都铺出来**：未渲染的更早轮次最多保留 6 个独立虚拟点，更早的折叠为一个「加载更早」标记（点击仍会正常翻页加载历史——被限制的只是导航条的点数，不是历史加载）；在第一条已渲染节点处继续上滑会自动加载上一轮并跳转，不会卡死在页面顶部的「加载更早」标记。支持**精选轮次**：assistant 操作条新增精选按钮（按会话存 localStorage），精选轮次在导航条上显示为金色药丸、恒可见、点击直达被精选的回复。零数据通道：全部读官方 DOM 锚点（`data-time-hover-root` / `data-chat-flow` / `data-turn-tail`）。 |
 | **界面皮肤** | 「设置 → 插件 → Web 增强 → 皮肤」：5 套内置皮肤（原生 / 深海 / 暖沙 / 森林 / 紫晶）经主题服务覆盖栈整体重着色，明暗两套色板成对定义、随「外观」自动切换，选择保存在浏览器本地。**自定义背景图片**：支持 PNG / JPG / WebP / GIF / AVIF / BMP / ICO / SVG（本地存储，超预算自动压缩后应用），与任意皮肤叠加；所有自定义背景统一淡化（高透明度蒙层 + 轻微模糊），内容卡片保持不透明，不影响阅读。 |
 | **文件 mention** | 输入框 `+` 菜单里的「引用文件」「引用文件夹」两项：项目内条目以**缩进目录视图**呈现（文件夹与文件都有，可本地过滤），文件选择器里点击文件夹行即**进入该文件夹**——打开插件自带的文件浏览器并定位到该目录；浏览器按文件资源管理器方式工作（面包屑 / 上一级 / 主目录 / 逐层列表 / 按名过滤，点文件夹进入、点文件选中）。第一行在项目根目录打开同一个浏览器，也可以走到**项目外**。选中文件后把 `@路径` 插入草稿，含空格的路径自动加引号。 |
@@ -171,6 +172,10 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 | `browseMaxEntries` | 500 | mention 浏览器单层目录的条目上限 |
 | `pluginOpTimeoutMs` | 300000 | 单次 pnpm 操作（update/remove）的超时 |
 | `profileDir` | 空 | profile 目录；留空则从本模块位置向上探测。仅用于 profile 不在插件模块祖先链上的部署 |
+| `terminalShell` | 空 | 集成终端启动的 shell；留空则用 `$SHELL`（Windows 用 `%COMSPEC%`），回退 `/bin/bash` |
+| `terminalScrollbackBytes` | 256 KiB | 每个终端保留并在重连时回放的输出字节数 |
+| `terminalGraceMs` | 5000 | 关闭终端时整棵会话进程树的 TERM→KILL 宽限期 |
+| `terminalTrustedHosts` | `[]` | 允许开终端的**非 loopback** 授权方（`host:port`）。留空表示只允许本机；**加进来就等于把 shell 开放给能以该名字访问到本部署的任何人** |
 | `visionEnabled` | true | 识图集成总开关 |
 | `visionPatchAdmission` | true | 包装 `llm.resolveModelInfo`，让纯文本模型通过发送门禁与 `read_image` 门禁（可逆、卸载顺序安全） |
 | `visionProvider` / `visionModel` | 空 | 指定用于转写的 DSH 模型渠道/模型；留空则从所有已配置渠道自动探测支持图片的模型 |
@@ -187,7 +192,7 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 
 ## 架构要点
 
-- **零仓库改动**：客户端 UI 只注册到既有槽位——`conversation.view`（工作区视图标签页，内含文件/预览/变更/**任务看板**/**Git 图谱** 五个 tab）、`shell.overlay`（mention 文件浏览器浮层）、`conversation.session.header.actions`（会话标题旁 `titleCluster` 行里的分支切换器）、`conversation.composer.dock`（余额 + 本轮花费行），外加通过 `ctx.commandUi.register` 注册的两个客户端命令（`+` 菜单里的文件 / 文件夹 mention）。未占用布局的 `details` 槽：那是已被 ui-conversation 的 `DetailsPanel` 占据的 `single` 槽，注册进去会顶掉工具详情列。
+- **零仓库改动**：客户端 UI 只注册到既有槽位——`conversation.view`（工作区视图标签页，内含文件/预览/变更/**任务看板**/**Git 图谱** 五个 tab，外加底部常驻的**终端抽屉**；抽屉不占新槽位，它是该视图内部的一行）、`shell.overlay`（mention 文件浏览器浮层）、`conversation.session.header.actions`（会话标题旁 `titleCluster` 行里的分支切换器）、`conversation.composer.dock`（余额 + 本轮花费行），外加通过 `ctx.commandUi.register` 注册的两个客户端命令（`+` 菜单里的文件 / 文件夹 mention）。未占用布局的 `details` 槽：那是已被 ui-conversation 的 `DetailsPanel` 占据的 `single` 槽，注册进去会顶掉工具详情列。
 - **可选服务一律非注入读取**：`agentPresets`、`llm`、`settings`、`credentials`、`modelDirectories`、`commandUi`、`conversation` 都用 `ctx.get()` 取，缺任何一个只让对应的那一小块降级，不会让插件入口卡住不启动。
 - **识图走宿主的「模型可见表面」而不是改适配器**：`visionIntegration` Cordis 服务可逆地包装共享 `llm.resolveModelInfo`（包装带标记，卸载时只有当前仍是自己的包装才还原，绝不误拆后来者的包装）。`agent/pre-step` 为含图消息计算描述并写入 `session` 表面替换（`surfaceOp: replace`）——模型推导历史读到文字，原文 append 的图片留在对话记录里；包装后的 `session.deriveMessages` 覆盖替换微任务落盘前的那一步请求，`tools/post-execute` 对 `read_image` 结果做同样替换。多模态判定始终读补丁前捕获的原始 resolver。转写引擎 `VisionTranscriber` 依次尝试 DSH 已配置的视觉模型（`llm.stream`）、本地 Ollama、OpenAI 兼容端点回退链（回退、内容哈希缓存、分类错误、冷却——这部分健壮性来自 `dsh-vision-proxy`）。
 - **任务执行**：`agentPresets.resolve()` 解析部署默认 preset → 写进 `meta.agentPreset` → 在 `setup` 里 `mount`（与宿主 `ensureSession` 同序），随后 `workspace.attachSession` 把会话记到项目上；之后 `followup` + `whenIdle` + `sessions.flush`，结果按 `turn/end` reason 回写。没有 preset 名册的部署照常运行，只是会话只带宿主根注册的工具。
@@ -197,13 +202,16 @@ Windows 上 tarball 安装需要真正的符号链接权限（pnpm 的 `importPa
 - **路径安全**：所有 fs/git 路径经工作区根校验（拒绝绝对路径、`..`、反斜杠）；单 ref 参数拒绝 `-` 开头、`..` 范围与空白/通配（防止一个参数变成两个或变成选项）；git 输出有界收集；文件读有字节上限与二进制嗅探。Office 文件在宿主侧用 fflate 解包为有界结构化 blocks（标题/段落/列表/表格，≤ 2000 块、≤ 200×50 表格），绝不产出原始 HTML。
 - **唯一的例外：`fsBrowse`**。它列出任意绝对目录，不受工作区根约束——因为 mention 产出的只是一个**路径字符串**，而用户要的路径可能就在项目外。它只返回名称、类型与大小；读、写、预览仍然全部锁在工作区内。
 - **插件管理不改宿主任何文件**：设置页注册进既有的 `settings.plugins.tab` 槽；配置与清单走本插件自己的 Typert 网关，因此不需要像 DSH-vision 那样去改 apiproxy 的 settings 暴露白名单（那是改 `node_modules` 里的宿主发布产物，每次升级会被覆盖）。remove/update 只在 profile 目录里跑 pnpm、重写该 profile 的 `dsh.profile.bundles`——与 `dsh plugin` 完全同一条路径。也没有把 `@deepseek-ai/dsh-app-boot`（CLI 里这些例程的归属）写成 peer：它是 dsh 安装的依赖而非 profile 的依赖，那样恰好会在这段代码唯一运行的部署里解析失败。
+- **终端选的是 `subprocess.spawnTerminal` 而不是宿主的 `ctx.terminals`**：后者看着更贴切（它就是持久 PTY 注册表），但它的输出经 `TerminalSanitizer` 剥掉了全部 CSI/OSC 只留行文本——那样就没有颜色、没有光标控制，vim 一类全屏程序完全不能用；它还把每个会话绑死在一个存活的 `Agent` 上（这些终端属于浏览器前的人，不属于某轮模型调用），一次只允许一个 `startSend`，而且 `dsh-terminal` / `dsh-terminal-bash` 根本不在 web profile 的默认 bundle 里。底层的 subprocess seam 直接给原始终端字节，会话生命周期归调用方，且 `ctx.subprocess` 本来就是本插件的依赖。
+- **终端自带一条双向 WebSocket**：Typert 只有一元调用（没有 streaming invocation kind），宿主自己的 `/api/events.mux` / `/api/events.host` 是**下行单向**的（收到任何客户端帧就 `close(1008)`）且不能加帧类型，看板那种 2 秒轮询也做不出能打字的终端。所以走 `webServer.registerUpgrade` 这个公开 seam 挂 `/plugins/dsh-web-enhanced/terminal`，用 `ws` 自己完成握手。帧刻意不带信封：客户端每一帧就是击键、服务端每一帧就是终端输出，控制面（列表 / 新建 / 关闭 / 信号）仍走 Typert 一元方法。路由通过 `ctx.inject(['webServer'])` 挂载而不是写进插件的 `inject`，因此 headless 部署照常加载本插件。
+- **终端的两道栅栏都在握手时**：`Host` 头挡 DNS rebinding，`Origin` 头挡跨站 WebSocket 劫持——**WebSocket 完全不受 CORS 约束**，没有 Origin 校验的话，互联网上任意页面都能 `new WebSocket('ws://localhost:3190/...')` 拿到用户的 shell。浏览器对 WebSocket 一定发 Origin，因此缺失也拒绝。
 - **预览安全**：markdown / CSV / diff / Office / 表格全部渲染为 React 元素，从不 `dangerouslySetInnerHTML`。markdown 里的 HTML 走白名单映射到对应元素，未知标签只丢标记保留文字，`script`/`style` 连内容一起丢；`javascript:`/`data:` 链接降级为字面文本（`data:image/*` 的图片除外），HTML 文件预览进 `sandbox=""` iframe。
 
 ## 开发
 
 ```sh
 pnpm install
-pnpm run check   # typecheck + 全部测试 + 构建（400 个测试，2 个跳过）
+pnpm run check   # typecheck + 全部测试 + 构建（544 个测试，2 个跳过）
 ```
 
 构建产物：
@@ -245,6 +253,10 @@ node scripts/e2e.mjs --capture --install tarball --tarball "$TARBALL_PATH" --tar
 - 端点转写会把图片字节（base64、HTTPS）发给配置的 VLM 端点——除非端点是本机服务（如 Ollama），图片会离开本机。除进程内内容哈希缓存外不保存任何东西。DSH 模型路径在同一轮内按图片去重，但不跨轮缓存；端点路径按图片内容跨轮缓存。
 - 不要再同时安装 `DSH-vision`（`dsh-image-vision`）：两个插件都会打发送补丁、都会对同一张图识别一次。本插件的补丁自身卸载顺序安全，但 DSH-vision 的卸载会还原它自己捕获的方法，仍可能覆盖后来挂上的包装。
 - 暂未内置大图缩放（`dsh-vision-proxy` 里可选的 `sharp` 步骤）；端点收到的是原始字节，`visionMaxTokens` 仍会限制转写输出长度。
+- 终端**尺寸在创建时定死、之后改不了**：宿主的 `SubprocessTerminalHandle` 没有 resize 方法（只有 `write` / `signalForeground` / `terminate`），PTY 的行列数只能在 spawn 时给。拖抽屉高度只影响可见行数，对普通命令行没有影响；但**浏览器窗口宽度变化后**列数就与 PTY 不符了，vim / htop 一类全屏程序会错位——新开一个终端即可。彻底修复要给宿主的 subprocess seam 加 `resize()`（node-pty 本身支持）。
+- 终端**不经过审批门**：命令直接执行，与本插件的 git / pnpm 操作一致（它们本来就在 `ctx.approval` 之外跑子进程）。防线只有 WebSocket 握手时的 Host + Origin 校验：默认只接受 loopback 且同源的页面，非 loopback 需要显式配置 `terminalTrustedHosts`。**把 dsh web 的端口暴露到局域网或公网并配上 trusted host，等于把 shell 一起暴露出去。**
+- 终端**不跨进程存活**：PTY 活在 dsh 进程里，没有磁盘持久化，dsh 重启后全部消失。回放缓冲区默认 256 KB（`terminalScrollbackBytes`），更早的输出会被丢弃，且回放可能从一个转义序列中间开始（终端会忽略残缺序列，与真实 scrollback 行为一致）。
+- 终端在**没有 web server 的部署里不存在**：抽屉的 WebSocket 路由通过 `ctx.inject(['webServer'])` 挂载，headless 部署照常加载本插件，只是没有终端。
 
 ## License
 

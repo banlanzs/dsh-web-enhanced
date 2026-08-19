@@ -27,6 +27,9 @@ import type { OfficeLimits } from './office.ts'
 import { PnpmRunner, pnpmFailureCode } from './pnpm.ts'
 import { ModelsDevPricing } from './pricing.ts'
 import { findProfileDir, readInventory } from './profile.ts'
+import { createTerminalRegistry } from './terminal.ts'
+import type { TerminalRegistry } from './terminal.ts'
+import { applyTerminalSocket } from './terminal-socket.ts'
 import type { PresetRoster, RunDeps } from './run-task.ts'
 import { ModelRouteNames } from './model-names.ts'
 import type { LlmNamesFace } from './model-names.ts'
@@ -55,7 +58,10 @@ import type {
   PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult,
   TaskCreateRequest, TaskCreateResult,
   TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult,
-  TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigPatch,
+  TaskUpdateRequest, TaskUpdateResult,
+  TerminalCloseRequest, TerminalCloseResult, TerminalListRequest, TerminalListResult,
+  TerminalSignalRequest, TerminalSignalResult, TerminalSpawnRequest, TerminalSpawnResult,
+  VisionConfigGetResult, VisionConfigPatch,
   VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelView,
   VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionModelOptionView,
   VisionProviderOptionView, VisionStatusResult, VisionStatusView, WorkspaceId,
@@ -204,6 +210,19 @@ export interface Config {
   browseMaxEntries?: number
   pluginOpTimeoutMs?: number
   profileDir?: string
+  // Workspace terminal (see `src/terminal.ts` and `src/terminal-socket.ts`).
+  /** Shell executable for workspace terminals; empty selects the platform default. */
+  terminalShell?: string
+  /** Retained scrollback per terminal, replayed when a browser re-attaches. */
+  terminalScrollbackBytes?: number
+  /** TERM-to-KILL grace for one terminal's session tree. */
+  terminalGraceMs?: number
+  /**
+   * Non-loopback authorities allowed to open a terminal socket. Empty means
+   * loopback only; adding an entry hands a shell to anything that can reach
+   * this deployment under that name.
+   */
+  terminalTrustedHosts?: string[]
   // Image understanding (see `src/vision.ts` for the runtime half).
   visionEnabled?: boolean
   visionPatchAdmission?: boolean
@@ -262,6 +281,10 @@ export const Config: z<Config> = z.object({
   // Located by walking up from this module by default; naming it explicitly is
   // for a deployment whose profile is not an ancestor of the loaded plugin.
   profileDir: z.string().default(''),
+  terminalShell: z.string().default(''),
+  terminalScrollbackBytes: z.number().default(262_144),
+  terminalGraceMs: z.number().default(5_000),
+  terminalTrustedHosts: z.array(z.string()).default([]),
   // Image understanding. The interception core is transparent (images stay in
   // the UI, text-only models see the description) and the transcription engine
   // tries, in order: DSH-configured vision models, local Ollama, then the
@@ -326,6 +349,10 @@ export function resolveConfig(config: Config): Required<Config> {
     browseMaxEntries: config.browseMaxEntries ?? 500,
     pluginOpTimeoutMs: config.pluginOpTimeoutMs ?? 300_000,
     profileDir: config.profileDir ?? '',
+    terminalShell: config.terminalShell ?? '',
+    terminalScrollbackBytes: config.terminalScrollbackBytes ?? 262_144,
+    terminalGraceMs: config.terminalGraceMs ?? 5_000,
+    terminalTrustedHosts: config.terminalTrustedHosts ?? [],
     visionEnabled: config.visionEnabled ?? true,
     visionPatchAdmission: config.visionPatchAdmission ?? true,
     visionPrompt: config.visionPrompt ?? DEFAULT_VISION_PROMPT,
@@ -362,6 +389,8 @@ export class WebEnhancedGateway extends TypertRemoteService {
   private readonly pricing: ModelsDevPricing
   private readonly routeNames: ModelRouteNames
   private readonly opencodeGo: OpencodeGoUsageClient
+  /** Live workspace terminals; every session ends with this gateway. */
+  private readonly terminals: TerminalRegistry
   /** Resolved lazily: the walk is filesystem work no other capability needs. */
   private profileDirCache: Promise<string | undefined> | undefined
   /** Built on first mutation, so a deployment outside a profile never makes one. */
@@ -427,6 +456,12 @@ export class WebEnhancedGateway extends TypertRemoteService {
         return hit?.value
       },
     )
+    this.terminals = createTerminalRegistry(ctx, () => ctx.subprocess, {
+      scrollbackMaxBytes: this.resolved.terminalScrollbackBytes,
+      graceMs: this.resolved.terminalGraceMs,
+      shell: this.resolved.terminalShell,
+    })
+    applyTerminalSocket(ctx, this.terminals, { trustedHosts: this.resolved.terminalTrustedHosts })
     // Directory renames reach the balance line without a restart: drop the
     // name caches and let the next describe re-prime them from the directory.
     ctx.on('llm/adapters-updated', () => { this.routeNames.clear() })
@@ -1172,6 +1207,55 @@ export class WebEnhancedGateway extends TypertRemoteService {
   @Remote('pluginUpdate')
   async pluginUpdate(request: PluginMutateRequest): Promise<PluginMutateResult> {
     return this.pluginOperation(request.name, runner => runner.update(request.name))
+  }
+
+  // ── terminals ────────────────────────────────────────────────────────────
+  // Control plane only: keystrokes and output ride the plugin's own WebSocket
+  // (`src/terminal-socket.ts`), because Typert invocations are unary.
+
+  /** Live terminals of one workspace, oldest first. */
+  @Remote('terminalList')
+  terminalList(request: TerminalListRequest): Promise<TerminalListResult> {
+    return Promise.resolve({ terminals: this.terminals.list(request.workspaceId) })
+  }
+
+  /**
+   * Open one terminal in a workspace root. The measured `cols`/`rows` are
+   * fixed for the session: the subprocess seam exposes no resize.
+   */
+  @Remote('terminalSpawn')
+  async terminalSpawn(request: TerminalSpawnRequest): Promise<TerminalSpawnResult> {
+    const root = this.workspaceRootFor(request.workspaceId)
+    if (root === null) {
+      return { error: { code: 'workspace-not-found', message: `workspace '${request.workspaceId}' does not exist` } }
+    }
+    try {
+      return {
+        terminal: await this.terminals.spawn(request.workspaceId, root, request.cols, request.rows),
+      }
+    } catch (error) {
+      return { error: this.errorOf(error, 'terminal-spawn') }
+    }
+  }
+
+  /** Terminate one terminal's process tree. */
+  @Remote('terminalClose')
+  async terminalClose(request: TerminalCloseRequest): Promise<TerminalCloseResult> {
+    try {
+      return { closed: await this.terminals.close(request.terminalId) }
+    } catch (error) {
+      return { error: this.errorOf(error, 'terminal-close') }
+    }
+  }
+
+  /** Deliver one signal to a terminal's foreground process group. */
+  @Remote('terminalSignal')
+  async terminalSignal(request: TerminalSignalRequest): Promise<TerminalSignalResult> {
+    try {
+      return { delivered: await this.terminals.signal(request.terminalId, request.signal) }
+    } catch (error) {
+      return { error: this.errorOf(error, 'terminal-signal') }
+    }
   }
 
   // ── internals ────────────────────────────────────────────────────────────

@@ -239,6 +239,7 @@ describe('WebEnhancedGateway', () => {
       'gitStage', 'gitUnstage', 'gitDiscard',
       'fsList', 'fsSearch', 'fsRead', 'fsWrite', 'fsDelete', 'fsOfficePreview', 'fsBrowse',
       'pluginList', 'pluginRemove', 'pluginUpdate',
+      'terminalList', 'terminalSpawn', 'terminalClose', 'terminalSignal',
     ])
   })
 
@@ -1169,6 +1170,77 @@ describe('WebEnhancedGateway', () => {
         dsh: { profile: { bundles: string[] } }
       }
       expect(manifest.dsh.profile.bundles).toEqual(['@deepseek-ai/dsh-base'])
+    })
+  })
+
+  describe('terminal remotes', () => {
+    const workspaces = [{ id: 'w1', path: '/repo', name: 'repo' }]
+
+    it('opens a terminal in the workspace root and lists it', async () => {
+      const { gateway, subprocess } = await harness({ workspaces })
+
+      const created = await gateway.terminalSpawn({ workspaceId: 'w1', cols: 100, rows: 28 })
+      if ('error' in created) throw new Error(created.error.message)
+      expect(created.terminal).toMatchObject({ workspaceId: 'w1', cols: 100, rows: 28, running: true })
+      expect(subprocess.terminals[0]?.spec).toMatchObject({ cwd: '/repo', cols: 100, rows: 28 })
+
+      const listed = await gateway.terminalList({ workspaceId: 'w1' })
+      if ('error' in listed) throw new Error(listed.error.message)
+      expect(listed.terminals.map(view => view.id)).toEqual([created.terminal.id])
+    })
+
+    it('refuses a workspace it does not know instead of spawning anything', async () => {
+      const { gateway, subprocess } = await harness({ workspaces })
+
+      const created = await gateway.terminalSpawn({ workspaceId: 'nope', cols: 80, rows: 24 })
+
+      expect(created).toEqual({
+        error: { code: 'workspace-not-found', message: "workspace 'nope' does not exist" },
+      })
+      expect(subprocess.terminals).toHaveLength(0)
+    })
+
+    it('lists per workspace', async () => {
+      const { gateway } = await harness({
+        workspaces: [...workspaces, { id: 'w2', path: '/other', name: 'other' }],
+      })
+      await gateway.terminalSpawn({ workspaceId: 'w1', cols: 80, rows: 24 })
+      await gateway.terminalSpawn({ workspaceId: 'w2', cols: 80, rows: 24 })
+
+      const listed = await gateway.terminalList({ workspaceId: 'w2' })
+      if ('error' in listed) throw new Error(listed.error.message)
+      expect(listed.terminals.map(view => view.workspaceId)).toEqual(['w2'])
+    })
+
+    it('closes a terminal and reports an unknown id as not closed', async () => {
+      const { gateway, subprocess } = await harness({ workspaces })
+      const created = await gateway.terminalSpawn({ workspaceId: 'w1', cols: 80, rows: 24 })
+      if ('error' in created) throw new Error(created.error.message)
+
+      expect(await gateway.terminalClose({ terminalId: created.terminal.id }))
+        .toEqual({ closed: true })
+      expect(subprocess.terminals[0]?.terminated).toBe(true)
+      expect(await gateway.terminalClose({ terminalId: 'term-nope' })).toEqual({ closed: false })
+    })
+
+    it('signals the foreground group', async () => {
+      const { gateway, subprocess } = await harness({ workspaces })
+      const created = await gateway.terminalSpawn({ workspaceId: 'w1', cols: 80, rows: 24 })
+      if ('error' in created) throw new Error(created.error.message)
+
+      expect(await gateway.terminalSignal({ terminalId: created.terminal.id, signal: 'SIGINT' }))
+        .toEqual({ delivered: true })
+      expect(subprocess.terminals[0]?.signals).toEqual(['SIGINT'])
+    })
+
+    it('ends every terminal when the owning context goes away', async () => {
+      const { ctx, gateway, subprocess } = await harness({ workspaces })
+      await gateway.terminalSpawn({ workspaceId: 'w1', cols: 80, rows: 24 })
+
+      await ctx.fiber.dispose()
+      await new Promise(resolve => { setImmediate(resolve) })
+
+      expect(subprocess.terminals[0]?.terminated).toBe(true)
     })
   })
 })

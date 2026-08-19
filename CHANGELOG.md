@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### 新增：工作区集成终端
+
+- 「工作区」视图底部新增一个**可拖拽的终端抽屉**，跨资源管理器 / 变更 / 任务看板 / Git 图谱四个标签常驻，可以边看文件边敲命令。抽屉顶部为终端标签条（新建 / 切换 / 关闭），支持多个终端并存。抽屉默认收起，高度、折叠状态与当前终端持久化到 panel store（`revivePanel` 对旧数据做防御性恢复，升级后不会突然多出一个展开的抽屉）。
+- PTY 走宿主的 `ctx.subprocess.spawnTerminal`（node-pty），**不是** `ctx.terminals`：后者的输出经 `TerminalSanitizer` 剥掉全部 CSI/OSC 只剩行文本（没有颜色、vim 一类全屏程序不可用），会话强绑一个存活的 `Agent`，一次只允许一个 `startSend`，且 `dsh-terminal` / `dsh-terminal-bash` 不在 web profile 的默认 bundle 里。底层 seam 直接给原始终端字节，且 `ctx.subprocess` 本就是本插件的依赖，用户无需额外安装任何东西。
+- 终端跑用户自己的 shell（`$SHELL`，不禁用 rc/profile），工作目录为项目根，环境注入 `TERM=xterm-256color` / `COLORTERM=truecolor`。
+- 传输是插件自己挂的一条**双向 WebSocket**（`/plugins/dsh-web-enhanced/terminal`，经公开 seam `webServer.registerUpgrade` + `ws` 完成握手）：Typert 只有一元调用，宿主自带的 `/api/events.*` 是下行单向的（客户端帧一律 `close(1008)`）且不能加帧类型。帧不带信封——客户端帧即击键，服务端帧即输出；控制面（`terminalList` / `terminalSpawn` / `terminalClose` / `terminalSignal`）仍走 Typert 一元方法（描述符 43 → 47 条）。
+- 路由通过 `ctx.inject(['webServer'])` 挂载而非写进插件 `inject`，headless 部署照常加载本插件、只是没有终端。
+- **会话活在宿主进程里**：WebSocket 断开不杀 PTY，重连按 id 重新附着并回放有界 scrollback（默认 256 KB），刷新页面不丢 `cd` 与运行中的进程。插件卸载或 context 销毁时统一 terminate 整棵进程树。
+- 安全：握手同时校验 `Host`（防 DNS rebinding）与 `Origin`（防跨站 WebSocket 劫持——WebSocket 不受 CORS 约束，没有这道校验任何网页都能连上本机拿到 shell）；默认仅接受 loopback 同源，非 loopback 需显式配 `terminalTrustedHosts`。命令本身不经审批门，与插件既有的 git / pnpm 子进程一致。
+- 新配置项：`terminalShell` / `terminalScrollbackBytes` / `terminalGraceMs` / `terminalTrustedHosts`。
+- 客户端引入 `@xterm/xterm` + `@xterm/addon-fit`（内联进 `lib/client.js`，798 KB → 1.21 MB；打包门 tarball 0.69 MB / 上限 2 MB）。tsdown 的 CSS 插件扩展为也能内联**普通（非 module）依赖样式表**——客户端 bundle 是单个 JS，旁落的 CSS 文件永远不会被加载；vendor 样式表映射到固定虚拟 id（而非解析出的 pnpm 路径），以免版本号进入产物、触发 CI 的 lib/ 漂移门。
+- **已知限制：PTY 尺寸创建后不可改**。`SubprocessTerminalHandle` 没有 resize 方法，行列数只能在 spawn 时给；因此新终端按当时测量的尺寸创建，重连的终端按 PTY 原尺寸渲染（而不是按当前视口，否则每行都会在错误的列换行）。拖抽屉高度无妨，浏览器窗口**宽度**变化后全屏程序会错位，新开一个终端即可。彻底修复需给宿主 subprocess seam 加 `resize()`。
+- 测试 +27（`tests/terminal.spec.ts` 21 个：会话生命周期、多 sink 分发、scrollback 回放与丢弃、退出通知、销毁清理，以及 Host/Origin 两道栅栏的接受与拒绝用例；`tests/gateway.spec.ts` +6 个端点用例）。`FakeSubprocess` 补上可驱动的 `spawnTerminal` 假 PTY。e2e 新增一段真机断言：展开抽屉 → 在终端里 `echo` 一个唯一串 → 断言回显出现，这是唯一能覆盖「WS 握手 → PTY spawn → 击键 → 输出回传」整条链路的证据。
+
 ## [0.21.0] - 2026-08-19
 
 ### 优化：设置导航并入「插件」页

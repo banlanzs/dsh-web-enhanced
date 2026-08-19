@@ -1,0 +1,135 @@
+/* Terminal drawer: the bottom strip of the workspace view. It is the view's
+   last flex child, so it keeps its height while the tab body above absorbs
+   the rest. */
+
+.drawer {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--dsw-alias-border-l2, rgba(0 0 0 / 10%));
+  background: var(--dsw-alias-bg-layer-1, transparent);
+  /* The host floats the composer over this view's bottom edge, so the drawer
+     — not the tab body — has to carry the clearance now that it owns the
+     bottom of the column. ConversationRoot publishes the live height. */
+  margin-bottom: calc(var(--dsh-composer-height, 152px) + 16px);
+}
+
+.drawer[data-collapsed] {
+  height: auto;
+}
+
+.handle {
+  flex: none;
+  height: 6px;
+  cursor: ns-resize;
+  background: transparent;
+  touch-action: none;
+}
+
+.handle:hover {
+  background: var(--dsw-alias-state-business-primary, rgb(65 118 230));
+  opacity: 0.35;
+}
+
+.strip {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.toggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
+}
+
+.tab[data-active] {
+  background: var(--dsw-alias-interactive-bg-active, rgba(38 49 72 / 10%));
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+}
+
+.tabName {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 2px 4px 8px;
+}
+
+.tabClose,
+.new {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.tabClose:hover,
+.new:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38 49 72 / 6%));
+  color: var(--dsw-alias-label-primary, rgb(15 17 21));
+}
+
+.new {
+  flex: none;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
+}
+
+.body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.pane {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Hidden, not unmounted: a remounted viewport would drop its socket and its
+   scroll position even though the PTY itself survives. */
+.paneHidden {
+  display: none;
+}
+
+.empty {
+  margin: auto;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary, rgb(97 102 107));
+}

@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitCommitDiffRequest, GitCommitDiffResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, GlobalPromptGetResult, GlobalPromptSaveRequest, GlobalPromptSetResult, MemoryConfigGetResult, MemoryConfigSaveRequest, MemoryConfigSetResult, MemoryDeleteRequest, MemoryDeleteResult, MemoryListRequest, MemoryListResult, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult, ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
+import type { BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitCommitDiffRequest, GitCommitDiffResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, GlobalPromptGetResult, GlobalPromptSaveRequest, GlobalPromptSetResult, MemoryConfigGetResult, MemoryConfigSaveRequest, MemoryConfigSetResult, MemoryDeleteRequest, MemoryDeleteResult, MemoryListRequest, MemoryListResult, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult, ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, TerminalCloseRequest, TerminalCloseResult, TerminalListRequest, TerminalListResult, TerminalSignalRequest, TerminalSignalResult, TerminalSpawnRequest, TerminalSpawnResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
 /** One fallback vision endpoint entry, as declared in plugin config. */
 export interface VisionFallbackConfig {
     model: string;
@@ -48,6 +48,18 @@ export interface Config {
     browseMaxEntries?: number;
     pluginOpTimeoutMs?: number;
     profileDir?: string;
+    /** Shell executable for workspace terminals; empty selects the platform default. */
+    terminalShell?: string;
+    /** Retained scrollback per terminal, replayed when a browser re-attaches. */
+    terminalScrollbackBytes?: number;
+    /** TERM-to-KILL grace for one terminal's session tree. */
+    terminalGraceMs?: number;
+    /**
+     * Non-loopback authorities allowed to open a terminal socket. Empty means
+     * loopback only; adding an entry hands a shell to anything that can reach
+     * this deployment under that name.
+     */
+    terminalTrustedHosts?: string[];
     visionEnabled?: boolean;
     visionPatchAdmission?: boolean;
     visionPrompt?: string;
@@ -90,6 +102,8 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     private readonly pricing;
     private readonly routeNames;
     private readonly opencodeGo;
+    /** Live workspace terminals; every session ends with this gateway. */
+    private readonly terminals;
     /** Resolved lazily: the walk is filesystem work no other capability needs. */
     private profileDirCache;
     /** Built on first mutation, so a deployment outside a profile never makes one. */
@@ -254,6 +268,17 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
     pluginRemove(request: PluginMutateRequest): Promise<PluginMutateResult>;
     /** Update one plugin to its spec's head (takes effect on the next start). */
     pluginUpdate(request: PluginMutateRequest): Promise<PluginMutateResult>;
+    /** Live terminals of one workspace, oldest first. */
+    terminalList(request: TerminalListRequest): Promise<TerminalListResult>;
+    /**
+     * Open one terminal in a workspace root. The measured `cols`/`rows` are
+     * fixed for the session: the subprocess seam exposes no resize.
+     */
+    terminalSpawn(request: TerminalSpawnRequest): Promise<TerminalSpawnResult>;
+    /** Terminate one terminal's process tree. */
+    terminalClose(request: TerminalCloseRequest): Promise<TerminalCloseResult>;
+    /** Deliver one signal to a terminal's foreground process group. */
+    terminalSignal(request: TerminalSignalRequest): Promise<TerminalSignalResult>;
     /** The settings provider the vision config remotes read and write. */
     private visionSettings;
     /** The settings provider the model-retry remotes read and write. */

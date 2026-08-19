@@ -185,6 +185,9 @@ describe('workspace view state', () => {
         tab: 'scm',
         sidebarCollapsed: false,
         expanded: { w9: ['deep/dir'] },
+        drawerCollapsed: true,
+        drawerHeight: 260,
+        activeTerminalId: null,
       })
       writes.mockRestore()
     } finally {
