@@ -25,7 +25,7 @@ import { createWriteStream } from 'node:fs'
 import { mkdtemp, mkdir, copyFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { createServer } from 'node:net'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -34,10 +34,22 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const fail = (msg) => { console.error(`✗ ${msg}`); process.exit(1) }
 const log = (msg) => console.log(`· ${msg}`)
 
+/** Windows 上 .cmd shim 在受限环境直接 spawn 会 ENOENT/EINVAL；退回 cmd 包装。 */
+function winCommand(cmd, args) {
+  if (process.platform !== 'win32') return [cmd, args]
+  const probe = spawnSync(cmd, [], { stdio: 'ignore' })
+  if (probe.error === undefined || probe.error === null) return [cmd, args]
+  const flat = [cmd, ...args].map((part) => {
+    const text = String(part)
+    return /[\s"]/u.test(text) ? '"' + text.replaceAll('"', '\\"') + '"' : text
+  }).join(' ')
+  return [process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', flat]]
+}
+
 const DSH_ROOT = process.env.DSH_ROOT ?? resolve(process.env.HOME ?? '', '.dsh/source/current')
 // 精确宿主二进制：必须是 DSH_ROOT 内构建出的绝对路径；默认不从 PATH 找 dsh。
 const DSH_BIN = process.env.DSH_BIN ?? join(DSH_ROOT, 'apps/cli/lib/bin.js')
-if (!resolve(DSH_BIN).startsWith('/')) fail('DSH_BIN 必须是绝对路径')
+if (!isAbsolute(DSH_BIN)) fail('DSH_BIN 必须是绝对路径')
 if (!existsSync(DSH_BIN)) fail(`DSH_BIN 不存在: ${DSH_BIN}（在 DSH_ROOT 内先 pnpm run build）`)
 const arg = (name) => {
   const index = process.argv.indexOf(name)
@@ -67,7 +79,7 @@ if (!['git', 'tarball'].includes(INSTALL)) {
 }
 if (INSTALL === 'tarball') {
   if (!TARBALL || !TARBALL_SHA) fail('tarball 模式必须提供 --tarball <绝对路径> 与 --tarball-sha256 <sha256>')
-  if (!resolve(TARBALL).startsWith('/')) fail('--tarball 必须是绝对路径')
+  if (!isAbsolute(resolve(TARBALL))) fail('--tarball 必须是绝对路径')
   if (!existsSync(TARBALL)) fail(`tarball 不存在: ${TARBALL}`)
   const actual = createHash('sha256').update(await (await import('node:fs/promises')).readFile(TARBALL)).digest('hex')
   if (actual !== TARBALL_SHA.toLowerCase()) fail(`tarball SHA256 不匹配：期望 ${TARBALL_SHA}，实际 ${actual}`)
@@ -80,8 +92,11 @@ await new Promise((res) => {
   probe.listen(PORT, '127.0.0.1', () => probe.close(res))
 })
 {
-  const r = spawnSync('sh', ['-c', 'command -v pnpm'], { encoding: 'utf8' })
-  if (r.status !== 0) fail('未找到 pnpm，请先安装并确保在 PATH 上')
+  // 跨平台：Windows 上 pnpm 是 .cmd shim，受限环境直接 spawn 会 ENOENT/EINVAL，
+  // winCommand 探测失败时退回 cmd /c 包装。
+  const [pnpmCmd, pnpmArgs] = winCommand('pnpm', ['--version'])
+  const r = spawnSync(pnpmCmd, pnpmArgs, { encoding: 'utf8' })
+  if (r.error !== undefined && r.error !== null) fail('未找到 pnpm，请先安装并确保在 PATH 上')
 }
 log(`DSH_BIN: ${DSH_BIN}`)
 log(`pnpm: ${spawnSync('pnpm', ['--version'], { encoding: 'utf8' }).stdout.trim()}`)
@@ -91,15 +106,23 @@ if (SMOKE) log('smoke 模式：无模型 key 全链路（本插件四块功能�
 const DSH_HOME = await mkdtemp(join(tmpdir(), 'dsh-e2e-'))
 const env = { ...process.env, DSH_HOME }
 const webLog = join(DSH_HOME, 'dsh-web.log')
+
+// Windows 上 .js 没有 shebang 可执行位：统一经 node 启动 DSH_BIN（Unix 同形，无副作用）。
+const DSH_LAUNCH = [process.execPath, DSH_BIN]
 const artifactsDir = process.cwd()
 const assetsDir = join(REPO_ROOT, 'assets')
 let webChild = null
 
 const killWeb = () => {
   if (webChild === null) return
-  // 只杀自己启动的进程组（detached spawn 的负 pid），绝不 broad pkill
-  try { process.kill(-webChild.pid, 'SIGTERM') } catch { /* already gone */ }
-  try { process.kill(webChild.pid, 'SIGTERM') } catch { /* already gone */ }
+  // 只杀自己启动的进程：Windows 没有负 pid 进程组语义，用 taskkill /T 连子进程一起关；
+  // Unix 用 detached spawn 的负 pid 进程组。绝不 broad pkill。
+  if (process.platform === 'win32') {
+    try { spawnSync('taskkill', ['/pid', String(webChild.pid), '/T', '/F'], { stdio: 'ignore' }) } catch { /* already gone */ }
+  } else {
+    try { process.kill(-webChild.pid, 'SIGTERM') } catch { /* already gone */ }
+    try { process.kill(webChild.pid, 'SIGTERM') } catch { /* already gone */ }
+  }
   webChild = null
 }
 
@@ -131,11 +154,11 @@ try {
   // ── 安装插件 ────────────────────────────────────────────────────────────
   if (INSTALL === 'git') {
     log('安装插件（git+https，公开仓库）...')
-    const r = spawnSync(DSH_BIN, ['plugin', '--profile', 'web', 'add', GIT_URL], { env, stdio: 'inherit' })
+    const r = spawnSync(DSH_LAUNCH[0], [...DSH_LAUNCH.slice(1), 'plugin', '--profile', 'web', 'add', GIT_URL], { env, stdio: 'inherit' })
     if (r.status !== 0) fail('git URL 安装失败（见上方输出）')
   } else {
     log(`安装插件（tarball ${TARBALL}）...`)
-    const r = spawnSync(DSH_BIN, ['plugin', '--profile', 'web', 'add', TARBALL], { env, stdio: 'inherit' })
+    const r = spawnSync(DSH_LAUNCH[0], [...DSH_LAUNCH.slice(1), 'plugin', '--profile', 'web', 'add', TARBALL], { env, stdio: 'inherit' })
     if (r.status !== 0) fail('tarball 安装失败（见上方输出）')
   }
 
@@ -161,7 +184,7 @@ try {
 
   log(`启动 dsh web (port ${PORT}, DSH_HOME=${DSH_HOME})...`)
   const logStream = createWriteStream(webLog, { flags: 'a' })
-  webChild = spawn(DSH_BIN, ['web', '--port', String(PORT)], {
+  webChild = spawn(DSH_LAUNCH[0], [...DSH_LAUNCH.slice(1), 'web', '--port', String(PORT)], {
     env, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
   })
   webChild.stdout.pipe(logStream)

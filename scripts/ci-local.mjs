@@ -47,11 +47,29 @@ const fail = (msg) => { console.error(`\n✗ ${msg}\n`); process.exit(1) }
 const log = (msg) => console.log(`· ${msg}`)
 const step = (n, total, title) => console.log(`\n▶ [${n}/${total}] ${title}`)
 
+/**
+ * 解析命令的可执行形态。Windows 上 npm/pnpm/git 是 .cmd shim：正常终端里
+ * libuv 会按 PATHEXT 找到并包装；受限环境（无 cmd 包装权限）里直接 spawn
+ * 报 ENOENT/EINVAL，此时退回 `cmd /d /s /c` 显式包装（参数按需加引号）。
+ */
+function resolveCommand(cmd, args) {
+  if (process.platform !== 'win32') return { cmd, args }
+  // 无参数探测：只看 spawn 是否可行（usage/help 退出码不算失败），零副作用。
+  const probe = spawnSync(cmd, [], { stdio: 'ignore' })
+  if (probe.error === undefined || probe.error === null) return { cmd, args }
+  const flat = [cmd, ...args].map((part) => {
+    const text = String(part)
+    return /[\s"]/u.test(text) ? '"' + text.replaceAll('"', '\\"') + '"' : text
+  }).join(' ')
+  return { cmd: process.env.ComSpec ?? 'cmd.exe', args: ['/d', '/s', '/c', flat] }
+}
+
 /** 执行并继承 stdio；非零退出即失败，带上可复现的命令行。 */
 const run = (cmd, args, opts = {}) => {
   const where = opts.cwd === undefined ? '' : ` (cwd: ${opts.cwd})`
   log(`$ ${cmd} ${args.join(' ')}${where}`)
-  const r = spawnSync(cmd, args, { stdio: 'inherit', ...opts })
+  const resolved = resolveCommand(cmd, args)
+  const r = spawnSync(resolved.cmd, resolved.args, { stdio: 'inherit', ...opts })
   if (r.error !== undefined && r.error !== null) fail(`无法执行 ${cmd}：${r.error.message}`)
   if (r.status !== 0) fail(`失败（退出码 ${r.status}）：${cmd} ${args.join(' ')}${where}`)
 }
@@ -59,7 +77,11 @@ const run = (cmd, args, opts = {}) => {
 /** 执行并取回 stdout；失败返回 null，供探测类调用判断。 */
 const capture = (cmd, args, opts = {}) => {
   try {
-    return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim()
+    const resolved = resolveCommand(cmd, args)
+    const r = spawnSync(resolved.cmd, resolved.args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts })
+    if (r.error !== undefined && r.error !== null) return null
+    if (r.status !== 0) return null
+    return (r.stdout ?? '').trim()
   } catch {
     return null
   }
@@ -323,6 +345,22 @@ function findLocalHostClone() {
  * e2e 跑到浏览器那一步再报晦涩错误。
  */
 function assertChromeAvailable() {
+  if (process.platform === 'win32') {
+    const candidates = [
+      process.env['PROGRAMFILES'] + '\\Google\\Chrome\\Application\\chrome.exe',
+      process.env['PROGRAMFILES(X86)'] + '\\Google\\Chrome\\Application\\chrome.exe',
+      process.env['LOCALAPPDATA'] + '\\Google\\Chrome\\Application\\chrome.exe',
+    ]
+    for (const candidate of candidates) {
+      if (candidate !== undefined && existsSync(candidate)) {
+        log('Chrome: ' + candidate)
+        return
+      }
+    }
+    fail('smoke e2e 需要系统 Chrome（e2e.mjs 用 playwright channel:"chrome"），本机未找到。\n'
+      + '  装法：安装 Google Chrome 到默认路径（playwright channel:"chrome" 会读注册表/标准路径）。\n'
+      + '  只想先跑其余检查：加 --fast')
+  }
   const found = capture('sh', ['-c',
     'command -v google-chrome-stable || command -v google-chrome || command -v chrome'])
   if (found !== null && found !== '') {
@@ -354,6 +392,22 @@ function resolveNodeBin(version) {
       .sort()
       .pop()
     if (match !== undefined) return join(nvmVersions, match, 'bin/node')
+  }
+  if (process.platform === 'win32') {
+    // nvm-windows / nvm4w：版本目录 <root>\v<major>.*\node.exe；NVM_HOME 优先。
+    const roots = [
+      process.env.NVM_HOME,
+      'C:\\nvm4w',
+      'C:\\nvm',
+      join(process.env.APPDATA ?? '', 'nvm'),
+    ].filter((root) => root !== undefined && existsSync(root))
+    for (const root of roots) {
+      const match = readdirSync(root)
+        .filter(name => name.startsWith(`v${version}.`))
+        .sort()
+        .pop()
+      if (match !== undefined) return join(root, match, 'node.exe')
+    }
   }
   fail(`找不到 Node ${version}。本机装法：nvm install ${version}`)
 }

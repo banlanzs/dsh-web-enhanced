@@ -6,7 +6,19 @@
  * Fails non-zero with the concrete offenders; thresholds are overridable
  * via env (tuning), never silently widened.
  */
-import { execFileSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
+
+/** Windows 上 .cmd shim 在受限环境直接 spawn 会 ENOENT/EINVAL；退回 cmd 包装。 */
+function winCommand(cmd, args) {
+  if (process.platform !== 'win32') return [cmd, args]
+  const probe = spawnSync(cmd, [], { stdio: 'ignore' })
+  if (probe.error === undefined || probe.error === null) return [cmd, args]
+  const flat = [cmd, ...args].map((part) => {
+    const text = String(part)
+    return /[\s"]/u.test(text) ? '"' + text.replaceAll('"', '\\"') + '"' : text
+  }).join(' ')
+  return [process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', flat]]
+}
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -35,10 +47,21 @@ const required = [
 
 const dir = mkdtempSync(join(tmpdir(), 'web-enhanced-pack-'))
 try {
-  const out = execFileSync('npm', ['pack', '--pack-destination', dir, '--json'], {
+  // spawnSync + winCommand 包装：npm 是 .cmd shim，受限环境直接 spawn 会 ENOENT/EINVAL。
+  const [npmCmd, npmArgs] = winCommand('npm', ['pack', '--pack-destination', dir, '--json'])
+  const packedRun = spawnSync(npmCmd, npmArgs, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   })
+  if (packedRun.error !== undefined && packedRun.error !== null) {
+    console.error('verify-pack: FAIL — cannot run npm pack: ' + packedRun.error.message)
+    process.exit(1)
+  }
+  if (packedRun.status !== 0) {
+    console.error('verify-pack: FAIL — npm pack exited ' + packedRun.status + ':\n' + String(packedRun.stderr ?? '').slice(0, 500))
+    process.exit(1)
+  }
+  const out = packedRun.stdout ?? ''
   // npm pack runs the package's `prepare` script; on some platforms the
   // script's log lines (tsdown etc., possibly ANSI-colored) land on npm's
   // stdout BEFORE the JSON, and the JSON itself is pretty-printed. Find the
