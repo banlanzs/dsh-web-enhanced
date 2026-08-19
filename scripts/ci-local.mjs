@@ -248,7 +248,8 @@ function prepareWorktree() {
     if (existsSync(WORKTREE_DIR)) rmSync(WORKTREE_DIR, { recursive: true, force: true })
     run('git', ['worktree', 'add', '--detach', WORKTREE_DIR, head], { cwd: MAIN_ROOT })
   } else {
-    run('git', ['checkout', '--detach', head], { cwd: WORKTREE_DIR })
+    // reset --hard 直接移动 HEAD 并丢弃脏文件；先 checkout 会被上一次运行的
+    // 本地改动阻止（HEAD 前进复用 worktree 时必然发生）。
     run('git', ['reset', '--hard', head], { cwd: WORKTREE_DIR })
     run('git', ['clean', '-xdf', '--exclude=node_modules'], { cwd: WORKTREE_DIR })
   }
