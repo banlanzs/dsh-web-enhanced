@@ -55,7 +55,8 @@
     "build": "tsc -b && tsdown",
     "test": "vitest run",
     "typecheck": "tsc -b",
-    "check": "node -e \"require('node:fs').rmSync('lib',{recursive:true,force:true})\" && tsc -b --force && vitest run && tsdown"
+    "check": "node -e \"require('node:fs').rmSync('lib',{recursive:true,force:true})\" && tsc -b --force && vitest run && tsdown",
+    "version": "node scripts/sync-version.mjs && pnpm run check && git add src/client/meta.ts lib"
   },
   "publishConfig": {
     "access": "public"

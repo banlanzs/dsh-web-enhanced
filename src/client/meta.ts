@@ -1,10 +1,12 @@
 /**
  * Build-time metadata shown in the Settings → About tab.
  *
- * `WEB_ENHANCED_VERSION` must be bumped together with `package.json`'s
- * `version` (the client bundle cannot read the package manifest at runtime).
- * `tests/meta.spec.ts` pins the two equal, so a release with only one side
- * bumped fails `pnpm check` instead of shipping a stale About page.
+ * `WEB_ENHANCED_VERSION` duplicates `package.json`'s `version` because the
+ * client bundle cannot read the package manifest at runtime. `npm version`
+ * writes it through the `version` lifecycle script
+ * (`scripts/sync-version.mjs`), so both sides land in one commit;
+ * `tests/meta.spec.ts` pins them equal, so a hand-edited bump that skips that
+ * path still fails `pnpm check` instead of shipping a stale About page.
  * @module dsh-web-enhanced/src/client/meta
  */
 

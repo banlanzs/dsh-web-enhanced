@@ -25,7 +25,33 @@ node scripts/ci-local.mjs --matrix   # Node 22 + 24 全覆盖，等价整个 che
 
 `host-canary` job 只在 schedule / workflow_dispatch 触发且 `continue-on-error: true`，不参与 push 的红绿判定，因此不在本脚本范围内。
 
-本文其余部分讲的是另一件事：把插件真装进 profile 做人工交互验证。两者互补——CI 门保证「推上去会绿」，profile 测试保证「用起来对」。
+## 发布到 npm
+
+版本号在两个源里重复：`package.json` 的 `version` 与 `src/client/meta.ts` 的 `WEB_ENHANCED_VERSION`——浏览器 bundle 在运行时读不到 package manifest，import 它又会把整个文件拖进 bundle。`npm version` 的 `version` 生命周期脚本负责同步：
+
+```json
+"version": "node scripts/sync-version.mjs && pnpm run check && git add src/client/meta.ts lib"
+```
+
+它在 `npm version` 改完 `package.json` 之后、`git commit` 打 tag 之前运行，依次同步 `meta.ts`、干净重建 `lib/`、把两者一并 `git add`，因此源与产物落在同一个 version commit 里。
+
+这里必须是 `check` 而不是 `build`：`build` 是增量的，而干净重建会重排 `lib/client.js` 的内联模块顺序，只有 `check`（`rm -rf lib` + `tsc -b --force`）产出的字节与 CI 一致，否则 CI 的 lib/ 漂移门会红。
+
+`tests/meta.spec.ts` 把两个版本号钉死，是绕开上述路径手工改版本时的兜底。
+
+完整流程：
+
+```bash
+# 1. 写 CHANGELOG.md 并提交（内容必须人写；npm version 要求工作树干净）
+# 2. 版本号两处 + lib/ 产物 + commit + tag，一次完成
+npm version minor -m "chore(web-enhanced): release %s"
+# 3. 全门（含真机 e2e）
+node scripts/ci-local.mjs
+# 4. 发布
+npm publish && git push --follow-tags
+```
+
+本文其余部分讲的是另一件事：把插件真装进 profile 做人工交互验证。三者互补——CI 门保证「推上去会绿」，发布流程保证「发出去的版本号是对的」，profile 测试保证「用起来对」。
 
 ## 关键结论
 

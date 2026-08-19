@@ -1,12 +1,12 @@
 /**
  * Build-time metadata pins.
  *
- * `WEB_ENHANCED_VERSION` is a hand-written duplicate of `package.json`'s
- * `version` (the browser bundle cannot read the manifest at runtime, and
- * importing it would drag the whole file into the bundle). A duplicate
- * maintained by convention alone WILL drift — 0.20.0 shipped with the About
- * tab still saying 0.19.0 — so the convention is pinned here, where
- * `pnpm check` runs before every release.
+ * `WEB_ENHANCED_VERSION` duplicates `package.json`'s `version` (the browser
+ * bundle cannot read the manifest at runtime, and importing it would drag the
+ * whole file into the bundle). `scripts/sync-version.mjs` writes it during
+ * `npm version`, but a hand-edited bump bypasses that path — 0.20.0 shipped
+ * with the About tab still saying 0.19.0 — so the equality is pinned here,
+ * where `pnpm check` runs before every release.
  * @module dsh-web-enhanced/tests/meta
  */
 
