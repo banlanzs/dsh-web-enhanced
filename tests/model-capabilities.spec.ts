@@ -12,8 +12,8 @@ import {
   modelOptionsOf, visibleCapabilityProvider,
 } from '../src/client/model-capabilities/capability-join.ts'
 import {
-  applyDraft, draftAt, normalizePiAiDraft, pathOps, validateDeepSeekDraft,
-  validatePiAiDraft,
+  applyDraft, applyReasoningToAll, draftAt, normalizePiAiDraft, pathOps, usableReasoningPreset,
+  validateDeepSeekDraft, validatePiAiDraft,
 } from '../src/client/model-capabilities/settings-draft.ts'
 
 const provider = (overrides: Partial<ConfigurableProviderView> = {}): ConfigurableProviderView => ({
@@ -197,5 +197,94 @@ describe('modelOptionsOf', () => {
       'catalog-b', 'catalog-only', 'from-settings', 'override-c',
     ])
     expect(options[0]!.name).toBe('Catalog B')
+  })
+})
+
+describe('applyReasoningToAll', () => {
+  it('writes the preset onto every entry of a models list', () => {
+    const draft = {
+      defaultInput: ['text'],
+      models: [
+        { id: 'a', input: ['text'] },
+        { id: 'b', reasoningEfforts: false },
+        { id: 'c', input: ['image'], reasoningEfforts: { high: 'high' } },
+      ],
+    }
+    const result = applyReasoningToAll(draft, { off: null, high: 'high' }, true)
+    expect(result.models).toEqual([
+      { id: 'a', input: ['text'], reasoningEfforts: { off: null, high: 'high' } },
+      { id: 'b', reasoningEfforts: { off: null, high: 'high' } },
+      { id: 'c', input: ['image'], reasoningEfforts: { off: null, high: 'high' } },
+    ])
+  })
+
+  it('writes the preset onto every modelOverrides entry', () => {
+    const draft = {
+      defaultInput: ['text'],
+      modelOverrides: {
+        a: { input: ['text'] },
+        b: { reasoningEfforts: false },
+      },
+    }
+    const result = applyReasoningToAll(draft, { high: 'high' }, false)
+    expect(result.modelOverrides).toEqual({
+      a: { input: ['text'], reasoningEfforts: { high: 'high' } },
+      b: { reasoningEfforts: { high: 'high' } },
+    })
+  })
+
+  it('removes reasoningEfforts from all models when preset is undefined', () => {
+    const draft = {
+      models: [
+        { id: 'a', reasoningEfforts: { high: 'high' } },
+        { id: 'b', reasoningEfforts: false },
+      ],
+    }
+    const result = applyReasoningToAll(draft, undefined, true)
+    expect(result.models).toEqual([
+      { id: 'a' },
+      { id: 'b' },
+    ])
+  })
+
+  it('removes reasoningEfforts from overrides; normalizePiAiDraft later drops empties', () => {
+    const draft = {
+      modelOverrides: {
+        a: { reasoningEfforts: { high: 'high' } },
+        b: { reasoningEfforts: false },
+      },
+    }
+    const result = applyReasoningToAll(draft, undefined, false)
+    // applyReasoningToAll strips the field; empty-entry cleanup is the save path's job
+    expect(result.modelOverrides).toEqual({ a: {}, b: {} })
+    expect(normalizePiAiDraft(result)).not.toHaveProperty('modelOverrides')
+  })
+
+  it('preserves other top-level keys and existing non-reasoning fields', () => {
+    const draft = {
+      defaultInput: ['text', 'image'],
+      reasoning: 'high',
+      models: [{ id: 'a', input: ['image'], maxTokens: 4096 }],
+    }
+    const result = applyReasoningToAll(draft, false, true)
+    expect(result.defaultInput).toEqual(['text', 'image'])
+    expect(result.reasoning).toBe('high')
+    expect(result.models[0]).toEqual({ id: 'a', input: ['image'], maxTokens: 4096, reasoningEfforts: false })
+  })
+})
+
+describe('usableReasoningPreset', () => {
+  it('accepts false and a dict with at least one non-off level carrying a wire value', () => {
+    expect(usableReasoningPreset(false)).toBe(true)
+    expect(usableReasoningPreset({ high: 'high' })).toBe(true)
+    expect(usableReasoningPreset({ off: null, high: 'high', max: 'max' })).toBe(true)
+  })
+
+  it('rejects undefined, empty dicts, off-only dicts, and empty wire values', () => {
+    expect(usableReasoningPreset(undefined)).toBe(false)
+    expect(usableReasoningPreset({})).toBe(false)
+    expect(usableReasoningPreset({ off: null })).toBe(false)
+    expect(usableReasoningPreset({ high: '' })).toBe(false)
+    expect(usableReasoningPreset({ high: 'high', max: '' })).toBe(true)
   })
 })

@@ -13,7 +13,7 @@
  * @module dsh-web-enhanced/src/client/model-capabilities/ModelCapabilities
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
   ConfigurableProviderView, IApiClient, SettingsNamespaceView,
@@ -23,9 +23,9 @@ import {
 } from '@deepseek-ai/dsh-client-schema-form'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  applyDraft, cloneRecord, DEEPSEEK_NS, draftAt, isRecord, MODALITIES,
-  normalizePiAiDraft, PI_AI_NS, recordOf, THINKING_LEVELS, validateDeepSeekDraft,
-  validatePiAiDraft,
+  applyDraft, applyReasoningToAll, cloneRecord, DEEPSEEK_NS, draftAt, isRecord, MODALITIES,
+  normalizePiAiDraft, PI_AI_NS, recordOf, THINKING_LEVELS, usableReasoningPreset,
+  validateDeepSeekDraft, validatePiAiDraft,
 } from './settings-draft.ts'
 import type { JsonRecord } from './settings-draft.ts'
 import { modelOptionsOf } from './store.ts'
@@ -253,18 +253,30 @@ function InputEditor({ value, onChange, disabled, required = false, t }: InputEd
   )
 }
 
-type ReasoningMode = 'inherit' | 'none' | 'custom'
+type ReasoningMode = 'none' | 'custom'
 
-/** Read the reasoning-efforts field as one of the editor's three states. */
+/** Read the reasoning-efforts field as one of the editor's two states. */
 function reasoningModeOf(value: unknown): ReasoningMode {
   if (value === false) return 'none'
-  return isRecord(value) ? 'custom' : 'inherit'
+  return 'custom'
+}
+
+/** One-line summary of a model's reasoning-efforts value for a folded row. */
+function reasoningSummary(value: unknown, t: T): string {
+  if (value === false) return t('modelCapabilities.reasoningNone')
+  if (isRecord(value)) {
+    const levels = Object.keys(value)
+    return levels.length === 0
+      ? t('modelCapabilities.reasoningNoneSelected')
+      : levels.join(' / ')
+  }
+  return t('modelCapabilities.reasoningUnset')
 }
 
 /** The fixed custom-effort rows, initialized with the common levels. */
 const CUSTOM_REASONING_DEFAULT: JsonRecord = { off: null, high: 'high' }
 
-/** Editing surface for pi-ai `reasoningEfforts`: inherit / false / custom dict. */
+/** Editing surface for pi-ai `reasoningEfforts`: false / custom dict. */
 interface ReasoningEditorProps {
   value: unknown
   onChange: (value: unknown) => void
@@ -276,8 +288,7 @@ function ReasoningEditor({ value, onChange, disabled, t }: ReasoningEditorProps)
   const mode = reasoningModeOf(value)
   const dict = mode === 'custom' && isRecord(value) ? value : {}
   const setMode = (next: ReasoningMode): void => {
-    if (next === 'inherit') onChange(undefined)
-    else if (next === 'none') onChange(false)
+    if (next === 'none') onChange(false)
     else onChange(cloneRecord(isRecord(value) ? value : CUSTOM_REASONING_DEFAULT))
   }
   const toggleLevel = (level: ThinkingLevel): void => {
@@ -305,7 +316,6 @@ function ReasoningEditor({ value, onChange, disabled, t }: ReasoningEditorProps)
         aria-label={t('modelCapabilities.reasoning')}
         onChange={(event) => { setMode(event.target.value as ReasoningMode) }}
       >
-        <option value="inherit">{t('modelCapabilities.reasoningInherit')}</option>
         <option value="none">{t('modelCapabilities.reasoningNone')}</option>
         <option value="custom">{t('modelCapabilities.reasoningCustom')}</option>
       </select>
@@ -345,23 +355,6 @@ function ReasoningEditor({ value, onChange, disabled, t }: ReasoningEditorProps)
         )
         : null}
     </div>
-  )
-}
-
-/** What inheriting reasoning means for one exact model, read from llm.models. */
-function InheritedReasoningHint({ model, t }: { model: CatalogModel | undefined; t: T }): ReactNode {
-  const reasoning = model?.reasoning
-  if (reasoning === undefined || reasoning.efforts.length === 0) {
-    return <p className={css.fieldHint}>{t('modelCapabilities.reasoningInheritedNone')}</p>
-  }
-  const levels = reasoning.efforts.map(effort => effort.name).join(' / ')
-  const defaultName = reasoning.efforts.find(effort => effort.id === reasoning.defaultEffort)?.name ?? '—'
-  return (
-    <p className={css.fieldHint}>
-      {t('modelCapabilities.reasoningInherited')
-        .replace('{levels}', levels)
-        .replace('{default}', defaultName)}
-    </p>
   )
 }
 
@@ -553,9 +546,10 @@ function PiAiCapabilitiesCardBody({
   const [conflicted, setConflicted] = useState(false)
   const [saved, setSaved] = useState(false)
   const [addingId, setAddingId] = useState('')
+  const [presetReasoning, setPresetReasoning] = useState<unknown>(undefined)
   const disabled = readOnly || busy
   const configured = getPath(namespace.user, path) !== undefined
-  const catalogById = useMemo(() => new Map(catalog.map(model => [model.id, model])), [catalog])
+  const listMode = hasPath(draft, ['models'])
 
   // Only this page's own successful writes advance a sibling card's revision;
   // external settings changes deliberately keep the conflict path.
@@ -624,6 +618,12 @@ function PiAiCapabilitiesCardBody({
     setConflicted(false)
     setDraft(current => setPath(current, ['modelOverrides', id], { input: ['text'] }))
   }
+  const applyPresetToAll = (): void => {
+    setSaved(false)
+    setFailure(undefined)
+    setConflicted(false)
+    setDraft(current => applyReasoningToAll(current, presetReasoning, listMode))
+  }
   const reset = (): void => {
     setFailure(undefined)
     setConflicted(false)
@@ -665,7 +665,6 @@ function PiAiCapabilitiesCardBody({
     onApplied(namespace.ns, result.revision)
   }
 
-  const listMode = hasPath(draft, ['models'])
   const models = Array.isArray(draft['models']) ? draft['models'] : []
   const overrides = recordOf(draft['modelOverrides'])
   const overrideIds = new Set(Object.keys(overrides))
@@ -709,6 +708,26 @@ function PiAiCapabilitiesCardBody({
             </select>
             <p className={css.fieldHint}>{t('modelCapabilities.routeReasoningHint')}</p>
           </label>
+          <div className={css.field}>
+            <div className={css.fieldHead}>
+              <span className={css.fieldLabel}>{t('modelCapabilities.reasoningPreset')}</span>
+              <span className={css.fieldHint}>{t('modelCapabilities.reasoningPresetHint')}</span>
+            </div>
+            <ReasoningEditor
+              value={presetReasoning}
+              onChange={setPresetReasoning}
+              disabled={disabled}
+              t={t}
+            />
+            <button
+              type="button"
+              className={css.button}
+              disabled={disabled || !usableReasoningPreset(presetReasoning)}
+              onClick={applyPresetToAll}
+            >
+              {t('modelCapabilities.reasoningApplyAll')}
+            </button>
+          </div>
         </section>
 
         <section className={css.section} aria-label={t('modelCapabilities.modelSection')}>
@@ -743,18 +762,22 @@ function PiAiCapabilitiesCardBody({
                           t={t}
                         />
                       </label>
-                      <label className={css.field}>
-                        <span className={css.fieldLabel}>{t('modelCapabilities.reasoning')}</span>
-                        <ReasoningEditor
-                          value={entry['reasoningEfforts']}
-                          onChange={(value) => { patchListEntry(index, 'reasoningEfforts', value) }}
-                          disabled={disabled}
-                          t={t}
-                        />
-                        {reasoningModeOf(entry['reasoningEfforts']) === 'inherit'
-                          ? <InheritedReasoningHint model={catalogById.get(id)} t={t} />
-                          : null}
-                      </label>
+                      <details className={css.reasoningDisclosure}>
+                        <summary className={css.reasoningSummary}>
+                          <span>{t('modelCapabilities.reasoning')}</span>
+                          <span className={css.reasoningSummaryValue}>
+                            {reasoningSummary(entry['reasoningEfforts'], t)}
+                          </span>
+                        </summary>
+                        <div className={css.reasoningBody}>
+                          <ReasoningEditor
+                            value={entry['reasoningEfforts']}
+                            onChange={(value) => { patchListEntry(index, 'reasoningEfforts', value) }}
+                            disabled={disabled}
+                            t={t}
+                          />
+                        </div>
+                      </details>
                     </div>
                   )
                 })}
@@ -814,18 +837,22 @@ function PiAiCapabilitiesCardBody({
                                 t={t}
                               />
                             </label>
-                            <label className={css.field}>
-                              <span className={css.fieldLabel}>{t('modelCapabilities.reasoning')}</span>
-                              <ReasoningEditor
-                                value={entry['reasoningEfforts']}
-                                onChange={(value) => { patchOverride(id, 'reasoningEfforts', value) }}
-                                disabled={disabled}
-                                t={t}
-                              />
-                              {reasoningModeOf(entry['reasoningEfforts']) === 'inherit'
-                                ? <InheritedReasoningHint model={catalogById.get(id)} t={t} />
-                                : null}
-                            </label>
+                            <details className={css.reasoningDisclosure}>
+                              <summary className={css.reasoningSummary}>
+                                <span>{t('modelCapabilities.reasoning')}</span>
+                                <span className={css.reasoningSummaryValue}>
+                                  {reasoningSummary(entry['reasoningEfforts'], t)}
+                                </span>
+                              </summary>
+                              <div className={css.reasoningBody}>
+                                <ReasoningEditor
+                                  value={entry['reasoningEfforts']}
+                                  onChange={(value) => { patchOverride(id, 'reasoningEfforts', value) }}
+                                  disabled={disabled}
+                                  t={t}
+                                />
+                              </div>
+                            </details>
                           </div>
                         )
                       })}
