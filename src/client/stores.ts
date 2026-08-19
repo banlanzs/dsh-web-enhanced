@@ -236,24 +236,7 @@ export interface PanelState {
   readonly expanded: Readonly<Record<string, readonly string[]>>
   /** Live file-name filter of the tree (transient, never persisted). */
   readonly query: string
-  /** Whether the terminal drawer shows only its tab strip. */
-  readonly drawerCollapsed: boolean
-  /** Expanded height of the terminal drawer, in pixels. */
-  readonly drawerHeight: number
-  /**
-   * Focused terminal, or null for none. Ids are minted per host process, so a
-   * restored id can name a session that no longer exists; the drawer treats a
-   * refused attach as "pick another".
-   */
-  readonly activeTerminalId: string | null
 }
-
-/** Terminal drawer geometry bounds, applied on drag and on revive. */
-export const DRAWER_MIN_HEIGHT = 96
-
-export const DRAWER_MAX_HEIGHT = 900
-
-export const DRAWER_DEFAULT_HEIGHT = 260
 
 /** View actions handed to components through their inject face. */
 export interface PanelActions {
@@ -278,21 +261,6 @@ export interface PanelActions {
    * @param collapsed - the target state.
    */
   readonly setSidebarCollapsed: (collapsed: boolean) => void
-  /**
-   * Collapse or expand the terminal drawer.
-   * @param collapsed - the target state.
-   */
-  readonly setDrawerCollapsed: (collapsed: boolean) => void
-  /**
-   * Resize the terminal drawer; the value is clamped to the drawer bounds.
-   * @param height - requested height in pixels.
-   */
-  readonly setDrawerHeight: (height: number) => void
-  /**
-   * Focus one terminal, or none.
-   * @param terminalId - the session id, or null.
-   */
-  readonly setActiveTerminal: (terminalId: string | null) => void
 }
 
 /** Restore persisted view state, dropping anything that is not the stored shape. */
@@ -316,30 +284,13 @@ function revivePanel(raw: unknown): PanelState | undefined {
     expanded,
     // The filter is a live gesture, not a place: a reload starts unfiltered.
     query: '',
-    // Absent in anything stored before the drawer existed, which must restore
-    // collapsed rather than as an expanded drawer nobody opened.
-    drawerCollapsed: record['drawerCollapsed'] !== false,
-    drawerHeight: clampDrawerHeight(
-      typeof record['drawerHeight'] === 'number' ? record['drawerHeight'] : DRAWER_DEFAULT_HEIGHT,
-    ),
-    activeTerminalId: typeof record['activeTerminalId'] === 'string' ? record['activeTerminalId'] : null,
   }
 }
 
 /** Create the view cell and its bound actions. */
 export function createPanel(): { cell: Cell<PanelState>; actions: PanelActions } {
   const cell = createCell<PanelState>(
-    {
-      tab: 'explorer',
-      sidebarCollapsed: false,
-      expanded: {},
-      query: '',
-      // Collapsed by default: an upgrade must not silently take 260px of the
-      // workspace away from someone who never asked for a terminal.
-      drawerCollapsed: true,
-      drawerHeight: DRAWER_DEFAULT_HEIGHT,
-      activeTerminalId: null,
-    },
+    { tab: 'explorer', sidebarCollapsed: false, expanded: {}, query: '' },
     {
       key: PANEL_PERSIST_KEY,
       revive: revivePanel,
@@ -362,28 +313,8 @@ export function createPanel(): { cell: Cell<PanelState>; actions: PanelActions }
       setSidebarCollapsed: (collapsed) => {
         cell.update(current => current.sidebarCollapsed === collapsed ? current : { ...current, sidebarCollapsed: collapsed })
       },
-      setDrawerCollapsed: (collapsed) => {
-        cell.update(current => current.drawerCollapsed === collapsed ? current : { ...current, drawerCollapsed: collapsed })
-      },
-      setDrawerHeight: (height) => {
-        const clamped = clampDrawerHeight(height)
-        cell.update(current => current.drawerHeight === clamped ? current : { ...current, drawerHeight: clamped })
-      },
-      setActiveTerminal: (terminalId) => {
-        cell.update(current => current.activeTerminalId === terminalId ? current : { ...current, activeTerminalId: terminalId })
-      },
     },
   }
-}
-
-/**
- * Hold a drawer height inside its bounds.
- * @param height - requested height in pixels; a non-finite value falls back to the default.
- * @returns the height to apply.
- */
-export function clampDrawerHeight(height: number): number {
-  if (!Number.isFinite(height)) return DRAWER_DEFAULT_HEIGHT
-  return Math.min(DRAWER_MAX_HEIGHT, Math.max(DRAWER_MIN_HEIGHT, Math.round(height)))
 }
 
 // ── preview tabs ───────────────────────────────────────────────────────────

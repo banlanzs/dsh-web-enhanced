@@ -33,8 +33,6 @@ import type {
   MemoryConfigGetResult, MemoryConfigSaveRequest, MemoryConfigSetResult, MemoryConfigView,
   MemoryDeleteRequest, MemoryDeleteResult, MemoryKind, MemoryListRequest, MemoryListResult,
   MemoryRecord,
-  TerminalCloseRequest, TerminalCloseResult, TerminalListRequest, TerminalListResult,
-  TerminalSignalRequest, TerminalSignalResult, TerminalSpawnRequest, TerminalSpawnResult,
 } from '../types.ts'
 import type {
   BrowseActions, BrowseState, Observable, OverlayActions, OverlayState, PanelActions, PanelState,
@@ -98,10 +96,6 @@ export interface WebEnhancedRemote {
   memoryDelete(request: MemoryDeleteRequest): Promise<MemoryDeleteResult>
   memoryConfigGet(): Promise<MemoryConfigGetResult>
   memoryConfigSet(request: MemoryConfigSaveRequest): Promise<MemoryConfigSetResult>
-  terminalList(request: TerminalListRequest): Promise<TerminalListResult>
-  terminalSpawn(request: TerminalSpawnRequest): Promise<TerminalSpawnResult>
-  terminalClose(request: TerminalCloseRequest): Promise<TerminalCloseResult>
-  terminalSignal(request: TerminalSignalRequest): Promise<TerminalSignalResult>
 }
 
 /** Re-exported payload types (components, tests, and preview helpers). */
@@ -137,9 +131,6 @@ export type {
   VisionConfigView, VisionEndpointModelView, VisionEndpointModelsRequest, VisionEndpointModelsResult,
   VisionEndpointModelsView, VisionHarnessModelView, VisionModelOptionView, VisionProviderOptionView,
   VisionStatusResult, VisionStatusView,
-  TerminalCloseRequest, TerminalCloseResult, TerminalListRequest, TerminalListResult,
-  TerminalSignalName, TerminalSignalRequest, TerminalSignalResult, TerminalSpawnRequest,
-  TerminalSpawnResult, TerminalView,
 } from '../types.ts'
 
 /**

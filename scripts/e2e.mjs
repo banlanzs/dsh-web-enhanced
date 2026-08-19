@@ -350,43 +350,7 @@ try {
     await page.screenshot({ path: join(assetsDir, 'graph.png') })
   }
 
-  // ── 断言 4: 工作区终端抽屉 ──────────────────────────────────────────────
-  // 这条覆盖的是别处都覆盖不到的一整条链路：WebSocket 升级握手 → 宿主真的
-  // spawn 了 PTY → 击键写进 PTY → 输出字节回到浏览器并被 xterm 渲染。
-  const drawer = workspaceView.locator('[data-testid="terminal-drawer"]')
-  if (!(await drawer.isVisible().catch(() => false))) {
-    await screenshot('e2e-fail-terminal.png')
-    await logTail()
-    fail('工作区底部未出现终端抽屉')
-  }
-  // 抽屉默认收起，先展开。
-  await workspaceView.locator('[data-testid="terminal-toggle"]').click()
-  const surface = workspaceView.locator('[data-testid="terminal-surface"]')
-  await surface.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {})
-  if (!(await surface.isVisible().catch(() => false))) {
-    await screenshot('e2e-fail-terminal.png')
-    await logTail()
-    fail('展开终端抽屉后 20s 内未出现终端界面')
-  }
-  // 回显一个唯一串：出现即证明输入到达了真实 shell 且输出流了回来。
-  const marker = 'dsh-terminal-ok-' + String(PORT)
-  await surface.click()
-  await page.keyboard.type(`echo ${marker}`)
-  await page.keyboard.press('Enter')
-  const echoed = drawer.getByText(marker, { exact: false })
-  // 首次 attach 要等 profile 里的 shell 起 rc 文件，给足时间。
-  await echoed.first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {})
-  if (!(await echoed.first().isVisible().catch(() => false))) {
-    await screenshot('e2e-fail-terminal.png')
-    await logTail()
-    fail('终端里执行 echo 后 30s 内未看到回显，说明 PTY 链路没有打通')
-  }
-  log('✓ 工作区终端：WebSocket → PTY → 回显全链路')
-  if (CAPTURE) {
-    await page.screenshot({ path: join(assetsDir, 'terminal.png') })
-  }
-
-  // ── 断言 5: 输入框下余额行 ──────────────────────────────────────────────
+  // ── 断言 4: 输入框下余额行 ──────────────────────────────────────────────
 
   // 余额行（conversation.composer.dock；无 key 时渲染错误态，有 key 渲染数值）
   const balanceLine = page.locator('[data-testid="balance-line"]')
@@ -418,7 +382,7 @@ try {
     fail(`页面异常: ${pageErrors.slice(0, 3).join(' | ')}`)
   }
 
-  console.log('PASS 真机 e2e 通过（无模型 key）：安装 → 新会话 → 工作区预览 → 看板 → 图谱 → 终端 → 余额行')
+  console.log('PASS 真机 e2e 通过（无模型 key）：安装 → 新会话 → 工作区预览 → 看板 → 图谱 → 余额行')
   await browser.close()
   await cleanup()
   process.exit(0)

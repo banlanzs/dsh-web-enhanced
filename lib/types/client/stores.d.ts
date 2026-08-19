@@ -135,21 +135,7 @@ export interface PanelState {
     readonly expanded: Readonly<Record<string, readonly string[]>>;
     /** Live file-name filter of the tree (transient, never persisted). */
     readonly query: string;
-    /** Whether the terminal drawer shows only its tab strip. */
-    readonly drawerCollapsed: boolean;
-    /** Expanded height of the terminal drawer, in pixels. */
-    readonly drawerHeight: number;
-    /**
-     * Focused terminal, or null for none. Ids are minted per host process, so a
-     * restored id can name a session that no longer exists; the drawer treats a
-     * refused attach as "pick another".
-     */
-    readonly activeTerminalId: string | null;
 }
-/** Terminal drawer geometry bounds, applied on drag and on revive. */
-export declare const DRAWER_MIN_HEIGHT = 96;
-export declare const DRAWER_MAX_HEIGHT = 900;
-export declare const DRAWER_DEFAULT_HEIGHT = 260;
 /** View actions handed to components through their inject face. */
 export interface PanelActions {
     /**
@@ -173,33 +159,12 @@ export interface PanelActions {
      * @param collapsed - the target state.
      */
     readonly setSidebarCollapsed: (collapsed: boolean) => void;
-    /**
-     * Collapse or expand the terminal drawer.
-     * @param collapsed - the target state.
-     */
-    readonly setDrawerCollapsed: (collapsed: boolean) => void;
-    /**
-     * Resize the terminal drawer; the value is clamped to the drawer bounds.
-     * @param height - requested height in pixels.
-     */
-    readonly setDrawerHeight: (height: number) => void;
-    /**
-     * Focus one terminal, or none.
-     * @param terminalId - the session id, or null.
-     */
-    readonly setActiveTerminal: (terminalId: string | null) => void;
 }
 /** Create the view cell and its bound actions. */
 export declare function createPanel(): {
     cell: Cell<PanelState>;
     actions: PanelActions;
 };
-/**
- * Hold a drawer height inside its bounds.
- * @param height - requested height in pixels; a non-finite value falls back to the default.
- * @returns the height to apply.
- */
-export declare function clampDrawerHeight(height: number): number;
 /** Open preview tabs and the active selection. */
 export interface PreviewState {
     readonly tabs: readonly PreviewTab[];
