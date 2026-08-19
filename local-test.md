@@ -10,9 +10,12 @@
 node scripts/ci-local.mjs            # 默认 --full：等价 CI 的单个矩阵分支
 node scripts/ci-local.mjs --fast     # 跳过 smoke e2e，日常迭代用
 node scripts/ci-local.mjs --matrix   # Node 22 + 24 全覆盖，等价整个 check job
+node scripts/ci-local.mjs --clean    # 成功后清理 worktree 与打包产物（省空间）
 ```
 
 脚本默认在 `.ci-local/worktree`（HEAD 的干净副本）里执行，因此 `git diff --exit-code -- lib/` 的产物漂移门与 CI 的全新 checkout 语义一致，也不会污染开发树。代价是**未提交的改动不参与验证**：要验证工作中的改动，先提交，或加 `--no-worktree` 就地跑。
+
+worktree（含 node_modules）与每次打包的 tgz 都是可再生的缓存产物。加 `--clean` 会在成功后删除它们，省约 150 MB；代价是下次运行要重建 worktree 并全量 `pnpm install`（慢 1-2 分钟）。`.ci-local/host/<sha>` 的宿主构建**不**随 `--clean` 删除——它最重且按 SHA 缓存，需要时手动删除该目录即可。
 
 宿主基线 SHA 钉在脚本的 `HOST_REF` 常量里，是升级宿主基线时唯一需要改的地方。宿主按 SHA 缓存在 `.ci-local/host/<sha>`，优先从本地已有的 deepseek-harness clone 以 `git clone --local` 取（零网络、秒级），找不到才走网络浅取；构建一次后后续运行整步跳过，用 `--rebuild-host` 强制重建。
 
