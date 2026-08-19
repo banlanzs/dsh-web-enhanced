@@ -97,9 +97,9 @@ await new Promise((res) => {
   const [pnpmCmd, pnpmArgs] = winCommand('pnpm', ['--version'])
   const r = spawnSync(pnpmCmd, pnpmArgs, { encoding: 'utf8' })
   if (r.error !== undefined && r.error !== null) fail('未找到 pnpm，请先安装并确保在 PATH 上')
+  log(`pnpm: ${r.stdout.trim()}`)
 }
 log(`DSH_BIN: ${DSH_BIN}`)
-log(`pnpm: ${spawnSync('pnpm', ['--version'], { encoding: 'utf8' }).stdout.trim()}`)
 if (SMOKE) log('smoke 模式：无模型 key 全链路（本插件四块功能均不需 key）')
 
 // ── 临时环境 ──────────────────────────────────────────────────────────────
