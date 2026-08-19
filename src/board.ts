@@ -12,6 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import type { ZodType } from 'zod'
+import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { nextAfter, parseCron } from './cron.ts'
@@ -149,6 +150,21 @@ export interface BoardConfig {
    * arms no timer at all.
    */
   readonly cronIntervalMs: number
+}
+
+/** The board's slice of the plugin config (user input; defaults bind later). */
+export interface BoardConfigInput {
+  cronIntervalMs?: number
+}
+
+/** The board's config fragment, as the plugin schema assembles it. */
+export const boardConfigFragment = z.object({
+  cronIntervalMs: z.number().default(30_000),
+})
+
+/** Field defaults applied when the board is assembled directly. */
+export function resolveBoardConfig(config: Partial<BoardConfigInput>): Required<BoardConfigInput> {
+  return { cronIntervalMs: config.cronIntervalMs ?? 30_000 }
 }
 
 /** How the board reaches the world outside the task table. */

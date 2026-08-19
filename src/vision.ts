@@ -35,8 +35,7 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Message } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
 import z from '@deepseek-ai/schemastery'
-import type { VisionFallbackConfig } from './gateway.ts'
-import type { VisionAttemptFailureView, VisionStatusView } from './types.ts'
+import type { VisionAttemptFailureView, VisionFallbackConfig, VisionStatusView } from './types.ts'
 
 /** Default description prompt: thorough Chinese transcription + scene detail. */
 export const DEFAULT_VISION_PROMPT =
