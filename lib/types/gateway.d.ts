@@ -1,108 +1,39 @@
 /**
  * The web-enhanced gateway: one Typert namespace (`webEnhanced`) exposing
- * the task board, git, files, Office preview, and balance capabilities to
- * the client. Business failures are result fields, never thrown exceptions,
- * so the client renders them inline. The task domain lives in {@link
- * TaskBoard}; this class is the wire-facing assembly.
+ * the task board, git, files, Office preview, balance, and image
+ * understanding to the client.
+ *
+ * This class is the wire face and nothing else: every method declares its
+ * `@Remote` binding and delegates to the domain that owns the behaviour (see
+ * {@link ./services.ts} for the assembly, and each `*-gateway.ts` for one
+ * domain). The methods stay here because `@Remote` records its markers on
+ * this service's prototype. Business failures are result fields, never thrown
+ * exceptions, so the client renders them inline.
  * @module dsh-web-enhanced/src/gateway
  */
 import type { Context } from '@deepseek-ai/cordis';
-import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
+import { Config } from './config.ts';
 import type { BalanceGetRequest, BalanceView, DeepSeekRateGetRequest, DeepSeekRateGetResult, FsBrowseRequest, FsBrowseResult, FsDeleteRequest, FsListRequest, FsListResult, FsOfficePreviewRequest, FsOfficePreviewResult, FsReadRequest, FsReadResult, FsSearchRequest, FsSearchResult, FsWriteRequest, FsWriteResult, GitBranchesRequest, GitBranchesResult, GitCheckoutRequest, GitCheckoutResult, GitCommitRequest, GitCommitResult, GitCommitDiffRequest, GitCommitDiffResult, GitDiffRequest, GitDiffResult, GitLogRequest, GitLogResult, GitMutateRequest, GitMutateResult, GitStatusRequest, GitStatusResult, GitWorkingRequest, GitWorkingResult, GlobalPromptGetResult, GlobalPromptSaveRequest, GlobalPromptSetResult, MemoryConfigGetResult, MemoryConfigSaveRequest, MemoryConfigSetResult, MemoryDeleteRequest, MemoryDeleteResult, MemoryListRequest, MemoryListResult, ModelRetryGetResult, ModelRetrySetRequest, ModelRetrySetResult, ModelRouteDescribeRequest, ModelRouteDescribeResult, OpencodeGoUsageView, PluginListRequest, PluginListResult, PluginMutateRequest, PluginMutateResult, PricingGetRequest, PricingGetResult, TaskCreateRequest, TaskCreateResult, TaskListResult, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, VisionConfigGetResult, VisionConfigSaveRequest, VisionConfigSetResult, VisionEndpointModelsRequest, VisionEndpointModelsResult, VisionStatusResult } from './types.ts';
-/** One fallback vision endpoint entry, as declared in plugin config. */
-export interface VisionFallbackConfig {
-    model: string;
-    baseURL?: string;
-    apiKey?: string;
-    anonymous?: boolean;
-    timeoutMs?: number;
-}
-/** Plugin config; every bound defaults when unset. */
-export interface Config {
-    cronIntervalMs?: number;
-    balanceApiKeyEnv?: string;
-    balanceCacheTtlMs?: number;
-    balanceBaseUrl?: string;
-    balanceProviders?: string[];
-    modelsDevUrl?: string;
-    modelsDevCacheTtlMs?: number;
-    modelsDevTimeoutMs?: number;
-    pricingProviderMap?: Record<string, string>;
-    /** OpenCode Go usage endpoint (quota windows for the subscription line). */
-    opencodeGoUsageUrl?: string;
-    /** How long one OpenCode Go quota snapshot stays fresh. */
-    opencodeGoCacheTtlMs?: number;
-    /** Override of the opencode CLI auth.json path (empty = platform default). */
-    opencodeGoAuthFile?: string;
-    skipDirs?: string[];
-    readMaxBytes?: number;
-    writeMaxBytes?: number;
-    binaryMaxBytes?: number;
-    gitOutputMaxBytes?: number;
-    gitMaxCount?: number;
-    gitWorkingMaxFiles?: number;
-    searchMaxDepth?: number;
-    searchMaxEntries?: number;
-    officeMaxBytes?: number;
-    browseMaxEntries?: number;
-    pluginOpTimeoutMs?: number;
-    profileDir?: string;
-    visionEnabled?: boolean;
-    visionPatchAdmission?: boolean;
-    visionPrompt?: string;
-    visionMarker?: string;
-    visionProvider?: string;
-    visionModel?: string;
-    /** User-selected DSH model pool; non-empty replaces auto-detection. */
-    visionHarnessModels?: Array<{
-        provider: string;
-        model: string;
-    }>;
-    visionBaseUrl?: string;
-    visionApiKey?: string;
-    visionApiKeyEnv?: string;
-    visionEndpointModel?: string;
-    /** Candidate pool for the dedicated endpoint; the active model is one of them. */
-    visionEndpointModels?: string[];
-    visionAnonymous?: boolean;
-    visionTimeoutMs?: number;
-    visionMaxTokens?: number;
-    visionAutoLocalOllama?: boolean;
-    visionLocalOllamaModel?: string;
-    visionLocalOllamaUrl?: string;
-    visionFallbackModels?: VisionFallbackConfig[];
-    visionCacheLimit?: number;
-    visionCooldownMs?: number;
-}
-export declare const Config: z<Config>;
-/** Field defaults applied when the gateway is constructed directly. */
-export declare function resolveConfig(config: Config): Required<Config>;
+/**
+ * Config re-exports.
+ *
+ * Each domain module owns its own slice of the schema (see
+ * {@link ./config.ts}); these keep the plugin entry and any external
+ * consumer importing the gateway's config surface unchanged.
+ */
+export { Config, resolveConfig } from './config.ts';
+export type { VisionFallbackConfig } from './types.ts';
 /**
  * The web-enhanced gateway. One Typert namespace so a single `remote`
  * contribution reaches the client; methods are grouped by prefix.
  */
 export declare class WebEnhancedGateway extends TypertRemoteService {
-    private readonly resolved;
-    private readonly balance;
-    private readonly board;
-    private readonly memoryStore;
-    private readonly pricing;
-    private readonly routeNames;
-    private readonly opencodeGo;
-    /** Resolved lazily: the walk is filesystem work no other capability needs. */
-    private profileDirCache;
-    /** Built on first mutation, so a deployment outside a profile never makes one. */
-    private pnpm;
+    private readonly services;
     /**
-     * Empty-query fsSearch results by `${workspaceId}:${path}`. The `+` mention
-     * picker opens with no query and would otherwise rewalk the workspace on
-     * every open; non-empty queries bypass this cache entirely.
-     */
-    private readonly emptySearchCache;
-    /**
-     * Register the gateway, mount the task board (recovering interrupted
-     * runs), and start the scheduler.
+     * Register the gateway, assemble every domain (mounting the task board,
+     * which recovers interrupted runs and starts the scheduler), and keep the
+     * route-name cache in step with the provider directory.
      * @param ctx - owning context with the injected core services.
      * @param config - plugin config; defaults apply field-wise.
      */
@@ -249,80 +180,9 @@ export declare class WebEnhancedGateway extends TypertRemoteService {
      * the plugin from outside any profile (a source checkout, a test): those are
      * different facts, and an empty list would invite a removal that cannot work.
      */
-    pluginList(_request: PluginListRequest): Promise<PluginListResult>;
+    pluginList(request: PluginListRequest): Promise<PluginListResult>;
     /** Remove one plugin from the profile (takes effect on the next start). */
     pluginRemove(request: PluginMutateRequest): Promise<PluginMutateResult>;
     /** Update one plugin to its spec's head (takes effect on the next start). */
     pluginUpdate(request: PluginMutateRequest): Promise<PluginMutateResult>;
-    /** The settings provider the vision config remotes read and write. */
-    private visionSettings;
-    /** The settings provider the model-retry remotes read and write. */
-    private modelRetrySettings;
-    /** The settings provider the global-prompt remotes read and write. */
-    private globalPromptSettings;
-    /** The settings service backing the memory feature switch, when composed. */
-    private memorySettings;
-    /** The live integration status, or the explicit unmounted state. */
-    private visionStatusView;
-    /** Providers and models for the Vision tab, from the model picker's source. */
-    private visionProviderOptions;
-    /**
-     * Whether the balance describes the account one model route bills.
-     *
-     * The provider's endpoint is read from the settings section its own adapter
-     * declares, through `ctx.llm`'s configurable-provider directory — both read
-     * uninjected, because a deployment that composes neither still has a working
-     * gateway and simply falls back to the allow list.
-     */
-    private balanceApplies;
-    /** Configured endpoint of one provider route, when its settings declare one. */
-    private providerBaseUrl;
-    /**
-     * Store one empty-query result, keeping at most {@link FS_SEARCH_CACHE_LIMIT}
-     * keys: a re-set refreshes recency, and the oldest key is evicted past the
-     * limit (Map insertion order).
-     */
-    private storeEmptySearch;
-    /**
-     * Drop every cached empty-query result of one workspace. A write or delete
-     * changes what an unfiltered listing returns; dropping the whole workspace's
-     * entries is cheap correctness over per-path tracking.
-     */
-    private invalidateSearchCache;
-    private get fsLimits();
-    private get gitLimits();
-    private get officeLimits();
-    private runDeps;
-    private boardDeps;
-    /** Resolve a workspace id to its canonical root; null when unknown. */
-    private workspaceRootFor;
-    private resolveWorkspaceId;
-    private workspaceRoot;
-    private withGit;
-    /** The error returned when this deployment sits outside any profile. */
-    private noProfile;
-    /**
-     * The profile directory, resolved once and cached.
-     *
-     * A profile cannot move under a running host, so a repeated walk would only
-     * repeat the same filesystem reads. The promise itself is cached so
-     * concurrent first callers share one walk. A configured path wins outright:
-     * the walk is a heuristic over where the module happens to sit.
-     */
-    private profileDir;
-    /**
-     * Run one plugin mutation, guarding what pnpm itself would not.
-     *
-     * The refusal here is for a name pnpm cannot act on: a template bundle is in
-     * the layer list precisely because nothing depends on it, so `pnpm remove`
-     * would report success having done nothing. Removing the row that IS this
-     * plugin is NOT refused — that is a legitimate thing to want, and the
-     * `self` flag exists so the surface can confirm it rather than have the
-     * gateway decide on the user's behalf.
-     * @param name - package name from the request.
-     * @param operation - the runner call to perform.
-     * @returns the mutation result.
-     */
-    private pluginOperation;
-    private errorOf;
 }

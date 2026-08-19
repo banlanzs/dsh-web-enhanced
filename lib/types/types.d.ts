@@ -563,6 +563,14 @@ export interface VisionHarnessModelView {
     readonly provider: string;
     readonly model: string;
 }
+/** One fallback vision endpoint entry, as declared in plugin config. */
+export interface VisionFallbackConfig {
+    model: string;
+    baseURL?: string;
+    apiKey?: string;
+    anonymous?: boolean;
+    timeoutMs?: number;
+}
 /** One transcription attempt that failed, kept for the Settings tab. */
 export interface VisionAttemptFailureView {
     /** Unix epoch ms. */

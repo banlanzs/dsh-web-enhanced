@@ -31,8 +31,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { Service } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
-import type { VisionFallbackConfig } from './gateway.ts';
-import type { VisionAttemptFailureView, VisionStatusView } from './types.ts';
+import type { VisionAttemptFailureView, VisionFallbackConfig, VisionStatusView } from './types.ts';
 /** Default description prompt: thorough Chinese transcription + scene detail. */
 export declare const DEFAULT_VISION_PROMPT = "\u8BF7\u4ED4\u7EC6\u89C2\u5BDF\u8FD9\u5F20\u56FE\u7247\u5E76\u8BE6\u7EC6\u63CF\u8FF0\u5176\u5185\u5BB9\uFF0C\u5305\u62EC\uFF1A\u6240\u6709\u53EF\u89C1\u7684\u6587\u5B57\uFF08\u8BF7\u9010\u5B57\u8F6C\u5F55\uFF09\u3001\u7269\u4F53\u3001\u4EBA\u7269\u3001\u573A\u666F\u3001\u5E03\u5C40\u3001\u989C\u8272\u4EE5\u53CA\u4EFB\u4F55\u503C\u5F97\u6CE8\u610F\u7684\u7EC6\u8282\u3002\u8BF7\u7528\u4E2D\u6587\u56DE\u7B54\u3002";
 /** Marker the model sees instead of the image block. */

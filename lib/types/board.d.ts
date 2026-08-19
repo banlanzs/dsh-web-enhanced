@@ -6,6 +6,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { Domain } from '@deepseek-ai/dsh-storage-domain';
+import z from '@deepseek-ai/schemastery';
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace';
 import type { RunDeps } from './run-task.ts';
 import type { TaskCreateRequest, TaskCreateResult, TaskId, TaskListResult, TaskRecord, TaskRemoveRequest, TaskRemoveResult, TaskRunRequest, TaskRunResult, TaskUpdateRequest, TaskUpdateResult, MemoryId, MemoryRecord } from './types.ts';
@@ -51,6 +52,18 @@ export interface BoardConfig {
      */
     readonly cronIntervalMs: number;
 }
+/** The board's slice of the plugin config (user input; defaults bind later). */
+export interface BoardConfigInput {
+    cronIntervalMs?: number;
+}
+/** The board's config fragment, as the plugin schema assembles it. */
+export declare const boardConfigFragment: z<Schemastery.ObjectS<{
+    cronIntervalMs: z<number, number>;
+}>, Schemastery.ObjectT<{
+    cronIntervalMs: z<number, number>;
+}>>;
+/** Field defaults applied when the board is assembled directly. */
+export declare function resolveBoardConfig(config: Partial<BoardConfigInput>): Required<BoardConfigInput>;
 /** How the board reaches the world outside the task table. */
 export interface BoardDeps extends RunDeps {
     /** Resolve a workspace id to its canonical root; fallback for null ids. */
