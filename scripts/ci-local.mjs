@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url'
 // 0.1.1 client 契约（renderMessageImages、seed 白名单、dsh.client 收窄），
 // peerDependencies 下界即 ^0.1.1-rc.2，更早的宿主不提供这些契约，e2e 会
 // 在加载期失败。宿主 master 前移不再能使本仓库变红；升级基线时只改这一处。
-const HOST_REF = 'aa6c361a97'
+const HOST_REF = 'aa6c361a972c8369148dea7380bb5c21c24e07ec'
 const HOST_URL = 'https://github.com/deepseek-ai/deepseek-harness.git'
 
 // ci.yml 的矩阵：22 = 最低支持宿主，24 = 前向集成。
