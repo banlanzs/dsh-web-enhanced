@@ -36,14 +36,20 @@ function repoRelative(abs: string): string {
   return relative(ROOT, abs).split(sep).join('/')
 }
 
-/** Browser platform modules resolved from the loader module table. */
+/**
+ * Browser platform modules resolved from the loader module table. The 0.1.1
+ * shell seeds exactly these words (react family, cordis, and the two
+ * UI-singleton seeds compiled into the frontend); every other specifier must
+ * either inline or resolve as a parser-preloaded graph row. The rc.6-only
+ * packages this plugin once required (web-react, schema-form, attachment
+ * values) are gone from the seed, and feature plugins may not runtime-import
+ * other feature packages anyway (packages/client AGENTS.md) — the plugin now
+ * carries those helpers locally.
+ */
 const PLATFORM_MODULES = [
   'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@deepseek-ai/cordis',
   '@deepseek-ai/dsh-client-ui-slots',
-  '@deepseek-ai/dsh-client-web-react',
   '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-ui-attachment',
-  '@deepseek-ai/dsh-client-schema-form',
 ]
 
 /** Documented runtime store exemption (see the harness tsdown preset). */
