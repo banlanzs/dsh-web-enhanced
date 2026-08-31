@@ -11,7 +11,7 @@
  */
 
 import type { IApiClient, SettingsNamespaceView, SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
-import { getPath } from '@deepseek-ai/dsh-client-schema-form'
+import { getPath } from './path.ts'
 
 /** Namespace owning the DeepSeek route-level thinking fields. */
 export const DEEPSEEK_NS = 'llm-deepseek'

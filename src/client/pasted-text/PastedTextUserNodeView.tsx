@@ -15,9 +15,7 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { ChatNodeViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { ImageGallery } from '@deepseek-ai/dsh-client-ui-attachment'
-import type { ImageGalleryLabelsFace } from '@deepseek-ai/dsh-client-ui-attachment'
+import type { ChatNodeViewProps, RenderMessageImages } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
   Button, IconCheckOutline16, IconCopyOutline16, Modal, Tooltip, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -46,18 +44,6 @@ export type PastedTextUserNodeProps =
   Omit<ChatNodeViewProps<'user'>, 't'>
   & InjectFace<PastedTextUserNodeInjected>
   & { readonly t: Translate }
-
-/** Host-style image group: the same attachment gallery the original user bubble used. */
-function imageLabels(t: Translate): ImageGalleryLabelsFace {
-  return {
-    image: t('pastedText.image'),
-    open: t('pastedText.imageOpen'),
-    openNamed: label => label || t('pastedText.image'),
-    loading: t('pastedText.imageLoading'),
-    loadFailed: t('pastedText.imageLoadFailed'),
-    lightbox: { dialog: t('pastedText.lightboxDialog'), close: t('pastedText.lightboxClose') },
-  }
-}
 
 /** Host-style copy action: outline icon with the same success-check swap. */
 function CopyButton({ text, t }: { text: string; t: Translate }) {
@@ -170,16 +156,16 @@ function contentParts(content: readonly unknown[]): {
 }
 
 /** Plain fallback bubble for user messages that contain no pasted-text span. */
-function PlainUserBubble({ content, loadImage, t }: {
+function PlainUserBubble({ content, renderMessageImages, t }: {
   content: readonly unknown[]
-  loadImage: ChatNodeViewProps<'user'>['loadImage']
+  renderMessageImages: RenderMessageImages
   t: Translate
 }): ReactNode {
   const { text, images, rest } = contentParts(content)
   return (
     <div className={css.userRow} data-time-hover-root>
       <div className={css.userStack}>
-        <ImageGallery images={images} load={loadImage as never} align="end" labels={imageLabels(t)} />
+        {renderMessageImages({ images: images as never, align: 'end' })}
         {text !== '' && <div className={css.bubble}>{text}</div>}
         {rest.map((block, index) => <pre key={index} className={css.extraBlock}>{JSON.stringify(block, null, 2)}</pre>)}
       </div>
@@ -190,18 +176,18 @@ function PlainUserBubble({ content, loadImage, t }: {
 
 /** The user-node renderer registered at priority -1. */
 export const PastedTextUserNodeView = memo(function PastedTextUserNodeView({
-  node, loadImage, store, t,
+  node, renderMessageImages, store, t,
 }: PastedTextUserNodeProps): ReactNode {
   const content = node.data.content as readonly unknown[]
   const { text, images, rest } = contentParts(content)
   const hit = pastedTextHitOfDraft(store, text)
   if (hit === undefined) {
-    return <PlainUserBubble content={content} loadImage={loadImage} t={t} />
+    return <PlainUserBubble content={content} renderMessageImages={renderMessageImages} t={t} />
   }
   return (
     <div className={css.userRow} data-time-hover-root>
       <div className={css.userStack}>
-        <ImageGallery images={images} load={loadImage as never} align="end" labels={imageLabels(t)} />
+        {renderMessageImages({ images: images as never, align: 'end' })}
         {text !== '' && (
           <div className={css.bubble}>
             {hit.start > 0 ? <span>{text.slice(0, hit.start)}</span> : null}

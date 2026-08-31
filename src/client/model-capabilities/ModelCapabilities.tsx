@@ -18,9 +18,7 @@ import type { ReactNode } from 'react'
 import type {
   ConfigurableProviderView, IApiClient, SettingsNamespaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
-import {
-  deletePath, getPath, hasPath, setPath,
-} from '@deepseek-ai/dsh-client-schema-form'
+import { deletePath, getPath, hasPath, setPath } from './path.ts'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   applyDraft, applyReasoningToAll, cloneRecord, DEEPSEEK_NS, draftAt, isRecord, MODALITIES,

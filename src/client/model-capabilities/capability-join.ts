@@ -9,7 +9,7 @@
 import type {
   ConfigurableProviderView, ModelProviderGroup, SettingsNamespaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
-import { getPath } from '@deepseek-ai/dsh-client-schema-form'
+import { getPath } from './path.ts'
 import { DEEPSEEK_NS, PI_AI_NS } from './settings-draft.ts'
 
 /** One model inside a live provider group (`llm.models`). */
