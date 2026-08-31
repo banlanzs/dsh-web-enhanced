@@ -33,9 +33,11 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // ── 宿主基线 ────────────────────────────────────────────────────────────────
-// smoke e2e 的宿主 SHA，钉在 rc.7 发布提交（2026-08-17，全链路 e2e 首次全绿
-// 时的宿主）。宿主 master 前移不再能使本仓库变红；升级基线时只改这一处。
-const HOST_REF = '99f6f02fecdb7dff40c3fbc9470f5907c29f74ca'
+// smoke e2e 的宿主 SHA，钉在 0.1.1-rc.2 发布提交（aa6c361a97）。本插件面向
+// 0.1.1 client 契约（renderMessageImages、seed 白名单、dsh.client 收窄），
+// peerDependencies 下界即 ^0.1.1-rc.2，更早的宿主不提供这些契约，e2e 会
+// 在加载期失败。宿主 master 前移不再能使本仓库变红；升级基线时只改这一处。
+const HOST_REF = 'aa6c361a97'
 const HOST_URL = 'https://github.com/deepseek-ai/deepseek-harness.git'
 
 // ci.yml 的矩阵：22 = 最低支持宿主，24 = 前向集成。
